@@ -1,15 +1,23 @@
 import { CfnOutput } from "aws-cdk-lib";
 import { AmazonLinuxCpuType, AmazonLinuxGeneration, CloudFormationInit, InitCommand, InitFile, InitService, InitSource, Instance, InstanceClass, InstanceSize, InstanceType, MachineImage, Peer, Port, SecurityGroup, ServiceManager, Vpc } from "aws-cdk-lib/aws-ec2";
+import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
+import { AwsLogDriver, Cluster, ContainerImage, FargateService, FargateTaskDefinition } from "aws-cdk-lib/aws-ecs";
+import { ApplicationLoadBalancedFargateService } from "aws-cdk-lib/aws-ecs-patterns";
+import { PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import path = require("path");
 
 export interface BotServiceConstructProps {
     /** The stage of this stack (dev, prod). */
     stage: string,
+
+    /** A bucket containing secrets used by the bot during runtime. */
+    secretsBucket: Bucket,
 }
 
 /**
- * A construct for hosting the bot on a t4g.nano instance. 
+ * A construct for deploying a container to host the bot. 
  */
 export class BotServiceConstruct extends Construct {
     constructor(scope: Construct, id: string, props: BotServiceConstructProps) {
@@ -18,60 +26,60 @@ export class BotServiceConstruct extends Construct {
         /**
          * VPC 
          */
-        const vpc = new Vpc(this, 'vpc');
-
-        /**
-         * Security Group
-         */
-        const securityGroup = new SecurityGroup(this, 'security-group', {
-            vpc,
-            allowAllOutbound: true,
+        const vpc = new Vpc(this, 'MM-Bot-VPC', {
+            maxAzs: 2,
         });
-        securityGroup.addIngressRule(Peer.ipv4(`${process.env.IP!}/32`), Port.tcp(22), 'Allow SSH access from personal device');
-        securityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443), 'Allow HTTP for Discord API');
 
         /**
-         * EC2 Instance
-         * 
-         * Server hosting the discord bot. 
+         * ECS Cluster
          */
-        const source_dir = path.join(__dirname, '../mm-bot');
-        const dest_dir = '/lib/mm-bot/';
-        const instance = new Instance(this, `bot-server-${props.stage}`, {
+        const cluster = new Cluster(this, 'MM-Bot-Cluster', {
             vpc,
-            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.NANO), // Est $1.67/mo
-            machineImage: MachineImage.latestAmazonLinux2({
-                cpuType: AmazonLinuxCpuType.ARM_64,
+        });
+  
+        // Build and push the Docker image to an ECR repository
+        const dockerImageAsset = new DockerImageAsset(this, 'MM-Bot-Image', {
+            directory: path.join(__dirname, '../mm-bot'), // Path to your Dockerfile directory
+        });
+    
+        // Define a task role
+        const taskRole = new Role(this, 'MM-Bot-TaskRole', {
+            assumedBy: new ServicePrincipal('ecs-tasks.amazonaws.com'),
+        });
+        taskRole.addToPolicy(new PolicyStatement({
+            actions: ['s3:GetObject', 's3:ListBucket'],
+            resources: [
+                props.secretsBucket.bucketArn,
+                `${props.secretsBucket.bucketArn}/*`,
+            ],
+        }));
+
+        // Define the Fargate task with container details
+        const fargateTaskDefinition = new FargateTaskDefinition(this, 'MM-Bot-Task', {
+            memoryLimitMiB: 512,
+            cpu: 256,
+        });
+    
+        const container = fargateTaskDefinition.addContainer('MM-Bot-Container', {
+            image: ContainerImage.fromDockerImageAsset(dockerImageAsset),
+            logging: new AwsLogDriver({
+            streamPrefix: 'MMBot',
             }),
-            init: CloudFormationInit.fromElements(
-                // Create the directory for your bot if needed
-                InitCommand.shellCommand(`mkdir -p ${dest_dir}`),
-                
-                // Install python
-                InitCommand.shellCommand('yum update -y && yum install -y python3'),
-
-                // Copy bot code into EC2 instance
-                InitSource.fromAsset(dest_dir, source_dir),
-
-                // Install dependencies from requirements.txt
-                InitCommand.shellCommand(`pip3 install -r ${dest_dir}/requirements.txt`),
-
-                // Create a systemd config file for your Discord bot service
-                InitService.systemdConfigFile('discordbot', {
-                    command: `/usr/bin/python3 ${dest_dir}/main.py`,
-                    cwd: dest_dir,
-                }),
-
-                // Enable and start the systemd service
-                InitService.enable('discordbot', {
-                    serviceManager: ServiceManager.SYSTEMD,
-                    enabled: true,  // Ensure it starts on boot
-                }),
-            ),
-            securityGroup: securityGroup,
+            environment: {
+                SECRETS_BUCKET: props.secretsBucket.bucketName,
+            }
         });
-        new CfnOutput(this, 'InstancePublicIP', {
-            value: instance.instancePublicIp,
+    
+        container.addPortMappings({
+            containerPort: 80, // Match this with the port exposed in Dockerfile
+        });
+    
+        // Create a Fargate service without an ALB
+        const fargateService = new FargateService(this, 'MM-Bot-Service', {
+            cluster,
+            taskDefinition: fargateTaskDefinition,
+            desiredCount: 1, // Only one task running
+            assignPublicIp: true, // Assign a public IP to the task
         });
     }
 }

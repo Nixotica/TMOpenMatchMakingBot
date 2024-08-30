@@ -12,7 +12,10 @@ export class TmOpenMatchMakingBotStack extends Stack {
     constructor(scope: Construct, id: string, props: TmOpenMatchMakingBotStackProps) {
         super(scope, id, props);
 
-        new StorageConstruct(this, 'Storage', props);
-        new BotServiceConstruct(this, 'BotServiceStack', props);
+        const storage = new StorageConstruct(this, 'Storage', props);
+        new BotServiceConstruct(this, 'BotServiceStack', {
+            ...props,
+            secretsBucket: storage.secretsBucket,
+        });
     }
 }

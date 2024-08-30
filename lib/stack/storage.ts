@@ -1,3 +1,4 @@
+import { Bucket, BucketAccessControl, BucketEncryption } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
 export interface StorageConstructProps {
@@ -9,6 +10,8 @@ export interface StorageConstructProps {
  * A construct for tables and buckets accessed by the bot.  
  */
 export class StorageConstruct extends Construct {
+    public readonly secretsBucket: Bucket;
+
     constructor(scope: Construct, id: string, props: StorageConstructProps) {
         super(scope, id);
 
@@ -41,9 +44,14 @@ export class StorageConstruct extends Construct {
          * ```
          * { 
          *      "UBI_AUTHS": ["Basic <base64(user:pass)>", ...],
-         *      "DISCORD_WEBHOOK_URL": "webhook_url"
+         *      "DISCORD_BOT_TOKEN": "bot_token"
          * }
          * ```
          */
+        this.secretsBucket = new Bucket(this, "MMBotSecretsBucket", {
+            encryption: BucketEncryption.S3_MANAGED,
+            accessControl: BucketAccessControl.BUCKET_OWNER_FULL_CONTROL,
+            bucketName: `tm-mm-bot-secrets-${props.stage}`
+        })
     }
 }
