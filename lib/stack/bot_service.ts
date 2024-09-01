@@ -27,7 +27,7 @@ export class BotServiceConstruct extends Construct {
          * VPC 
          */
         const vpc = new Vpc(this, 'MM-Bot-VPC', {
-            maxAzs: 2,
+            maxAzs: 1,
         });
 
         /**

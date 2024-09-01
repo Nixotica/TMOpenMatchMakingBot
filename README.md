@@ -15,4 +15,4 @@ The `cdk.json` file tells the CDK Toolkit how to execute your app.
 
 ## Development
 
-1. Set environment variable `IP` to the IPv4 of the device you will be accessing the EC2 instance from (no port). 
+1. Set environment variable `STAGE="dev"` to deploy developer stack locally for testing. NOTE: This will cost some money (up to $10/mo), so make sure to tear this down when you're done developing for a longer period of time.

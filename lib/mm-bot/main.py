@@ -36,7 +36,7 @@ discord_bot_token = get_discord_bot_token()
 import discord
 from discord.ext import commands
 
-bot = commands.Bot(command_prefix="!")
+bot = commands.Bot(command_prefix="/")
 
 @bot.command(name='ping')
 async def ping(ctx):
