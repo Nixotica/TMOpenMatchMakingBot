@@ -76,10 +76,11 @@ export class BotServiceConstruct extends Construct {
         });
     
         // Create a Fargate service without an ALB
+        // TODO - look into Ec2TaskDefinition and Ec2Service on t4g nano reduce costs further
         const fargateService = new FargateService(this, 'MM-Bot-Service', {
             cluster,
             taskDefinition: fargateTaskDefinition,
-            desiredCount: 1, // Only one task running
+            desiredCount: 0, // TODO - change back to 1 for prod 
             assignPublicIp: true, // Assign a public IP to the task
         });
     }

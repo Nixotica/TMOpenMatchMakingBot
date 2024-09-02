@@ -32,17 +32,19 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
     ```
     For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. 
 
-7. Ensure you've installed docker (easy to look up). 
+7. Go to S3 and upload `secrets.json` to the bucket `tm-mm-bot-secrets-dev-<account_id>` at the root directory. 
 
-8. Now you have a bot, the required infrastructure launched, and the code the bot will use in `/lib/mm-bot`. Navigate to `/lib/mm-bot` and run `docker build -t mm-bot .`, which will build the image locally. 
+8. Ensure you've installed docker (easy to look up). 
 
-9. Run `docker run --env-file .env mm-bot`. You should see output something like this:
+9. Now you have a bot, the required infrastructure launched, and the code the bot will use in `/lib/mm-bot`. Navigate to `/lib/mm-bot` and run `docker build -t mm-bot .`, which will build the image locally. 
+
+10. Run `docker run --env-file .env mm-bot`. You should see output something like this:
     ```
         $ discord.client logging in using static token
         $ discord.gateway Shard ID None has connected to Gateway (Session ID: d77e6960cc3dbd8d6201ce02f47c0d3d).
     ```
 
-10. Go to the server with the bot added to it, and try running some commands. Now you can either use it or continue to develop this bot. Enjoy!
+11. Go to the server with the bot added to it, and try running some commands. Now you can either use it or continue to develop this bot. Enjoy!
 
 ## Contact
 
