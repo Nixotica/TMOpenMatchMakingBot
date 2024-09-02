@@ -58,12 +58,13 @@ export class BotServiceConstruct extends Construct {
         const fargateTaskDefinition = new FargateTaskDefinition(this, 'MM-Bot-Task', {
             memoryLimitMiB: 512,
             cpu: 256,
+            taskRole: taskRole,
         });
     
         const container = fargateTaskDefinition.addContainer('MM-Bot-Container', {
             image: ContainerImage.fromDockerImageAsset(dockerImageAsset),
             logging: new AwsLogDriver({
-            streamPrefix: 'MMBot',
+                streamPrefix: 'MMBot',
             }),
             environment: {
                 SECRETS_BUCKET: props.secretsBucket.bucketName,

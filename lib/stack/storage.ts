@@ -4,6 +4,9 @@ import { Construct } from 'constructs';
 export interface StorageConstructProps {
     /** The stage of this stack (dev, prod). */
     stage: string,
+
+    /** The account ID this stack will be deployed to. */
+    account: string,
 }
 
 /**
@@ -51,7 +54,7 @@ export class StorageConstruct extends Construct {
         this.secretsBucket = new Bucket(this, "MMBotSecretsBucket", {
             encryption: BucketEncryption.S3_MANAGED,
             accessControl: BucketAccessControl.BUCKET_OWNER_FULL_CONTROL,
-            bucketName: `tm-mm-bot-secrets-${props.stage}`
+            bucketName: `tm-mm-bot-secrets-${props.stage}-${props.account}`
         })
     }
 }
