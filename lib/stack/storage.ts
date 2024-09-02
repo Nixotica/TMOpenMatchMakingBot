@@ -22,7 +22,8 @@ export class StorageConstruct extends Construct {
          * PlayerProfiles Table
          * 
          * A table for storing player profiles consisting of:
-         * - `account_id`: Player's account ID (Primary Key)
+         * - `ubi_account_id`: Player's Ubisoft account ID (Primary Key)
+         * - `discord_account_id`: Player's linked discord account ID (GSI)
          * - `elo`: Player's elo (Number)
          * - `matches_played`: Player's cached number of matches played, negates checking results table (Number)
          */
