@@ -1,3 +1,8 @@
 SECRETS_JSON = "secrets.json"
 SECRET_UBI_AUTHS = "UBI_AUTHS"
 SECRET_DISCORD_BOT_TOKEN = "DISCORD_BOT_TOKEN"
+
+KEY_TM_ACCOUNT_ID = "tm_account_id"
+KEY_DISCORD_ACCOUNT_ID = "discord_account_id"
+KEY_ELO = "elo"
+KEY_MATCHES_PLAYED = "matches_played"

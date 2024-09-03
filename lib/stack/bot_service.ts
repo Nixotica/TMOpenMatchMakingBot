@@ -1,4 +1,5 @@
 import { CfnOutput } from "aws-cdk-lib";
+import { Table } from "aws-cdk-lib/aws-dynamodb";
 import { AmazonLinuxCpuType, AmazonLinuxGeneration, CloudFormationInit, InitCommand, InitFile, InitService, InitSource, Instance, InstanceClass, InstanceSize, InstanceType, MachineImage, Peer, Port, SecurityGroup, ServiceManager, Vpc } from "aws-cdk-lib/aws-ec2";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { AwsLogDriver, Cluster, ContainerImage, FargateService, FargateTaskDefinition } from "aws-cdk-lib/aws-ecs";
@@ -14,6 +15,12 @@ export interface BotServiceConstructProps {
 
     /** A bucket containing secrets used by the bot during runtime. */
     secretsBucket: Bucket,
+
+    /** A table containing player specific information. */
+    playerProfilesTable: Table,
+
+    /** A table containing match results. */
+    matchResultsTable: Table,
 }
 
 /**
@@ -46,13 +53,9 @@ export class BotServiceConstruct extends Construct {
         const taskRole = new Role(this, 'MM-Bot-TaskRole', {
             assumedBy: new ServicePrincipal('ecs-tasks.amazonaws.com'),
         });
-        taskRole.addToPolicy(new PolicyStatement({
-            actions: ['s3:GetObject', 's3:ListBucket'],
-            resources: [
-                props.secretsBucket.bucketArn,
-                `${props.secretsBucket.bucketArn}/*`,
-            ],
-        }));
+        props.secretsBucket.grantRead(taskRole);
+        props.playerProfilesTable.grantFullAccess(taskRole);
+        props.matchResultsTable.grantFullAccess(taskRole);
 
         // Define the Fargate task with container details
         const fargateTaskDefinition = new FargateTaskDefinition(this, 'MM-Bot-Task', {
@@ -68,6 +71,8 @@ export class BotServiceConstruct extends Construct {
             }),
             environment: {
                 SECRETS_BUCKET: props.secretsBucket.bucketName,
+                PLAYER_PROFILES_TABLE: props.playerProfilesTable.tableName,
+                MATCH_RESULTS_TABLE: props.matchResultsTable.tableName
             }
         });
     

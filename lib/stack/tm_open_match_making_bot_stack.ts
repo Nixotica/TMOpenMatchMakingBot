@@ -19,6 +19,8 @@ export class TmOpenMatchMakingBotStack extends Stack {
         new BotServiceConstruct(this, 'BotServiceStack', {
             ...props,
             secretsBucket: storage.secretsBucket,
+            playerProfilesTable: storage.playerProfilesTable,
+            matchResultsTable: storage.matchResultsTable
         });
     }
 }

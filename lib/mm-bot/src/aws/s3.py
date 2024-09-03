@@ -4,10 +4,9 @@ import os
 from typing import Any, Dict
 
 import boto3
-from mypy_boto3_s3 import S3Client
-
-from aws.bot_secrets import Secrets
 from aws.constants import *
+from models.bot_secrets import Secrets
+from mypy_boto3_s3 import S3Client
 
 
 class S3ClientManager:
@@ -31,9 +30,9 @@ class S3ClientManager:
     def _create_client(self) -> S3Client:
         try:
             s3_client = boto3.client("s3")
-            return s3_client
+            return s3_client  # type: ignore
         except Exception as e:
-            print(f"Error creating S3 client: {e}")
+            logging.error(f"Error creating S3 client: {e}")
             raise
 
     def _get_object_content(self, bucket_name: str, object_key: str) -> str:
@@ -41,7 +40,7 @@ class S3ClientManager:
         Fetches the content of an S3 object as a string.
         """
         try:
-            response = self._client.get_object(Bucket=bucket_name, Key=object_key)
+            response = self._client.get_object(Bucket=bucket_name, Key=object_key)  # type: ignore
             content = response["Body"].read().decode("utf-8")
             return content
         except Exception as e:

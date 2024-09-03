@@ -17,7 +17,4 @@ class Secrets:
         if not ubi_auths or not discord_bot_token:
             raise ValueError("Missing required secrets")
 
-        return cls(
-            ubi_auths=ubi_auths,
-            discord_bot_token=discord_bot_token,
-        )
+        return cls(ubi_auths, discord_bot_token)

@@ -4,10 +4,10 @@ import platform
 from typing import Any, Dict
 
 import discord
+from aws.s3 import S3ClientManager
 from discord import Intents
 from discord.ext.commands import Bot
-
-from aws.s3 import S3ClientManager
+from models.bot_secrets import Secrets
 
 # Configure logging
 logging.basicConfig(
@@ -15,7 +15,7 @@ logging.basicConfig(
 )
 
 # Retrieve secrets from S3
-secrets: Dict[str, Any] = S3ClientManager().get_secrets()
+secrets: Secrets = S3ClientManager().get_secrets()
 
 
 # Define bot
@@ -44,7 +44,7 @@ class DiscordBot(Bot):
         """
         Executed when the bot starts for first time.
         """
-        logging.info(f"Logged in as {self.user.name}")
+        logging.info(f"Logged in as {self.user.name}")  # type: ignore
         logging.info(f"discord.py API version: {discord.__version__}")
         logging.info(f"Python version: {platform.python_version()}")
         logging.info(
