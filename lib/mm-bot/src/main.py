@@ -8,6 +8,7 @@ from aws.s3 import S3ClientManager
 from discord import Intents
 from discord.ext.commands import Bot
 from models.bot_secrets import Secrets
+from nadeo.ubi_token_vendor import UbiTokenVendor
 
 # Configure logging
 logging.basicConfig(
@@ -55,6 +56,9 @@ class DiscordBot(Bot):
         await self.load_cogs()
         await self.tree.sync()
 
+
+# Initialize the token vendor
+UbiTokenVendor(secrets.ubi_auths)
 
 # Set up and run bot
 bot = DiscordBot()

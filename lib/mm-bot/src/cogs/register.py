@@ -21,6 +21,7 @@ class Register(commands.Cog, name="register"):
         description="Register your Trackmania account ID to your Discord account. You can find it on trackmania.io",
     )
     async def register(self, ctx: commands.Context, tm_account_id: str) -> None:
+        logging.info(f"Processing command to register TM account {tm_account_id} to user {ctx.message.author.name} with id {ctx.message.author.id}")
         # TODO check that the requested account ID actually exists via TM API
 
         dynamodb = DynamoDbManager()

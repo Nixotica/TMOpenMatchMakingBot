@@ -16,11 +16,12 @@ export class TmOpenMatchMakingBotStack extends Stack {
             ...props,
             account: this.account,
         });
-        new BotServiceConstruct(this, 'BotServiceStack', {
-            ...props,
-            secretsBucket: storage.secretsBucket,
-            playerProfilesTable: storage.playerProfilesTable,
-            matchResultsTable: storage.matchResultsTable
-        });
+        // TODO - create service for prod once we cross that bridge 
+        // new BotServiceConstruct(this, 'BotServiceStack', {
+        //     ...props,
+        //     secretsBucket: storage.secretsBucket,
+        //     playerProfilesTable: storage.playerProfilesTable,
+        //     matchResultsTable: storage.matchResultsTable
+        // });
     }
 }

@@ -17,6 +17,7 @@ export class StorageConstruct extends Construct {
     public readonly secretsBucket: Bucket;
     public readonly playerProfilesTable: Table;
     public readonly matchResultsTable: Table;
+    public readonly matchQueuesTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageConstructProps) {
         super(scope, id);
@@ -49,6 +50,22 @@ export class StorageConstruct extends Construct {
         this.matchResultsTable = new Table(this, "MatchResults1v1v1v1Table", {
             partitionKey: { name: "bot_match_id", type: AttributeType.NUMBER },
             tableName: `tm-mm-bot-match-results-${props.stage}-${props.account}`,
+        });
+
+        /**
+         * MatchQueues Table
+         * 
+         * A table for storing different match queues consisting of:
+         * - `queue_id`: Queue ID (Primary Key)
+         * - `campaign_club_id`: Club ID containing campaign to use
+         * - `campaign_id`: Campaign ID to use for maps
+         * - `match_club_id`: Club ID in which the match is hosted
+         * - `type`: Type of match queue (1v1v1v1, 2v2, etc)
+         * - `active`: Boolean to enable/disable the queue
+         */
+        this.matchQueuesTable = new Table(this, "MatchQueuesTable", {
+            partitionKey: { name: "queue_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-match-queues-${props.stage}-${props.account}`,
         });
 
         /**
