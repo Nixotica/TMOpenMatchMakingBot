@@ -1,12 +1,16 @@
+import logging
 from typing import List
 from models.player_profile import PlayerProfile
 from models.match_queue import MatchQueue
 from matchmaking.match_queues.enum import QueueType
+from matchmaking.matches.active_match import ActiveMatch
 
 class ActiveMatchQueue:
-    def __init__(self):
+    """An active queue of players awaiting a match for the given MatchQueue.
+    """
+    def __init__(self, match_queue: MatchQueue):
         self.players: List[PlayerProfile] = []
-        self.queue: MatchQueue
+        self.queue = match_queue
 
     def add_player(self, player: PlayerProfile) -> None:
         """Add a player to the queue. 
@@ -14,6 +18,7 @@ class ActiveMatchQueue:
         Args:
             player (PlayerProfile): The player to add to the queue
         """
+        logging.info(f"Added player {player.tm_account_id} to queue {self.queue.queue_id}.")
         self.players.append(player)
 
     def remove_player(self, player: PlayerProfile | int | str) -> None:
@@ -24,28 +29,27 @@ class ActiveMatchQueue:
         """        
         if isinstance(player, int):
             self.players = [p for p in self.players if p.discord_account_id != player]
+            logging.info(f"Removed player {player} from queue {self.queue.queue_id}.")
         elif isinstance(player, str):
             self.players = [p for p in self.players if p.tm_account_id != player]
+            logging.info(f"Removed player {player} from queue {self.queue.queue_id}.")
         else:
             self.players.remove(player)
+            logging.info(f"Removed player {player.tm_account_id} from queue {self.queue.queue_id}.")
 
-    def try_generate_match(self) -> int | None:
+    def try_generate_match(self) -> ActiveMatch | None:
         """Generate a match if the current queue permits. 
 
         Returns:
             int | None: Return match ID if a match was generated, otherwise None
         """
+        logging.info(f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}.")
         if self.queue.type == QueueType.Queue1v1v1v1 and len(self.players) >= 4:
-            return self.generate_match(QueueType.Queue1v1v1v1)
+            players_in_match = self.players[:4]
+            for player in players_in_match:
+                self.remove_player(player)
+            return ActiveMatch.create(self.queue, players_in_match)
         elif self.queue.type == QueueType.Queue2v2:
-            return False # TODO - need to check if the players in the queue are "partied"
+            return None # TODO - need to check if the players in the queue are "partied"
         else:
-            return False
-        
-    def generate_match(self, queue_type: QueueType) -> int:
-        """Generate a match from the current queue. 
-
-        Returns:
-            int: The match ID.
-        """
-        
+            return None

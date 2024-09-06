@@ -15,11 +15,11 @@ from models.player_profile import PlayerProfile
 from nadeo.ubi_token_vendor import UbiTokenVendor
 import datetime as dt
 
-def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) -> int:
+def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) -> tuple[int, int, int, str]:
     """Create a 1v1v1v1 match using Trackmania competition tool. 
 
     Returns:
-        int: The match ID from the created event. 
+        (int, int, int): The event ID, round ID, and match ID of the created match. 
     """
 
     event_name = "Better MM Match"
@@ -60,6 +60,8 @@ def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) 
     # TODO - error handling 
     event_id = post_event(event)
     round_id = get_rounds_for_event(event_id)[0].id # type: ignore
-    match_id = get_matches_for_round(round_id)[0].id # type: ignore
+    matches = get_matches_for_round(round_id, 1, 0)
+    match_id = matches[0].id 
+    match_live_id = matches[0].club_match_live_id
     
-    return match_id
+    return (event_id, round_id, match_id, match_live_id) # type: ignore

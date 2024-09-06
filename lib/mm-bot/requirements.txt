@@ -1,9 +1,10 @@
 boto3==1.35.10
-boto3-stubs==1.35.10
+boto3-stubs==1.35.13.post1
 botocore==1.35.10
 discord==2.3.2
 mypy-boto3-dynamodb==1.35.0
 mypy-boto3-s3==1.35.2
 requests==2.32.3
+pytz==2024.1
 
 git+https://github.com/Nixotica/NadeoEventAPIWrapper.git@release#egg=nadeo_event_api&subdirectory=nadeo_event_api

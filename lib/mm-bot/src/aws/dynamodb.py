@@ -1,14 +1,15 @@
 import logging
 import os
-from typing import Optional
+from typing import List, Optional
 
 import boto3
-from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED
+from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 from models.player_profile import PlayerProfile
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
+from models.match_queue import MatchQueue
 
 
 class DynamoDbManager:
@@ -37,6 +38,11 @@ class DynamoDbManager:
         if match_results_table is None:
             raise ValueError("MATCH_RESULTS_TABLE environment variable is not set")
         self._match_results_table = self._resource.Table(match_results_table)
+
+        match_queues_table = os.environ.get("MATCH_QUEUES_TABLE")
+        if match_queues_table is None:
+            raise ValueError("MATCH_QUEUES_TABLE environment variable is not set")
+        self._match_queues_table = self._resource.Table(match_queues_table)
 
     def _create_client(self) -> DynamoDBClient:
         try:
@@ -78,6 +84,30 @@ class DynamoDbManager:
             logging.error(f"Error getting player profile from DynamoDB: {e}")
             raise
 
+    def query_player_profile_for_discord_account_id(
+        self, discord_account_id: int
+    ) -> Optional[PlayerProfile]:
+        """
+        Query the PlayerProfiles table for a player profile with the given Discord account ID.
+        :param discord_account_id: The Discord account ID to query for
+        :return: The player profile if found, None otherwise
+        """
+        try:
+            response = self._player_profiles_table.query(
+                KeyConditionExpression=Key(KEY_DISCORD_ACCOUNT_ID).eq(discord_account_id)
+            )
+            items = response.get("Items", [])
+            if not items:
+                return None
+            if len(items) > 1:
+                logging.warning(
+                    f"Multiple player profiles found for Discord account ID {discord_account_id}: {items}"
+                )
+            return PlayerProfile.from_dict(items[0])
+        except Exception as e:
+            logging.error(f"Error getting player profile from DynamoDB: {e}")
+            raise
+
     def create_player_profile_for_tm_account_id(
         self, tm_account_id: str, discord_account_id: int,
     ) -> bool:
@@ -113,4 +143,22 @@ class DynamoDbManager:
                 raise
         except Exception as e:
             logging.error(f"Error creating player profile in DynamoDB: {e}")
+            raise
+
+    def get_active_match_queues(self) -> List[MatchQueue]:
+        """Get a list of active match queues from the MatchQueues table.
+
+        Returns:
+            List[MatchQueue]: List of match queues marked as "active" in DDB. 
+        """
+        try:
+            response = self._match_queues_table.scan(
+                FilterExpression=Attr(KEY_ACTIVE).eq(True)
+            )
+            items = response.get("Items", [])
+            if not items:
+                return []
+            return [MatchQueue.from_dict(items[i]) for i in range(len(items))]
+        except Exception as e:
+            logging.error(f"Error getting active match queues from DynamoDB: {e}")
             raise
