@@ -26,4 +26,4 @@ class PlayerProfile:
         if not tm_account_id or not discord_account_id or elo is None or matches_played is None:
             raise ValueError("Missing required fields")
 
-        return cls(tm_account_id, discord_account_id, elo, matches_played)
+        return cls(tm_account_id, int(discord_account_id), int(elo), int(matches_played))

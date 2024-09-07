@@ -3,7 +3,7 @@ import os
 from typing import List, Optional
 
 import boto3
-from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE
+from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
@@ -94,6 +94,7 @@ class DynamoDbManager:
         """
         try:
             response = self._player_profiles_table.query(
+                IndexName=INDEX_DISCORD_ACCOUNT_ID,
                 KeyConditionExpression=Key(KEY_DISCORD_ACCOUNT_ID).eq(discord_account_id)
             )
             items = response.get("Items", [])
@@ -158,7 +159,8 @@ class DynamoDbManager:
             items = response.get("Items", [])
             if not items:
                 return []
-            return [MatchQueue.from_dict(items[i]) for i in range(len(items))]
+            active_matches = [MatchQueue.from_dict(items[i]) for i in range(len(items))]
+            return active_matches
         except Exception as e:
             logging.error(f"Error getting active match queues from DynamoDB: {e}")
             raise

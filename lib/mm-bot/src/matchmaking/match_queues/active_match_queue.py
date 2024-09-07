@@ -4,6 +4,7 @@ from models.player_profile import PlayerProfile
 from models.match_queue import MatchQueue
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
+from matchmaking.constants import NUM_1v1v1v1_PLAYERS
 
 class ActiveMatchQueue:
     """An active queue of players awaiting a match for the given MatchQueue.
@@ -43,13 +44,13 @@ class ActiveMatchQueue:
         Returns:
             int | None: Return match ID if a match was generated, otherwise None
         """
-        logging.info(f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}.")
-        if self.queue.type == QueueType.Queue1v1v1v1 and len(self.players) >= 4:
-            players_in_match = self.players[:4]
+        logging.debug(f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}.")
+        if self.queue.type == QueueType.Queue1v1v1v1.value and len(self.players) >= NUM_1v1v1v1_PLAYERS:
+            players_in_match = self.players[:NUM_1v1v1v1_PLAYERS]
             for player in players_in_match:
                 self.remove_player(player)
             return ActiveMatch.create(self.queue, players_in_match)
-        elif self.queue.type == QueueType.Queue2v2:
+        elif self.queue.type == QueueType.Queue2v2.value:
             return None # TODO - need to check if the players in the queue are "partied"
         else:
             return None

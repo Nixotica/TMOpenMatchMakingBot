@@ -25,10 +25,14 @@ class Register(commands.Cog, name="register"):
         logging.info(f"Processing command to register TM account {tm_account_id} to user {ctx.message.author.name} with id {ctx.message.author.id}.")
         # TODO check that the requested account ID actually exists via TM API
 
-        existing_player_profile = self.ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
+        existing_tm_account_link = self.ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
+        existing_discord_account_link = self.ddb_manager.query_player_profile_for_discord_account_id(ctx.message.author.id)
         
-        if existing_player_profile is not None:
-            await ctx.send(f"Account {tm_account_id} is already registered to a Discord account.")
+        if existing_tm_account_link is not None:
+            await ctx.send(f"Account {tm_account_id} is already registered to a Discord account: {existing_tm_account_link.discord_account_id}.")
+            return
+        if existing_discord_account_link is not None:
+            await ctx.send(f"Your Discord account is already registered to a Trackmania account: {existing_discord_account_link.tm_account_id}.")
             return
         
         success = self.ddb_manager.create_player_profile_for_tm_account_id(tm_account_id, ctx.message.author.id)

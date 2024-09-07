@@ -10,7 +10,7 @@ class JoinQueue(commands.Cog, name="join"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.mm_manager = MatchmakingManager() # type: ignore
+        self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
 
     @commands.hybrid_command(
@@ -27,7 +27,7 @@ class JoinQueue(commands.Cog, name="join"):
         if not added_queue:
             await ctx.send(f"Failed to join queue {queue_id}.")
             return
-        await ctx.send(f"Joined queue {queue_id} along with {len(added_queue.players)} others.")
+        await ctx.send(f"Joined queue {queue_id} along with {len(added_queue.players) - 1} others.")
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(JoinQueue(bot))

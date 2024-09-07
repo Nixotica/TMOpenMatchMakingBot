@@ -5,6 +5,7 @@ from typing import List, Optional
 from models.match_queue import MatchQueue
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
+from aws.dynamodb import DynamoDbManager
 from matchmaking.match_queues.constants import QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC, QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC
 from models.player_profile import PlayerProfile
 import time
@@ -14,19 +15,18 @@ class MatchmakingManager:
     """
 
     _instance = None
-    _instance_lock = threading.Lock()
 
-    def __new__(cls, *args, **kwargs):
+    def __new__(cls):
         if not cls._instance:
-            with cls._instance_lock:
-                if not cls._instance:
-                    cls._instance = super(MatchmakingManager, cls).__new__(cls)
+            cls._instance = super(MatchmakingManager, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, match_queues: List[MatchQueue]):
+    def __init__(self):
         if not hasattr(self, "_initialized"):  # Avoid re-initializing the instance
             self._initialized = True
             self.active_queues: List[ActiveMatchQueue] = []
+            match_queues = DynamoDbManager().get_active_match_queues()
+            logging.info(f"Instantiating matchmaking manager with active match queues {match_queues}.")
             for queue in match_queues:
                 self.active_queues.append(ActiveMatchQueue(queue))  # TODO - it should also check DDB table if this updated on some cadence
             self.active_matches: List[ActiveMatch] = []
@@ -64,6 +64,8 @@ class MatchmakingManager:
         """Returns a list of completed matches and clears the list.
         """
         completed_matches = self.completed_matches
+        for match in completed_matches:
+            match.cleanup()
         self.completed_matches = []
         return completed_matches
     
@@ -78,9 +80,10 @@ class MatchmakingManager:
         """Run the matchmaking manager forever. 
         """
         while True:
+            logging.debug(f"Running Matchmaking Manager loop...")
             await self._check_if_should_queue_matches()
             await self._check_active_matches()
-            await asyncio.sleep(1)
+            await asyncio.sleep(5)
 
     def start_run_forever_in_thread(self):
         """Starts the run_forever method in a separate thread with its own event loop."""
@@ -98,18 +101,27 @@ class MatchmakingManager:
     async def _check_if_should_queue_matches(self):
         """Checks if the matchmaking manager should queue matches.
         """
-        if time.time() - self._last_check_queues_time < QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC:
-            logging.info("Checking queues for sufficient size to generate matches...")
+        now = time.time()
+        if now - self._last_check_queues_time > QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC:
+            self._last_check_queues_time = now
+            logging.debug("Checking queues for sufficient size to generate matches...")
             for active_queue in self.active_queues:
-                active_queue.try_generate_match()
+                active_match = active_queue.try_generate_match()
+                if active_match is not None: 
+                    logging.info(f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}.")
+                    self.new_active_matches.append(active_match)
+                    self.active_matches.append(active_match)
 
     async def _check_active_matches(self):
         """Checks if the matchmaking manager can get results from ongoing/completed matches.
         """
-        if time.time() - self._last_check_matches_time < QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC:
-            logging.info("Checking matches for results...")
+        now = time.time()
+        if now - self._last_check_matches_time > QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC:
+            self._last_check_matches_time = now
+            logging.debug("Checking matches for results...")
             for active_match in self.active_matches:
                 if active_match.is_match_complete():
                     logging.info(f"Match {active_match.match_id} is complete.")
+                    self.active_matches.remove(active_match)
                     self.completed_matches.append(active_match)
                     # TODO - call distribute points, etc

@@ -10,11 +10,10 @@ from discord import Intents
 from discord.ext.commands import Bot
 from models.bot_secrets import Secrets
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
-from nadeo.ubi_token_vendor import UbiTokenVendor
 
 # Configure logging
 logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 # Retrieve secrets from S3
@@ -57,15 +56,8 @@ class DiscordBot(Bot):
         await self.load_cogs()
         await self.tree.sync()
 
-
-# Initialize the token vendor
-UbiTokenVendor(secrets.ubi_auths)
-
-# Get match queues to activate from DDB
-match_queues = DynamoDbManager().get_active_match_queues()
-
 # Set up the matchmaking manager and run 
-MatchmakingManager(match_queues).start_run_forever_in_thread()
+MatchmakingManager().start_run_forever_in_thread()
 
 # Set up and run bot
 bot = DiscordBot()

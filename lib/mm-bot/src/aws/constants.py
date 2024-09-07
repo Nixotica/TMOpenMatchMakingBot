@@ -13,3 +13,5 @@ KEY_CAMPAIGN_ID = "campaign_id"
 KEY_MATCH_CLUB_ID = "match_club_id"
 KEY_QUEUE_TYPE = "type"
 KEY_ACTIVE = "active"
+
+INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

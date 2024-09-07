@@ -25,4 +25,4 @@ class MatchQueue:
 
         if not queue_id or not campaign_club_id or not campaign_id or not match_club_id or not type or not active:
             raise ValueError("Missing required fields")
-        return cls(queue_id, campaign_club_id, campaign_id, match_club_id, type, active)
+        return cls(queue_id, int(campaign_club_id), int(campaign_id), int(match_club_id), type, active)
