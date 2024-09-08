@@ -7,7 +7,8 @@ from nadeo_event_api.objects.inbound.match_results import MatchResults
 from nadeo_event_api.objects.inbound.match_info import MatchInfo
 from nadeo_event_api.api.structure.event import Event
 from models.match_queue import MatchQueue
-from matchmaking.matches.event_creator import create_1v1v1v1_match
+from models.team_2v2 import Teams2v2
+from matchmaking.matches.event_creator import create_1v1v1v1_match, create_2v2_match
 
 
 class ActiveMatch:
@@ -19,7 +20,7 @@ class ActiveMatch:
             round_id: int,
             match_id: int,
             match_live_id: str,
-            player_profiles: List[PlayerProfile],
+            player_profiles: List[PlayerProfile] | Teams2v2, # TODO - this is terrible and not extensible
     ):
         self.event_id = event_id
         self.round_id = round_id
@@ -30,14 +31,24 @@ class ActiveMatch:
         self._match_info = None
 
     @staticmethod
-    def create(
+    def create_1v1v1v1(
         match_queue: MatchQueue,
         players: List[PlayerProfile],
     ) -> ActiveMatch:
         logging.info(f"Creating new match for players: {players}")
-        (event_id, round_id, match_id, match_live_id) = create_1v1v1v1_match(match_queue, players)
+        match_info = create_1v1v1v1_match(match_queue, players)
         
-        return ActiveMatch(event_id, round_id, match_id, match_live_id, players)
+        return ActiveMatch(match_info.event_id, match_info.round_id, match_info.match_id, match_info.match_live_id, players)
+    
+    @staticmethod
+    def create_2v2(
+        match_queue: MatchQueue,
+        teams: Teams2v2,
+    ) -> ActiveMatch:
+        logging.info(f"Creating new 2v2 match for teams {teams}")
+        match_info = create_2v2_match(match_queue, teams)
+
+        return ActiveMatch(match_info.event_id, match_info.round_id, match_info.match_id, match_info.match_live_id, teams)
 
     def _get_match_info(self) -> MatchInfo:
         if not self._match_info:
@@ -60,6 +71,8 @@ class ActiveMatch:
 
     def get_match_results(self) -> MatchResults:
         # TODO - pagination if needed
+        if isinstance(self.player_profiles, Teams2v2):
+            return get_match_results(self.match_id, length=4, offset=0)
         return get_match_results(self.match_id, length=len(self.player_profiles), offset=0)
 
     def cleanup(self) -> None:

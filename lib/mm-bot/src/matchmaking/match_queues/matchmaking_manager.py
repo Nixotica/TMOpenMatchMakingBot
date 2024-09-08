@@ -8,6 +8,8 @@ from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from aws.dynamodb import DynamoDbManager
 from matchmaking.match_queues.constants import QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC, QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC
 from models.player_profile import PlayerProfile
+from models.match_queue import QueueType
+from models.team_2v2 import Team2v2
 import time
 
 class MatchmakingManager:
@@ -50,15 +52,42 @@ class MatchmakingManager:
         """
         for queue in self.active_queues:
             if queue.queue.queue_id == queue_id:
+                if queue.queue.type == QueueType.Queue2v2.value:
+                    logging.error(f"Attempted to add player to a 2v2 queue: {queue_id}")
+                    # TODO - this should not be an error, we should allow free agents
+                    return None
                 queue.add_player(player)
                 return queue
         logging.warn(f"Attempted to add player to a queue which doesn't exist: {queue_id}")
+        return None
+    
+    def add_team_to_queue(self, team: Team2v2, queue_id: str) -> Optional[ActiveMatchQueue]:
+        """Adds a team to the given queue by ID. 
+
+        Args:
+            team (Team2v2): Team to add to the queue.
+            queue_id (str): The queue to add to.
+
+        Returns:
+            Optional[ActiveMatchQueue]: Returns the queue the team was added to, None if not.
+        """
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                if queue.queue.type == QueueType.Queue1v1v1v1.value:
+                    logging.error(f"Attempt to add team {team} to single player queue {queue_id}.")
+                    return None
+                queue.add_team(team)
+                return queue
+        logging.warn(f"Attempted to add team to a queue which doesn't exist: {queue_id}")
         return None
 
     def remove_player_from_queue(self, player: PlayerProfile, queue_id: str):
         """Handles a player leaving a queue by ID (not caused by new match spawning).
         """
         pass  # TODO
+
+    def remove_team_from_queue(self, team: Team2v2):
+        pass # TODO
 
     def process_completed_matches(self) -> List[ActiveMatch]:
         """Returns a list of completed matches and clears the list.

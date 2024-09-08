@@ -4,22 +4,46 @@ import time
 from typing import List
 from nadeo_event_api.api.structure.event import Event
 from nadeo_event_api.api.structure.round.round import Round, RoundConfig
-from nadeo_event_api.api.structure.enums import ScriptType
-from nadeo_event_api.api.structure.settings.script_settings import CupScriptSettings, BaseScriptSettings
-from nadeo_event_api.api.structure.settings.plugin_settings import ClassicPluginSettings
+from nadeo_event_api.api.structure.enums import ScriptType, ParticipantType
+from nadeo_event_api.api.structure.settings.script_settings import CupScriptSettings, BaseScriptSettings, TMWTScriptSettings
+from nadeo_event_api.api.structure.settings.plugin_settings import ClassicPluginSettings, TMWTPluginSettings
 from nadeo_event_api.api.structure.round.match import Match
 from nadeo_event_api.api.structure.enums import AutoStartMode
 from nadeo_event_api.api.structure.round.match_spot import SeedMatchSpot
 from nadeo_event_api.api.club.campaign import Campaign
 from nadeo_event_api.api.structure.maps import Map
-from nadeo_event_api.api.event_api import post_event, get_rounds_for_event, get_matches_for_round, get_match_results
+from nadeo_event_api.api.event_api import post_event, get_rounds_for_event, get_matches_for_round
+from nadeo_event_api.api.structure.round.match_spot import TeamMatchSpot
 from models.match_queue import MatchQueue
+from models.team_2v2 import Teams2v2
 from models.player_profile import PlayerProfile
-from matchmaking.constants import NUM_1v1v1v1_PLAYERS
 from nadeo.ubi_token_vendor import UbiTokenRefresher
+from models.created_match_info import CreatedMatchInfo
 import datetime as dt
 
-def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) -> tuple[int, int, int, str]:
+def get_random_map(match_queue: MatchQueue) -> Map:
+    """Get a random map for the given match queue. 
+
+    Args:
+        match_queue (MatchQueue): The match queue containing the campaign from which a map should be chosen.
+
+    Returns:
+        Map: A random map from the campaign.
+    """
+    UbiTokenRefresher().refresh_tokens()
+
+    campaign_playlist = Campaign(match_queue.campaign_club_id, match_queue.campaign_id)._playlist
+    if not campaign_playlist:
+        error = f"No campaign playlist found with club id {match_queue.campaign_club_id} campaign id {match_queue.campaign_id}"
+        logging.error(error)
+        raise Exception(error)
+    map_pool = [Map(playlist_map._uuid) for playlist_map in campaign_playlist]
+    map_to_use = map_pool[random.randint(0, len(map_pool) - 1)]
+
+    return map_to_use
+    
+
+def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) -> CreatedMatchInfo:
     """Create a 1v1v1v1 match using Trackmania competition tool. 
 
     Returns:
@@ -29,11 +53,7 @@ def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) 
     event_name = "Better MM Match"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
-    UbiTokenRefresher().refresh_tokens()
-
-    campaign_playlist = Campaign(match_queue.campaign_club_id, match_queue.campaign_id)._playlist
-    map_pool = [Map(playlist_map._uuid) for playlist_map in campaign_playlist] # type: ignore
-    map_to_use = map_pool[random.randint(0, len(map_pool) - 1)]
+    map_to_use = get_random_map(match_queue)
 
     event = Event(
         name=event_name,
@@ -79,4 +99,70 @@ def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) 
     match_id = matches[0].id 
     match_live_id = matches[0].club_match_live_id
 
-    return (event_id, round_id, match_id, match_live_id) # type: ignore
+    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id) # type: ignore
+
+def create_2v2_match(match_queue: MatchQueue, teams: Teams2v2) -> CreatedMatchInfo:
+    """Create a 2v2 match using Trackmania competition tool. 
+
+    Args:
+        match_queue (MatchQueue): The match queue from which the map, club, and campaign are derived.
+        team_a (tuple[PlayerProfile, PlayerProfile]): Team A player profiles. 
+        team_b (tuple[PlayerProfile, PlayerProfile]): Team B player profiles.
+
+    Returns:
+        CreatedMatchInfo: The info for the created match.
+    """
+
+    event_name = "Better MM 2v2"
+    match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
+
+    map_to_use = get_random_map(match_queue)
+
+    event = Event(
+        name=event_name,
+        club_id=match_queue.match_club_id,
+        rounds=[
+            Round(
+                name="Match",
+                start_date=match_start_time,
+                end_date=match_start_time + dt.timedelta(hours=1),
+                matches=[
+                    Match(
+                        spots=[TeamMatchSpot(1), TeamMatchSpot(2)],
+                    )
+                ],
+                config=RoundConfig(
+                    map_pool=[map_to_use],
+                    script=ScriptType.TMWT_TEAMS,
+                    max_players=4,
+                    script_settings=TMWTScriptSettings(
+                        base_script_settings=BaseScriptSettings(
+                            warmup_number=1,
+                        ),
+                        match_points_limit=1,
+                    ),
+                    plugin_settings=TMWTPluginSettings(
+                        ready_minimum_team_size=1,
+                    ),
+                ),
+            )
+        ],
+        participant_type=ParticipantType.TEAM,
+    )
+
+    # TODO - error handling
+    event_id = post_event(event)
+
+    # Add players before event actually starts
+    event.add_team("team_a", [teams.team_a.player_a.tm_account_id, teams.team_a.player_b.tm_account_id], 1)
+    event.add_team("team_b", [teams.team_b.player_a.tm_account_id, teams.team_b.player_b.tm_account_id], 2)
+
+    round_id = get_rounds_for_event(event_id)[0].id # type: ignore
+    matches = get_matches_for_round(round_id, 1, 0)
+    while matches == []:
+        time.sleep(5)
+        matches = get_matches_for_round(round_id, 1, 0)
+    match_id = matches[0].id 
+    match_live_id = matches[0].club_match_live_id
+
+    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id) # type: ignore

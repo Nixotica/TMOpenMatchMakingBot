@@ -1,6 +1,8 @@
 import logging
+from typing import List
 import discord
 from discord.ext import commands, tasks
+from models.player_profile import PlayerProfile
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
 class MonitorMatchmakingManager(commands.Cog):
@@ -17,6 +19,14 @@ class MonitorMatchmakingManager(commands.Cog):
         """Stop the task when the cog is unloaded."""
         self.check_for_new_matches.cancel()
 
+    async def send_player_match_start_notification(self, player: PlayerProfile) -> None:
+        user = await self.bot.fetch_user(player.discord_account_id)
+        await user.send(f"You got a match, check the Events tab in-game. Good luck!")
+
+    async def send_player_match_complete_notification(self, player: PlayerProfile) -> None:
+        user = await self.bot.fetch_user(player.discord_account_id)
+        await user.send(f"Your match has been completed!")
+
     @tasks.loop(seconds=10)  # Run every 10 seconds
     async def check_for_new_matches(self):
         """Periodically checks if new matches have been created."""
@@ -26,9 +36,14 @@ class MonitorMatchmakingManager(commands.Cog):
         for match in new_matches:
             match_join_link = match.get_match_join_link()
             # Notify the players in the match
-            for player in match.player_profiles:
-                user = await self.bot.fetch_user(player.discord_account_id)
-                await user.send(f"You got a match: {match_join_link}! Good luck!")
+            if isinstance(match.player_profiles, List):
+                for player in match.player_profiles:
+                    await self.send_player_match_start_notification(player)
+            else:
+                await self.send_player_match_start_notification(match.player_profiles.team_a.player_a)
+                await self.send_player_match_start_notification(match.player_profiles.team_a.player_b)
+                await self.send_player_match_start_notification(match.player_profiles.team_b.player_a)
+                await self.send_player_match_start_notification(match.player_profiles.team_b.player_b)
 
     @tasks.loop(seconds=10)  # Run every 10 seconds
     async def check_for_completed_matches(self):
@@ -38,9 +53,14 @@ class MonitorMatchmakingManager(commands.Cog):
 
         for match in completed_matches:
             # Notify the players in the match
-            for player in match.player_profiles:
-                user = self.bot.fetch_user(player.discord_account_id)
-                user.send(f"Your match has been completed. Good job!")
+            if isinstance(match.player_profiles, List):
+                for player in match.player_profiles:
+                    await self.send_player_match_complete_notification(player)
+            else:
+                await self.send_player_match_complete_notification(match.player_profiles.team_a.player_a)
+                await self.send_player_match_complete_notification(match.player_profiles.team_a.player_b)
+                await self.send_player_match_complete_notification(match.player_profiles.team_b.player_a)
+                await self.send_player_match_complete_notification(match.player_profiles.team_b.player_b)
 
     @check_for_new_matches.before_loop
     async def before_check_for_new_matches(self):
