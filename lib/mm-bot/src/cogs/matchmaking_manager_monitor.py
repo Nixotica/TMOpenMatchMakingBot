@@ -53,14 +53,14 @@ class MonitorMatchmakingManager(commands.Cog):
 
         for match in completed_matches:
             # Notify the players in the match
-            if isinstance(match.player_profiles, List):
-                for player in match.player_profiles:
+            if isinstance(match.active_match.player_profiles, List):
+                for player in match.active_match.player_profiles:
                     await self.send_player_match_complete_notification(player)
             else:
-                await self.send_player_match_complete_notification(match.player_profiles.team_a.player_a)
-                await self.send_player_match_complete_notification(match.player_profiles.team_a.player_b)
-                await self.send_player_match_complete_notification(match.player_profiles.team_b.player_a)
-                await self.send_player_match_complete_notification(match.player_profiles.team_b.player_b)
+                await self.send_player_match_complete_notification(match.active_match.player_profiles.team_a.player_a)
+                await self.send_player_match_complete_notification(match.active_match.player_profiles.team_a.player_b)
+                await self.send_player_match_complete_notification(match.active_match.player_profiles.team_b.player_a)
+                await self.send_player_match_complete_notification(match.active_match.player_profiles.team_b.player_b)
 
     @check_for_new_matches.before_loop
     async def before_check_for_new_matches(self):

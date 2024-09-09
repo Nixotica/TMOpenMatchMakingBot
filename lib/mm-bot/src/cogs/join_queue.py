@@ -1,7 +1,7 @@
 import logging
 import discord
 from discord.ext import commands
-from models.team_2v2 import Team2v2
+from matchmaking.matches.team_2v2 import Team2v2
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
 

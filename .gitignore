@@ -9,3 +9,4 @@ cdk.out
 
 # Environment for 
 *.env
+*.pyc

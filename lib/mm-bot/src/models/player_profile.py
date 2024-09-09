@@ -9,7 +9,7 @@ from aws.constants import (
 )
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class PlayerProfile:
     tm_account_id: str
     discord_account_id: int

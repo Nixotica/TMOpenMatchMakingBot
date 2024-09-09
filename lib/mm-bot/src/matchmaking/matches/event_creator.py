@@ -15,10 +15,10 @@ from nadeo_event_api.api.structure.maps import Map
 from nadeo_event_api.api.event_api import post_event, get_rounds_for_event, get_matches_for_round
 from nadeo_event_api.api.structure.round.match_spot import TeamMatchSpot
 from models.match_queue import MatchQueue
-from models.team_2v2 import Teams2v2
+from matchmaking.matches.team_2v2 import Teams2v2
 from models.player_profile import PlayerProfile
 from nadeo.ubi_token_vendor import UbiTokenRefresher
-from models.created_match_info import CreatedMatchInfo
+from matchmaking.matches.created_match_info import CreatedMatchInfo
 import datetime as dt
 
 def get_random_map(match_queue: MatchQueue) -> Map:
@@ -143,6 +143,8 @@ def create_2v2_match(match_queue: MatchQueue, teams: Teams2v2) -> CreatedMatchIn
                     ),
                     plugin_settings=TMWTPluginSettings(
                         ready_minimum_team_size=1,
+                        pick_ban_start_auto=False,
+                        pick_ban_order=""
                     ),
                 ),
             )

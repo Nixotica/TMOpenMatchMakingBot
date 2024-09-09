@@ -8,8 +8,10 @@ from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 from models.player_profile import PlayerProfile
+from models.match_results import DdbMatchResults
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from models.match_queue import MatchQueue
+from matchmaking.matches.completed_match import CompletedMatch
 
 
 class DynamoDbManager:
@@ -163,4 +165,25 @@ class DynamoDbManager:
             return active_matches
         except Exception as e:
             logging.error(f"Error getting active match queues from DynamoDB: {e}")
+            raise
+
+    def put_match_results(self, completed_match: CompletedMatch) -> None:
+        """Puts match results into the MatchResults table.
+
+        Returns:
+            None
+        """
+        try:
+            self._match_results_table.put_item(
+                Item=DdbMatchResults(
+                    bot_match_id=completed_match.active_match.match_id,
+                    queue_id=completed_match.active_match.match_queue.queue_id, # type: ignore
+                    tm_match_id=completed_match.active_match.match_id,
+                    tm_match_live_id=completed_match.active_match.match_live_id,
+                    time_played=completed_match.time_completed,
+                    results=completed_match.match_results.__str__(),
+                ).to_dict()
+            )
+        except Exception as e:
+            logging.error(f"Error putting match results into DynamoDB: {e}")
             raise

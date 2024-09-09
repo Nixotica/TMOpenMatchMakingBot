@@ -4,12 +4,15 @@ import threading
 from typing import List, Optional
 from models.match_queue import MatchQueue
 from matchmaking.matches.active_match import ActiveMatch
+from matchmaking.matches.completed_match import CompletedMatch
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from aws.dynamodb import DynamoDbManager
 from matchmaking.match_queues.constants import QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC, QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC
+from matchmaking.match_complete.match_positions import get_match_positions_1v1v1v1, get_match_positions_2v2
+from matchmaking.match_complete.calculate_elo import calculate_elo_ratings
 from models.player_profile import PlayerProfile
 from models.match_queue import QueueType
-from models.team_2v2 import Team2v2
+from matchmaking.matches.team_2v2 import Team2v2
 import time
 
 class MatchmakingManager:
@@ -33,7 +36,7 @@ class MatchmakingManager:
                 self.active_queues.append(ActiveMatchQueue(queue))  # TODO - it should also check DDB table if this updated on some cadence
             self.active_matches: List[ActiveMatch] = []
             self.new_active_matches: List[ActiveMatch] = [] # Only new and not processed by bot
-            self.completed_matches: List[ActiveMatch] = [] # Only completed and not processed by bot
+            self.completed_matches: List[CompletedMatch] = [] # Only completed and not processed by bot
 
             self._last_check_queues_time = 0
             self._last_check_matches_time = 0
@@ -89,11 +92,12 @@ class MatchmakingManager:
     def remove_team_from_queue(self, team: Team2v2):
         pass # TODO
 
-    def process_completed_matches(self) -> List[ActiveMatch]:
+    def process_completed_matches(self) -> List[CompletedMatch]:
         """Returns a list of completed matches and clears the list.
         """
         completed_matches = self.completed_matches
         for match in completed_matches:
+            match.update_database()
             match.cleanup()
         self.completed_matches = []
         return completed_matches
@@ -150,7 +154,8 @@ class MatchmakingManager:
             logging.debug("Checking matches for results...")
             for active_match in self.active_matches:
                 if active_match.is_match_complete():
-                    logging.info(f"Match {active_match.match_id} is complete.")
+                    logging.info(f"Match {active_match.match_id} is complete. Adding to list of completed matches.")
+                    completed_match = CompletedMatch(active_match)
                     self.active_matches.remove(active_match)
-                    self.completed_matches.append(active_match)
-                    # TODO - call distribute points, etc
+                    self.completed_matches.append(completed_match)
+

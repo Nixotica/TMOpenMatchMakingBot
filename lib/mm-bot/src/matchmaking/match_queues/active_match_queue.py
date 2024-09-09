@@ -1,7 +1,7 @@
 import logging
 from typing import List
 from models.player_profile import PlayerProfile
-from models.team_2v2 import Team2v2, Teams2v2
+from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
 from models.match_queue import MatchQueue
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
