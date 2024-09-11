@@ -108,6 +108,14 @@ class MatchmakingManager:
         new_active_matches = self.new_active_matches
         self.new_active_matches = []
         return new_active_matches
+    
+    def get_active_queue_by_id(self, queue_id: str) -> Optional[ActiveMatchQueue]:
+        """Returns an active queue with the given ID, else None
+        """
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                return queue
+        return None
 
     async def _run_forever(self):
         """Run the matchmaking manager forever. 

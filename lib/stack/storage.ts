@@ -76,6 +76,7 @@ export class StorageConstruct extends Construct {
          * - `match_club_id`: Club ID in which the match is hosted
          * - `type`: Type of match queue (1v1v1v1, 2v2, etc)
          * - `active`: Boolean to enable/disable the queue
+         * - `channel_id`: Channel ID to host queue view in Discord
          */
         this.matchQueuesTable = new Table(this, "MatchQueuesTable", {
             partitionKey: { name: "queue_id", type: AttributeType.STRING },

@@ -21,8 +21,11 @@ class ActiveMatchQueue:
         Args:
             player (PlayerProfile): The player to add to the queue
         """
-        logging.info(f"Added player {player.tm_account_id} to queue {self.queue.queue_id}.")
-        self.players.append(player)
+        if player not in self.players:
+            self.players.append(player)
+            logging.info(f"Added player {player.tm_account_id} to queue {self.queue.queue_id}.")
+        else:
+            logging.warn(f"Player {player.tm_account_id} attempted to join queue {self.queue.queue_id} they were already in.")
 
     def remove_player(self, player: PlayerProfile | int | str) -> None:
         """Remove a player from the queue.

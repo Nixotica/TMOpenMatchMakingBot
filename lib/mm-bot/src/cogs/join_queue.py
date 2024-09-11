@@ -7,7 +7,7 @@ from aws.dynamodb import DynamoDbManager
 
 class JoinQueue(commands.Cog, name="join"):
     """
-    Command for a player to join a matchmaking queue. 
+    Commands and Views for a player to join/leave a matchmaking queue. 
     """
 
     def __init__(self, bot: commands.Bot):

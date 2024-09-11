@@ -13,6 +13,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
         SECRETS_BUCKET=secrets.json
         PLAYER_PROFILES_TABLE=tm-mm-bot-player-profiles-dev-<account-id>
         MATCH_RESULTS_TABLE=tm-mm-bot-match-results-dev-<account-id>
+        MATCH_QUEUES_TABLE=tm-mm-bot-match-queues-dev-<account-id>
         AWS_ACCESS_KEY_ID=<your-id>
         AWS_SECRET_ACCESS_KEY=<your-access-key>
         AWS_DEFAULT_REGION=<your-region>
