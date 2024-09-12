@@ -1,0 +1,12 @@
+version: '3'
+services:
+  mm-bot:
+    build: .
+    container_name: mm-bot 
+    command: python src/main.py
+    stop_signal: SIGTERM
+    stop_grace_period: 30s
+    env_file: .env
+    volumes:
+      - .:/app
+    tty: true

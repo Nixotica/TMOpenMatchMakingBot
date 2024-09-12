@@ -14,8 +14,6 @@ class JoinQueueView(ui.View):
         self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
         self.queue_id = queue_id
-
-        self.update_embed_task = None
         
     @ui.button(label="Join Queue", style=discord.ButtonStyle.green)
     async def join_queue(self, interaction: discord.Interaction, button: ui.Button):
@@ -42,15 +40,11 @@ class JoinQueueView(ui.View):
     # TODO - leave queue button
 
     async def start_task(self, message: discord.message.Message):
-        # Start the loop only once
-        if self.update_embed_task is None:
-            self.message = message
-            self.update_embed_task = self.update_embed.start()
+        self.message = message
+        self.update_embed_task = self.update_embed.start()
 
     async def stop_task(self):
-        if self.update_embed_task and self.update_embed_task.is_running(): # type: ignore
-            self.update_embed_task.cancel()
-            self.update_embed_task = None
+        await self.message.delete()
 
     @tasks.loop(seconds=15)
     async def update_embed(self) -> None:

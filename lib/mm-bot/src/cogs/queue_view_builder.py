@@ -14,12 +14,12 @@ class QueueViewBuilder(commands.Cog):
         self.mm_manager = MatchmakingManager()
         self.views: List[JoinQueueView] = []
     
-    @commands.Cog.listener()
-    async def on_ready(self) -> None:
+    async def cog_load(self) -> None:
+        logging.info("Queue View Builder loading...")
         await self.setup_queues()
 
-    @commands.Cog.listener()
-    async def on_shutdown(self) -> None:
+    async def cog_unload(self) -> None:
+        logging.info("Queue View Builder unloading...")
         for view in self.views:
             await view.stop_task()
             logging.info(f"Stopped view for Queue ID {view.queue_id}.")
