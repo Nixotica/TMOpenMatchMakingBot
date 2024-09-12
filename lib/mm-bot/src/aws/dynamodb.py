@@ -148,6 +148,43 @@ class DynamoDbManager:
             logging.error(f"Error creating player profile in DynamoDB: {e}")
             raise
 
+    def update_player_profile_match_complete(self, tm_account_id: str, new_elo: int) -> bool:
+        """Updates player profile for completing a new match with a new elo, and increments matches played by 1. 
+
+        Args:
+            tm_account_id (str): The TM account for which the match was completed. 
+            new_elo (int): The player's new elo. 
+
+        Returns:
+            bool: True if the profile was successfully updated, False otherwise. 
+        """
+        try:
+            self._player_profiles_table.update_item(
+                Key={KEY_TM_ACCOUNT_ID: tm_account_id},
+                UpdateExpression="SET #elo = :new_elo, #matches_played = #matches_played + :increment",
+                ExpressionAttributeNames={
+                    "#elo": KEY_ELO,
+                    "#matches_played": KEY_MATCHES_PLAYED,
+                },
+                ExpressionAttributeValues={
+                    ":new_elo": new_elo,
+                    ":increment": 1,
+                },
+                ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).exists(),
+                ReturnValues="UPDATED_NEW",
+            )
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                logging.warning(f"Player profile for TM account ID {tm_account_id} does not exist.")
+                return False
+            else:
+                logging.error(f"ClientError when updating player profile: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Error updating player profile in DynamoDB: {e}")
+            raise
+
     def get_active_match_queues(self) -> List[MatchQueue]:
         """Get a list of active match queues from the MatchQueues table.
 
@@ -177,10 +214,10 @@ class DynamoDbManager:
             self._match_results_table.put_item(
                 Item=DdbMatchResults(
                     bot_match_id=completed_match.active_match.match_id,
-                    queue_id=completed_match.active_match.match_queue.queue_id, # type: ignore
+                    queue_id=completed_match.active_match.match_queue.queue_id, 
                     tm_match_id=completed_match.active_match.match_id,
                     tm_match_live_id=completed_match.active_match.match_live_id,
-                    time_played=completed_match.time_completed,
+                    time_played=completed_match.time_completed.isoformat(),
                     results=completed_match.match_results.__str__(),
                 ).to_dict()
             )

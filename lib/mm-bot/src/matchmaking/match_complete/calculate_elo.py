@@ -48,7 +48,7 @@ def calculate_elo_ratings(match_positions: Dict[PlayerProfile, int], K=7) -> tup
         S_i = position_to_score[match_positions[player]]
         E_i = expected_scores[player]
         R_i = initial_elo_ratings[player]
-        updated_elo_ratings[player] = round(update_elo(R_i, S_i, E_i, K), 2)
+        updated_elo_ratings[player] = round(update_elo(R_i, S_i, E_i, K))
 
     # Calculate the difference in Elo ratings
     elo_differences = {player: updated_elo_ratings[player] - initial_elo_ratings[player] for player in initial_elo_ratings}

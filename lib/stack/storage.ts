@@ -28,18 +28,16 @@ export class StorageConstruct extends Construct {
          * A table for storing player profiles consisting of:
          * - `tm_account_id`: Player's Trackmania account ID (Primary Key)
          * - `discord_account_id`: Player's linked discord account ID (GSI)
-         * - `elo`: Player's elo (Sort Key)
+         * - `elo`: Player's elo
          * - `matches_played`: Player's cached number of matches played, negates checking results table (Number)
          */
         this.playerProfilesTable = new Table(this, "PlayerProfilesTable", {
             partitionKey: { name: "tm_account_id", type: AttributeType.STRING },
-            sortKey: { name: "elo", type: AttributeType.NUMBER },
             tableName: `tm-mm-bot-player-profiles-${props.stage}-${props.account}`,
         });
         this.playerProfilesTable.addGlobalSecondaryIndex({
             indexName: "discord_account_id",
             partitionKey: { name: "discord_account_id", type: AttributeType.NUMBER },
-            sortKey: { name: "elo", type: AttributeType.NUMBER },
         });
 
         /**

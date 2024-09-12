@@ -30,7 +30,8 @@ class MatchmakingManager:
         if not hasattr(self, "_initialized"):  # Avoid re-initializing the instance
             self._initialized = True
             self.active_queues: List[ActiveMatchQueue] = []
-            match_queues = DynamoDbManager().get_active_match_queues()
+            self.ddb_manager = DynamoDbManager()
+            match_queues = self.ddb_manager.get_active_match_queues()
             logging.info(f"Instantiating matchmaking manager with active match queues {match_queues}.")
             for queue in match_queues:
                 self.active_queues.append(ActiveMatchQueue(queue))  # TODO - it should also check DDB table if this updated on some cadence
@@ -96,9 +97,6 @@ class MatchmakingManager:
         """Returns a list of completed matches and clears the list.
         """
         completed_matches = self.completed_matches
-        for match in completed_matches:
-            match.update_database()
-            match.cleanup()
         self.completed_matches = []
         return completed_matches
     

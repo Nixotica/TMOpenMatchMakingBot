@@ -10,7 +10,7 @@ class DdbMatchResults:
     queue_id: str
     tm_match_id: int
     tm_match_live_id: str 
-    time_played: dt.datetime
+    time_played: str
     results: str
 
     def to_dict(self) -> Dict[str, Any]:

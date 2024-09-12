@@ -66,13 +66,13 @@ def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) 
             config=RoundConfig(
                 map_pool=[map_to_use],
                 script=ScriptType.CUP,
-                max_players=len(players),
+                max_players=len(players) + 1,
                 script_settings=CupScriptSettings(
                     base_script_settings=BaseScriptSettings(
                         warmup_number=1,
-                        warmup_duration=60,
                     ),
                     points_repartition="10,6,4,3",
+                    number_of_winners=3,
                     finish_timeout=10,
                     points_limit=40,
                     rounds_per_map=99,

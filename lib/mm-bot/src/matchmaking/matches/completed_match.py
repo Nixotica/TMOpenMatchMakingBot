@@ -20,7 +20,7 @@ class CompletedMatch:
             self,
             active_match: ActiveMatch,
     ): 
-        if not self.active_match.is_match_complete():
+        if not active_match.is_match_complete():
             raise ValueError(f"Match {self.active_match.match_id} is not complete and cannot be converted to CompletedMatch.")
 
         self.time_completed = dt.datetime.utcnow()
@@ -40,10 +40,8 @@ class CompletedMatch:
         
         self.updated_elo_ratings = updated_elo_ratings
         self.elo_differences = elo_differences
-    
-    def update_database(self) -> None:
-        pass
-        # TODO
+
+        logging.info(f"Match {self.active_match.match_id} completed at {self.time_completed} with results: {self.match_results}. Elo updated: {self.updated_elo_ratings} ({elo_differences}).")
 
     def cleanup(self) -> None:
         logging.info(f"Cleaning up match {self.active_match.match_id} by deleting from Nadeo servers...")

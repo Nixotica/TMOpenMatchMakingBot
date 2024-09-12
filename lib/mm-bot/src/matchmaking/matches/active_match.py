@@ -28,7 +28,7 @@ class ActiveMatch:
         self.match_id = match_id
         self.match_live_id = match_live_id
         self.player_profiles = player_profiles
-        self.match_queue = match_queue,
+        self.match_queue = match_queue
         
         self._match_info = None
 
@@ -52,19 +52,19 @@ class ActiveMatch:
 
         return ActiveMatch(match_info.event_id, match_info.round_id, match_info.match_id, match_info.match_live_id, teams, match_queue)
 
-    def _get_match_info(self) -> MatchInfo:
+    def _get_cached_match_info(self) -> MatchInfo:
         if not self._match_info:
             self._match_info = get_match_info(self.match_live_id)
         return self._match_info
 
     def is_match_complete(self) -> bool:
-        match_info = self._get_match_info()
-        if match_info.status == "COMPLETED":
+        self._match_info = get_match_info(self.match_live_id)
+        if self._match_info.status == "COMPLETED":
             return True
         return False
     
     def get_match_join_link(self) -> str | None:
-        match_info = self._get_match_info()
+        match_info = self._get_cached_match_info()
         if match_info.join_link:
             return match_info.join_link
         else: 
