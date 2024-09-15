@@ -44,6 +44,19 @@ class MatchmakingManager:
 
             self._thread = None
 
+    def add_queue(self, queue: MatchQueue) -> ActiveMatchQueue:
+        """Adds a new active queue to the Matchmaking manager.
+
+        Args:
+            queue (MatchQueue): The queue to add and activate.
+
+        Returns:
+            ActiveMatchQueue: ActiveMatchQueue generated from the queue. 
+        """
+        active_queue = ActiveMatchQueue(queue)
+        self.active_queues.append(active_queue)
+        return active_queue
+
     def add_player_to_queue(self, player: PlayerProfile, queue_id: str) -> Optional[ActiveMatchQueue]:
         """Adds a player to the given queue by ID. 
 
@@ -60,7 +73,10 @@ class MatchmakingManager:
                     logging.error(f"Attempted to add player to a 2v2 queue: {queue_id}")
                     # TODO - this should not be an error, we should allow free agents
                     return None
-                queue.add_player(player)
+                player_added = queue.add_player(player)
+                if not player_added:
+                    logging.info(f"Player {player.tm_account_id} already in queue {queue_id}.")
+                    return None
                 return queue
         logging.warn(f"Attempted to add player to a queue which doesn't exist: {queue_id}")
         return None
@@ -148,6 +164,26 @@ class MatchmakingManager:
                 active_match = active_queue.try_generate_match()
                 if active_match is not None: 
                     logging.info(f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}.")
+                    # Remove players in new active match from all queues
+                    for active_queue in self.active_queues:
+                        # Remove all independent players
+                        for player in active_queue.players:
+                            if isinstance(active_match.player_profiles, List):
+                                if player in active_match.player_profiles:
+                                    active_queue.remove_player(player)
+                            else:
+                                if active_match.player_profiles.team_a.player_a == player or \
+                                    active_match.player_profiles.team_a.player_b == player or \
+                                    active_match.player_profiles.team_b.player_a == player or \
+                                    active_match.player_profiles.team_b.player_b == player:
+                                        active_queue.remove_player(player)
+                        # Remove all teams (joined as parties)
+                        for team in active_queue.teams:
+                            if isinstance(active_match.player_profiles, List):
+                                logging.warning("Found individual player in an active queue team, this should not happen.")
+                                continue
+                            if team == active_match.player_profiles.team_a or team == active_match.player_profiles.team_b:
+                                active_queue.remove_team(team)
                     self.new_active_matches.append(active_match)
                     self.active_matches.append(active_match)
 

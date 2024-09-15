@@ -3,7 +3,7 @@ import os
 from typing import List, Optional
 
 import boto3
-from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID
+from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID, KEY_QUEUE_ID
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
@@ -223,4 +223,32 @@ class DynamoDbManager:
             )
         except Exception as e:
             logging.error(f"Error putting match results into DynamoDB: {e}")
+            raise
+
+    def create_queue(self, queue: MatchQueue) -> bool:
+        """Create a new matchmaking queue. 
+
+        Args:
+            queue (MatchQueue): The queue to add to the database.
+
+        Returns:
+            bool: True if the queue was successfully created, False otherwise. 
+        """
+        try:
+            self._match_queues_table.put_item(
+                Item=queue.to_dict(),
+                ConditionExpression=Attr(KEY_QUEUE_ID).not_exists(),
+            )
+
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+                logging.warning(
+                    f"Queue already exists for queue ID {queue.queue_id}"
+                )
+                return False
+            else:
+                raise
+        except Exception as e:
+            logging.error(f"Error creating queue in DynamoDB: {e}")
             raise

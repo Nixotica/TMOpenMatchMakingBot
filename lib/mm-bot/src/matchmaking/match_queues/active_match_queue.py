@@ -15,17 +15,22 @@ class ActiveMatchQueue:
         self.teams: List[Team2v2] = []
         self.queue = match_queue
 
-    def add_player(self, player: PlayerProfile) -> None:
-        """Add a player to the queue. 
+    def add_player(self, player: PlayerProfile) -> bool:
+        """Adds a player to the active queue.
 
         Args:
-            player (PlayerProfile): The player to add to the queue
+            player (PlayerProfile): _description_
+
+        Returns:
+            bool: True if player was added to queue, False if they were already in the queue. 
         """
         if player not in self.players:
             self.players.append(player)
             logging.info(f"Added player {player.tm_account_id} to queue {self.queue.queue_id}.")
+            return True
         else:
             logging.warn(f"Player {player.tm_account_id} attempted to join queue {self.queue.queue_id} they were already in.")
+            return False
 
     def remove_player(self, player: PlayerProfile | int | str) -> None:
         """Remove a player from the queue.
@@ -71,16 +76,12 @@ class ActiveMatchQueue:
             logging.debug(f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}.")
             if len(self.players) >= NUM_1v1v1v1_PLAYERS:
                 players_in_match = self.players[:NUM_1v1v1v1_PLAYERS]
-                for player in players_in_match:
-                    self.remove_player(player)
                 return ActiveMatch.create_1v1v1v1(self.queue, players_in_match)
         elif self.queue.type == QueueType.Queue2v2.value:
             logging.debug(f"Checking if should generate match for {self.queue.queue_id} length {len(self.teams)}.")
             if len(self.teams) >= 2:
                 teams_in_match = self.teams[:2]
                 teams = Teams2v2(teams_in_match[0], teams_in_match[1])
-                for team in teams_in_match:
-                    self.remove_team(team)
                 return ActiveMatch.create_2v2(self.queue, teams)
         else:
             return None

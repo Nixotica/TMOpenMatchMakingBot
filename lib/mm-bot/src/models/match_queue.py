@@ -28,3 +28,14 @@ class MatchQueue:
         if not queue_id or not campaign_club_id or not campaign_id or not match_club_id or not type or not active or not channel_id:
             raise ValueError("Missing required fields")
         return cls(queue_id, int(campaign_club_id), int(campaign_id), int(match_club_id), type, active, int(channel_id))
+    
+    def to_dict(self):
+        return {
+            KEY_QUEUE_ID: self.queue_id,
+            KEY_CAMPAIGN_CLUB_ID: self.campaign_club_id,
+            KEY_CAMPAIGN_ID: self.campaign_id,
+            KEY_MATCH_CLUB_ID: self.match_club_id,
+            KEY_QUEUE_TYPE: self.type.value,
+            KEY_ACTIVE: self.active,
+            KEY_CHANNEL_ID: self.channel_id
+        }   

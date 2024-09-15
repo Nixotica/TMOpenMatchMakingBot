@@ -39,15 +39,15 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
 
 8. Ensure you've installed docker (easy to look up). 
 
-9. Now you have a bot, the required infrastructure launched, and the code the bot will use in `/lib/mm-bot`. Navigate to `/lib/mm-bot` and run `docker build -t mm-bot .`, which will build the image locally. 
-
-10. Run `docker run --env-file .env mm-bot`. You should see output something like this:
+9. Now you have a bot, the required infrastructure launched, and the code the bot will use in `/lib/mm-bot`. Navigate to `/lib/mm-bot` and run `docker-compose up --build` to build and run the bot locally. You should see output something like this:
     ```
         $ discord.client logging in using static token
         $ discord.gateway Shard ID None has connected to Gateway (Session ID: d77e6960cc3dbd8d6201ce02f47c0d3d).
     ```
 
-11. Go to the server with the bot added to it, and try running some commands. Now you can either use it or continue to develop this bot. Enjoy!
+10. Go to the server with the bot added to it, and try running some commands. Now you can either use it or continue to develop this bot. Enjoy!
+
+11. To stop running the bot, you should run `docker-compose stop` from the same directory (in a separate terminal instance if your logs are being output to the first instance), which will run through the necessary tear-down steps to remove queues from the discord server channels, etc. 
 
 ## Contact
 
