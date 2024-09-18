@@ -27,16 +27,22 @@ class MonitorMatchmakingManager(commands.Cog):
         self.check_for_completed_matches.cancel()
 
     async def send_player_match_start_notification(self, player: PlayerProfile, match_join_link: str | None) -> None:
-        user = await self.bot.fetch_user(player.discord_account_id)
-        if match_join_link is None:
-            await user.send(f"Your match has been created, join with the Events tab in-game. Good luck!")
-        else:
-            await user.send(f"You got a match, join link: {match_join_link}. Good luck!")
+        try:
+            user = await self.bot.fetch_user(player.discord_account_id)
+            if match_join_link is None:
+                await user.send(f"Your match has been created, join with the Events tab in-game. Good luck!")
+            else:
+                await user.send(f"You got a match, join link: {match_join_link}. Good luck!")
+        except Exception as e:
+            logging.error(f"Error sending message to {player.discord_account_id}: {e}")
 
     async def send_player_match_complete_notification(self, player: PlayerProfile, updated_elo: int, elo_diff: int) -> None:
-        user = await self.bot.fetch_user(player.discord_account_id)
-        elo_diff_prefix = "+" if elo_diff >= 0 else "-"
-        await user.send(f"Your match has finished! New elo: {updated_elo} ({elo_diff_prefix}{elo_diff})")
+        try:
+            user = await self.bot.fetch_user(player.discord_account_id)
+            elo_diff_prefix = "+" if elo_diff >= 0 else "-"
+            await user.send(f"Your match has finished! New elo: {updated_elo} ({elo_diff_prefix}{elo_diff})")
+        except Exception as e:
+            logging.error(f"Error sending message to {player.discord_account_id}: {e}")
 
     @tasks.loop(seconds=10)  # Run every 10 seconds
     async def check_for_new_matches(self):
