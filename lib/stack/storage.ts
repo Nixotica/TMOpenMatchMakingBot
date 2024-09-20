@@ -1,4 +1,4 @@
-import { AttributeType, Table } from 'aws-cdk-lib/aws-dynamodb';
+import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { Bucket, BucketAccessControl, BucketEncryption } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
@@ -34,6 +34,7 @@ export class StorageConstruct extends Construct {
         this.playerProfilesTable = new Table(this, "PlayerProfilesTable", {
             partitionKey: { name: "tm_account_id", type: AttributeType.STRING },
             tableName: `tm-mm-bot-player-profiles-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
         });
         this.playerProfilesTable.addGlobalSecondaryIndex({
             indexName: "discord_account_id",
@@ -54,6 +55,7 @@ export class StorageConstruct extends Construct {
         this.matchResultsTable = new Table(this, "MatchResults1v1v1v1Table", {
             partitionKey: { name: "bot_match_id", type: AttributeType.NUMBER },
             tableName: `tm-mm-bot-match-results-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
         });
         this.matchResultsTable.addGlobalSecondaryIndex({
             indexName: "tm_match_id",
@@ -79,6 +81,7 @@ export class StorageConstruct extends Construct {
         this.matchQueuesTable = new Table(this, "MatchQueuesTable", {
             partitionKey: { name: "queue_id", type: AttributeType.STRING },
             tableName: `tm-mm-bot-match-queues-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
         });
 
         /**
