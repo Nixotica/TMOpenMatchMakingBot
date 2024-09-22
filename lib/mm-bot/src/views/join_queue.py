@@ -7,7 +7,7 @@ from aws.dynamodb import DynamoDbManager
 
 class JoinQueueView(ui.View):
     """
-    A view responsible for the 
+    A view for joining and leaving a matchmaking queue, plus the players in the queue. 
     """
     def __init__(self, queue_id: str):
         super().__init__(timeout=None)
@@ -37,7 +37,29 @@ class JoinQueueView(ui.View):
 
         await self.update_embed()
 
-    # TODO - leave queue button
+    @ui.button(label="Leave Queue", style=discord.ButtonStyle.red)
+    async def leave_queue(self, interaction: discord.Interaction, button: ui.Button):
+        user = interaction.user
+
+        logging.info(f"Processing button pressed to leave queue {self.queue_id} for user {user.name}")
+
+        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(user.id)
+
+        requested_queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
+
+        if not requested_queue:
+            logging.error(f"When attempting to leave queue {self.queue_id}, queue was not found.")
+            return
+
+        if player_profile not in requested_queue.players:
+            await interaction.response.send_message(f"You are not in queue {self.queue_id}.", ephemeral=True)
+            return
+
+        self.mm_manager.remove_player_from_queue(player_profile, self.queue_id)
+
+        await interaction.response.send_message(f"Left queue {self.queue_id}.", ephemeral=True)
+
+        await self.update_embed()
 
     async def start_task(self, message: discord.message.Message):
         self.message = message

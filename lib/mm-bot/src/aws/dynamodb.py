@@ -148,6 +148,23 @@ class DynamoDbManager:
             logging.error(f"Error creating player profile in DynamoDB: {e}")
             raise
 
+    def get_player_profiles(self) -> List[PlayerProfile]:
+        """Gets all player profiles.
+
+        Returns:
+            List[PlayerProfile]: List of all registered players' profiles.
+        """
+        try:
+            response = self._player_profiles_table.scan()
+            items = response.get("Items", [])
+            if not items:
+                return []
+            player_profiles = [PlayerProfile.from_dict(items[i]) for i in range(len(items))]
+            return player_profiles
+        except Exception as e:
+            logging.error(f"Error getting player profiles from DynamoDB: {e}")
+            raise
+
     def update_player_profile_match_complete(self, tm_account_id: str, new_elo: int) -> bool:
         """Updates player profile for completing a new match with a new elo, and increments matches played by 1. 
 

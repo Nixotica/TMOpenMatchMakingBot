@@ -101,10 +101,20 @@ class MatchmakingManager:
         logging.warn(f"Attempted to add team to a queue which doesn't exist: {queue_id}")
         return None
 
-    def remove_player_from_queue(self, player: PlayerProfile, queue_id: str):
-        """Handles a player leaving a queue by ID (not caused by new match spawning).
+    def remove_player_from_queue(self, player: PlayerProfile, queue_id: str) -> None:
+        """Removes a player from the given queue by ID.
+
+        Args:
+            player (PlayerProfile): Player to remove from the queue.
+            queue_id (str): The queue to remove from.
         """
-        pass  # TODO
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                if queue.queue.type == QueueType.Queue2v2.value:
+                    logging.error(f"Attempted to remove player from a 2v2 queue: {queue_id}")
+                    # TODO - this should not be an error, we should allow free agents
+                    return None
+                queue.remove_player(player)
 
     def remove_team_from_queue(self, team: Team2v2):
         pass # TODO
