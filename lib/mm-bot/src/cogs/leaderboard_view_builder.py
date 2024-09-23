@@ -20,7 +20,7 @@ class LeaderboardViewBuilder(commands.Cog):
     async def cog_unload(self) -> None:
         logging.info("Leaderboard View Builder unloading...")
         if self.view is not None:
-            await self.view.unload()
+            await self.view.stop_task()
         logging.info("All Leaderboard Views have been unloaded.")
 
     async def setup_leaderboards(self) -> None:
@@ -50,7 +50,7 @@ class LeaderboardViewBuilder(commands.Cog):
 
         message = await channel.send(embed=embed, view=self.view)
 
-        await self.view.give_message(message)
+        await self.view.start_task(message)
 
         await self.view.update_embed()
 

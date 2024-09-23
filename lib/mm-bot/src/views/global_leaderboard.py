@@ -1,6 +1,6 @@
 import logging
 from discord import ui
-from discord.ext import commands
+from discord.ext import commands, tasks
 import discord
 from aws.dynamodb import DynamoDbManager
 
@@ -13,20 +13,22 @@ class GlobalLeaderboardView(ui.View):
         self.bot = bot
         self.ddb_manager = DynamoDbManager()
 
-    async def give_message(self, message: discord.message.Message) -> None:
-        """Pass-through for cog to give the view the pre-loaded embed message to retain and update.
+    async def start_task(self, message: discord.message.Message) -> None:
+        """Pass-through for cog to give the view the pre-loaded embed message to retain and update. 
 
         Args:
             message (discord.message.Message): The message containing the leaderboard embed.
         """
         self.message = message
+        self.update_embed.start()
 
-    async def unload(self) -> None:
+    async def stop_task(self) -> None:
         """
         Unloads the view.
         """
         await self.message.delete()
 
+    @tasks.loop(minutes=5)
     async def update_embed(self) -> None:
         """Updates the embed with the latest global leaderboard state.
         """

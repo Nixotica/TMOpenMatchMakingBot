@@ -3,7 +3,7 @@ import { AutoScalingGroup } from "aws-cdk-lib/aws-autoscaling";
 import { Table } from "aws-cdk-lib/aws-dynamodb";
 import { AmazonLinuxCpuType, AmazonLinuxGeneration, CloudFormationInit, InitCommand, InitFile, InitService, InitSource, Instance, InstanceClass, InstanceSize, InstanceType, LaunchTemplate, MachineImage, Peer, Port, SecurityGroup, ServiceManager, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
-import { AsgCapacityProvider, AwsLogDriver, Cluster, ContainerImage, Ec2Service, Ec2TaskDefinition, FargateService, FargateTaskDefinition, Protocol } from "aws-cdk-lib/aws-ecs";
+import { AsgCapacityProvider, AwsLogDriver, Cluster, ContainerImage, Ec2Service, Ec2TaskDefinition, FargateService, FargateTaskDefinition, PlacementConstraint, Protocol } from "aws-cdk-lib/aws-ecs";
 import { ApplicationLoadBalancedFargateService } from "aws-cdk-lib/aws-ecs-patterns";
 import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Bucket } from "aws-cdk-lib/aws-s3";
@@ -41,21 +41,21 @@ export class BotServiceConstruct extends Construct {
             maxAzs: 1,
         });
 
-        /**
-         * Security Group
-         */
-        const securityGroup = new SecurityGroup(this, 'MM-Bot-SG', {
-            vpc,
-            description: 'Allow ECS instances to communicate with ECS control plane and other APIs',
-            allowAllOutbound: true, // Allow all outbound traffic
-        });
+        // /**
+        //  * Security Group
+        //  */
+        // const securityGroup = new SecurityGroup(this, 'MM-Bot-SG', {
+        //     vpc,
+        //     description: 'Allow ECS instances to communicate with ECS control plane and other APIs',
+        //     allowAllOutbound: true, // Allow all outbound traffic
+        // });
 
-        // Allow inbound SSH traffic from EC2 Instance Connect IP range (replace with your region's IP range)
-        securityGroup.addIngressRule(
-            Peer.ipv4('18.237.140.160/29'), // This is the range for EC2 Instance Connect in the Oregon region
-            Port.tcp(22),
-            'Allow SSH access for EC2 Instance Connect'
-        );
+        // // Allow inbound SSH traffic from EC2 Instance Connect IP range (replace with your region's IP range)
+        // securityGroup.addIngressRule(
+        //     Peer.ipv4('18.237.140.160/29'), // This is the range for EC2 Instance Connect in the Oregon region
+        //     Port.tcp(22),
+        //     'Allow SSH access for EC2 Instance Connect'
+        // );
 
         /**
          * ECS Cluster
@@ -63,29 +63,33 @@ export class BotServiceConstruct extends Construct {
         const cluster = new Cluster(this, 'MM-Bot-Cluster', {
             vpc,
         });
-        const instanceRole = new Role(this, 'MM-Bot-InstanceRole', {
-            assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
+        cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
+            instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.MICRO),
         });
-        instanceRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'));
-        const launchTemplate = new LaunchTemplate(this, 'MM-Bot-LaunchTemplate', {
-            instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.NANO),
-            machineImage: MachineImage.latestAmazonLinux2023({
-                cpuType: AmazonLinuxCpuType.ARM_64,
-            }),
-            securityGroup: securityGroup,
-            role: instanceRole,
-            blockDevices: [],
-        });
-        const autoscalingGroup = new AutoScalingGroup(this, 'MM-Bot-AutoScalingGroup', {
-            desiredCapacity: 1,
-            vpcSubnets: { subnetType: SubnetType.PUBLIC },
-            vpc: vpc,
-            launchTemplate: launchTemplate,
-        });
-        const capacityProvider = new AsgCapacityProvider(this, 'MM-Bot-AsgCapProvider', {
-            autoScalingGroup: autoscalingGroup,
-        });
-        cluster.addAsgCapacityProvider(capacityProvider);
+        // const instanceRole = new Role(this, 'MM-Bot-InstanceRole', {
+        //     assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
+        // });
+        // instanceRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'));
+        // const launchTemplate = new LaunchTemplate(this, 'MM-Bot-LaunchTemplate', {
+        //     instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.NANO),
+        //     machineImage: MachineImage.latestAmazonLinux2023({
+        //         cpuType: AmazonLinuxCpuType.ARM_64,
+        //     }),
+        //     securityGroup: securityGroup,
+        //     role: instanceRole,
+        //     blockDevices: [],
+        // });
+        // const autoscalingGroup = new AutoScalingGroup(this, 'MM-Bot-AutoScalingGroup', {
+        //     desiredCapacity: 1,
+        //     vpcSubnets: { subnetType: SubnetType.PUBLIC },
+        //     vpc: vpc,
+        //     launchTemplate: launchTemplate,
+        // });
+        // const capacityProvider = new AsgCapacityProvider(this, 'MM-Bot-AsgCapProvider', {
+        //     autoScalingGroup: autoscalingGroup,
+        //     canContainersAccessInstanceRole: true,
+        // });
+        // cluster.addAsgCapacityProvider(capacityProvider);
   
         /**
          * Task Definition
@@ -115,18 +119,18 @@ export class BotServiceConstruct extends Construct {
          */
         const container = ec2TaskDefinition.addContainer('MM-Bot-Container', {
             image: ContainerImage.fromDockerImageAsset(dockerImageAsset),
-            logging: new AwsLogDriver({
-                streamPrefix: 'MMBot',
-            }),
+            logging: AwsLogDriver.awsLogs({ streamPrefix: 'mm-bot' }),
             environment: {
                 SECRETS_BUCKET: props.secretsBucket.bucketName,
                 PLAYER_PROFILES_TABLE: props.playerProfilesTable.tableName,
                 MATCH_RESULTS_TABLE: props.matchResultsTable.tableName,
                 MATCH_QUEUES_TABLE: props.matchQueuesTable.tableName,
+                AWS_REGION: 'us-west-2',
+                AWS_DEFAULT_REGION: 'us-west-2',
             },
-            memoryReservationMiB: 256,
-            memoryLimitMiB: 512,
-            cpu: 256,
+            // memoryReservationMiB: 256,
+            memoryLimitMiB: 256,
+            // cpu: 256,
         });
     
         container.addPortMappings({
@@ -141,6 +145,9 @@ export class BotServiceConstruct extends Construct {
         const ec2Service = new Ec2Service(this, 'MM-Bot-Service', {
             cluster, 
             taskDefinition: ec2TaskDefinition,
+            placementConstraints: [
+                PlacementConstraint.distinctInstances(),
+            ]
         });
     }
 }

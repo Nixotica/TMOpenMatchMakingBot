@@ -17,12 +17,15 @@ export class TmOpenMatchMakingBotStack extends Stack {
             account: this.account,
         });
 
-        new BotServiceConstruct(this, 'BotServiceStack', {
-            ...props,
-            secretsBucket: storage.secretsBucket,
-            playerProfilesTable: storage.playerProfilesTable,
-            matchResultsTable: storage.matchResultsTable,
-            matchQueuesTable: storage.matchQueuesTable,
-        });
+        if (props.stage != 'dev') {
+            // This costs ~$8/mo so don't deploy to dev in normal circumstances 
+            new BotServiceConstruct(this, 'BotServiceStack', {
+                ...props,
+                secretsBucket: storage.secretsBucket,
+                playerProfilesTable: storage.playerProfilesTable,
+                matchResultsTable: storage.matchResultsTable,
+                matchQueuesTable: storage.matchQueuesTable,
+            });
+        }
     }
 }
