@@ -1,8 +1,10 @@
 import logging
+from typing import List
 import discord
 from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
-from views.global_leaderboard import GlobalLeaderboardView
+from views.leaderboard import LeaderboardView
+from models.leaderboard import Leaderboard
 
 class LeaderboardViewBuilder(commands.Cog):
     """ 
@@ -11,7 +13,7 @@ class LeaderboardViewBuilder(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.ddb_manager = DynamoDbManager()
-        self.view: GlobalLeaderboardView | None = None # TODO - store multiple base class leaderboard views
+        self.views: List[LeaderboardView] = []
 
     async def cog_load(self) -> None: 
         logging.info("Leaderboard View Builder loading...")
@@ -19,19 +21,17 @@ class LeaderboardViewBuilder(commands.Cog):
 
     async def cog_unload(self) -> None:
         logging.info("Leaderboard View Builder unloading...")
-        if self.view is not None:
-            await self.view.stop_task()
+        for view in self.views:
+            await view.stop_task()
+            logging.info(f"Unloading view for Leaderboard ID {view.leaderboard_id}.")
         logging.info("All Leaderboard Views have been unloaded.")
 
-    async def setup_leaderboards(self) -> None:
-        # TODO - loop over all queues registered in mm manager and separate by leaderboard group
-        
+    async def add_leaderboard_view(self, leaderboard: Leaderboard) -> None:
         # If view is already setup, ignore (this will sometimes run multiple times on startup...)
-        if self.view is not None:
+        if any(view.leaderboard_id == leaderboard.leaderboard_id for view in self.views):
             return
 
-        # TODO - store this in some table of leaderboards? 
-        channel_id = 1287229419588419644 # test server - Leaderboards - #global
+        channel_id = leaderboard.channel_id
         channel = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id) # Caching work-around
 
         if not channel:
@@ -44,15 +44,24 @@ class LeaderboardViewBuilder(commands.Cog):
         
         logging.info(f"Sending global leaderboard view to channel {channel_id}.")
 
-        self.view = GlobalLeaderboardView(self.bot)
+        view = LeaderboardView(self.bot, leaderboard.leaderboard_id)
+
+        self.views.append(view)
 
         embed = discord.Embed(title="Pending leaderboard setup...")
 
-        message = await channel.send(embed=embed, view=self.view)
+        message = await channel.send(embed=embed, view=view)
 
-        await self.view.start_task(message)
+        await view.start_task(message)
 
-        await self.view.update_embed()
+        await view.update_embed()
+
+    async def setup_leaderboards(self) -> None:
+        leaderboards = self.ddb_manager.get_leaderboards()
+
+        for leaderboard in leaderboards: 
+            await self.add_leaderboard_view(leaderboard)
+
 
 # TODO - command for admins to /create_leaderboard which takes a queue id and makes a new leaderboard
 # would require adding leaderboards table and adding field to match queues table for leaderboard

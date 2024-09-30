@@ -1,35 +1,31 @@
 import unittest
 from typing import Dict
-from src.models.player_profile import PlayerProfile
+from src.models.player_elo import PlayerElo
 from src.matchmaking.match_complete.calculate_elo import calculate_elo_ratings  # Assuming this code is in a module called elo_system
 
 class TestEloSystem(unittest.TestCase):
     
     def setUp(self):
         # Create player profiles 
-        self.player1 = PlayerProfile(
+        self.player1 = PlayerElo(
             "tm_acc_1",
-            1,
+            "leaderboard_id",
             1200,
-            0,
         )
-        self.player2 = PlayerProfile(
+        self.player2 = PlayerElo(
             "tm_acc_2",
-            2,
+            "leaderboard_id",
             1300,
-            0,
         )
-        self.player3 = PlayerProfile(
+        self.player3 = PlayerElo(
             "tm_acc_3",
-            3,
+            "leaderboard_id",
             1100,
-            0,
         )
-        self.player4 = PlayerProfile(
+        self.player4 = PlayerElo(
             "tm_acc_4",
-            4,
+            "leaderboard_id",
             1000,
-            0,
         )
 
         self.match_positions = {

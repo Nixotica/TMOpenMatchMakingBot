@@ -14,11 +14,14 @@ KEY_MATCH_CLUB_ID = "match_club_id"
 KEY_QUEUE_TYPE = "type"
 KEY_ACTIVE = "active"
 KEY_CHANNEL_ID = "channel_id"
+KEY_LEADERBOARD_IDS = "leaderboard_ids"
 
 KEY_BOT_MATCH_ID = "bot_match_id"
 KEY_TM_MATCH_ID = "tm_match_id"
 KEY_TM_MATCH_LIVE_ID = "tm_match_live_id"
 KEY_TIME_PLAYED = "time_played"
 KEY_RESULTS = "results"
+
+KEY_LEADERBOARD_ID = "leaderboard_id"
 
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

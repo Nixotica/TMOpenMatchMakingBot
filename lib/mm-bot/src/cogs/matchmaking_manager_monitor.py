@@ -85,7 +85,7 @@ class MonitorMatchmakingManager(commands.Cog):
                         logging.warning(f"Player {player} not found in updated_elo_ratings or elo_differences, not updating their elo...")
                         continue
 
-                    self.ddb_manager.update_player_profile_match_complete(player.tm_account_id, updated_elo)
+                    self.ddb_manager.update_player_elo(player.tm_account_id, updated_elo)
 
                     await self.send_player_match_complete_notification(player, updated_elo, elo_diff)
             else:

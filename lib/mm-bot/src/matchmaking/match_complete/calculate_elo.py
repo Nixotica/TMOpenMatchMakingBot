@@ -1,8 +1,8 @@
 from typing import Dict
 import numpy as np
-from models.player_profile import PlayerProfile
+from models.player_elo import PlayerElo
 
-def calculate_elo_ratings(match_positions: Dict[PlayerProfile, int], K=7) -> tuple[Dict[PlayerProfile, int], Dict[PlayerProfile, int]]:
+def calculate_elo_ratings(match_positions: Dict[PlayerElo, int], K=7) -> tuple[Dict[PlayerElo, int], Dict[PlayerElo, int]]:
     """
     Calculate updated Elo ratings for all players based on their match positions.
     

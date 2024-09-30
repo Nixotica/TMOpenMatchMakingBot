@@ -8,8 +8,6 @@ from matchmaking.matches.completed_match import CompletedMatch
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from aws.dynamodb import DynamoDbManager
 from matchmaking.match_queues.constants import QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC, QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC
-from matchmaking.match_complete.match_positions import get_match_positions_1v1v1v1, get_match_positions_2v2
-from matchmaking.match_complete.calculate_elo import calculate_elo_ratings
 from models.player_profile import PlayerProfile
 from models.match_queue import QueueType
 from matchmaking.matches.team_2v2 import Team2v2

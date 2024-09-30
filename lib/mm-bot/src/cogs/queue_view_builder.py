@@ -28,8 +28,8 @@ class QueueViewBuilder(commands.Cog):
         logging.info("Queue View Builder unloading...")
         for view in self.views:
             await view.stop_task()
-            logging.info(f"Stopped view for Queue ID {view.queue_id}.")
-        logging.info("All Queue Views have been stopped.")
+            logging.info(f"Unloading view for Queue ID {view.queue_id}.")
+        logging.info("All Queue Views have been unloadded.")
 
     async def add_active_queue_view(self, queue: ActiveMatchQueue) -> None:
             # If view is already setup, ignore (this will sometimes run multiple times on startup...)
@@ -102,6 +102,7 @@ class QueueViewBuilder(commands.Cog):
             channel_id=channel_id,
             type=queue_type,
             active=True,
+            leaderboard_ids=[], # Currently requires admin to add leaderboards
         )
 
         # Add a new queue to the matchmaking manager to activate it

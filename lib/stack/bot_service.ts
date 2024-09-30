@@ -20,11 +20,17 @@ export interface BotServiceConstructProps {
     /** A table containing player specific information. */
     playerProfilesTable: Table,
 
+    /** A table containing player elos by leaderboard. */
+    playerElosTable: Table,
+
     /** A table containing match results. */
     matchResultsTable: Table,
 
     /** A table containing available matchmaking queues. */
     matchQueuesTable: Table,
+
+    /** A table containing leaderboards. */
+    leaderboardsTable: Table,
 }
 
 /**
@@ -64,7 +70,7 @@ export class BotServiceConstruct extends Construct {
             vpc,
         });
         cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
-            instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.MICRO),
+            instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.NANO), // <- if this doesn't work, go back to micro
         });
         // const instanceRole = new Role(this, 'MM-Bot-InstanceRole', {
         //     assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
@@ -106,8 +112,10 @@ export class BotServiceConstruct extends Construct {
         });
         props.secretsBucket.grantRead(taskRole);
         props.playerProfilesTable.grantFullAccess(taskRole);
+        props.playerElosTable.grantFullAccess(taskRole);
         props.matchResultsTable.grantFullAccess(taskRole);
         props.matchQueuesTable.grantFullAccess(taskRole);
+        props.leaderboardsTable.grantFullAccess(taskRole);
 
         // Define the EC2 task with container details
         const ec2TaskDefinition = new Ec2TaskDefinition(this, 'MM-Bot-Task', {
@@ -123,8 +131,10 @@ export class BotServiceConstruct extends Construct {
             environment: {
                 SECRETS_BUCKET: props.secretsBucket.bucketName,
                 PLAYER_PROFILES_TABLE: props.playerProfilesTable.tableName,
+                PLAYER_ELOS_TABLE: props.playerElosTable.tableName,
                 MATCH_RESULTS_TABLE: props.matchResultsTable.tableName,
                 MATCH_QUEUES_TABLE: props.matchQueuesTable.tableName,
+                LEADERBOARDS_TABLE: props.leaderboardsTable.tableName,
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },

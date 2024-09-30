@@ -3,12 +3,14 @@ import os
 from typing import List, Optional
 
 import boto3
-from aws.constants import KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID, KEY_QUEUE_ID
+from aws.constants import KEY_LEADERBOARD_ID, KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID, KEY_QUEUE_ID
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
 from models.player_profile import PlayerProfile
 from models.match_results import DdbMatchResults
+from models.leaderboard import Leaderboard
+from models.player_elo import PlayerElo
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from models.match_queue import MatchQueue
 from matchmaking.matches.completed_match import CompletedMatch
@@ -36,6 +38,11 @@ class DynamoDbManager:
             raise ValueError("PLAYER_PROFILES_TABLE environment variable is not set")
         self._player_profiles_table = self._resource.Table(player_profiles_table)
 
+        player_elos_table = os.environ.get("PLAYER_ELOS_TABLE")
+        if player_elos_table is None:
+            raise ValueError("PLAYER_ELOS_TABLE environment variable is not set")
+        self._player_elos_table = self._resource.Table(player_elos_table)
+
         match_results_table = os.environ.get("MATCH_RESULTS_TABLE")
         if match_results_table is None:
             raise ValueError("MATCH_RESULTS_TABLE environment variable is not set")
@@ -45,6 +52,11 @@ class DynamoDbManager:
         if match_queues_table is None:
             raise ValueError("MATCH_QUEUES_TABLE environment variable is not set")
         self._match_queues_table = self._resource.Table(match_queues_table)
+
+        leaderboards_table = os.environ.get("LEADERBOARDS_TABLE")
+        if leaderboards_table is None:
+            raise ValueError("LEADERBOARDS_TABLE environment variable is not set")
+        self._leaderboards_table = self._resource.Table(leaderboards_table)
 
     def _create_client(self) -> DynamoDBClient:
         try:
@@ -125,7 +137,6 @@ class DynamoDbManager:
                 {
                     KEY_TM_ACCOUNT_ID: tm_account_id,
                     KEY_DISCORD_ACCOUNT_ID: discord_account_id,
-                    KEY_ELO: DEFAULT_ELO,
                     KEY_MATCHES_PLAYED: 0
                 }
             )
@@ -165,29 +176,64 @@ class DynamoDbManager:
             logging.error(f"Error getting player profiles from DynamoDB: {e}")
             raise
 
-    def update_player_profile_match_complete(self, tm_account_id: str, new_elo: int) -> bool:
-        """Updates player profile for completing a new match with a new elo, and increments matches played by 1. 
+    def update_player_matches_complete(self, tm_account_id: str) -> bool:
+        """Updates player profile for completing a new match by incrementing matches played by 1. 
 
         Args:
-            tm_account_id (str): The TM account for which the match was completed. 
+            tm_account_id (str): The TM acccount for which the match was completed.
+
+        Returns:
+            bool: True if the profile was successfully updated, False otherwise.
+        """
+        try:
+            self._player_profiles_table.update_item(
+                Key={KEY_TM_ACCOUNT_ID: tm_account_id},
+                UpdateExpression="SET #matches_played = #matches_played + :increment",
+                ExpressionAttributeNames={
+                    "#matches_played": KEY_MATCHES_PLAYED,
+                },
+                ExpressionAttributeValues={
+                    ":increment": 1,
+                },
+                ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).exists(),
+                ReturnValues="UPDATED_NEW",
+            )
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+                logging.warning(f"Player profile for TM account ID {tm_account_id} does not exist.")
+                return False
+            else:
+                logging.error(f"ClientError when updating player profile: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Error updating player profile in DynamoDB: {e}")
+            raise
+
+    def update_player_elo(self, tm_account_id: str, leaderboard_id: str, new_elo: int) -> bool:
+        """Updates player elo for a given leaderboard. 
+
+        Args:
+            tm_account_id (str): The TM account for which the elo should be updated. 
+            leaderboard_id (str): The leaderboard ID for which the elo should be updated. 
             new_elo (int): The player's new elo. 
 
         Returns:
             bool: True if the profile was successfully updated, False otherwise. 
         """
         try:
-            self._player_profiles_table.update_item(
-                Key={KEY_TM_ACCOUNT_ID: tm_account_id},
-                UpdateExpression="SET #elo = :new_elo, #matches_played = #matches_played + :increment",
+            self._player_elos_table.update_item(
+                Key={
+                    KEY_TM_ACCOUNT_ID: tm_account_id,
+                    KEY_LEADERBOARD_ID: leaderboard_id
+                },
+                UpdateExpression="SET #elo = :new_elo",
                 ExpressionAttributeNames={
                     "#elo": KEY_ELO,
-                    "#matches_played": KEY_MATCHES_PLAYED,
                 },
                 ExpressionAttributeValues={
                     ":new_elo": new_elo,
-                    ":increment": 1,
                 },
-                ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).exists(),
                 ReturnValues="UPDATED_NEW",
             )
             return True
@@ -268,4 +314,112 @@ class DynamoDbManager:
                 raise
         except Exception as e:
             logging.error(f"Error creating queue in DynamoDB: {e}")
+            raise
+
+    def create_leaderboard(self, leaderboard: Leaderboard) -> bool:
+        """Create a new leaderboard.
+
+        Args:
+            leaderboard (Leaderboard): The leaderboard to add to the database.
+
+        Returns:
+            bool: True if the leaderboard was successfully created, False otherwise.
+        """
+        try:
+            self._leaderboards_table.put_item(
+                Item=leaderboard.to_dict(),
+                ConditionExpression=Attr(KEY_LEADERBOARD_ID).not_exists(),
+            )
+
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+                logging.warning(
+                    f"Leaderboard already exists for leaderboard ID {leaderboard.leaderboard_id}"
+                )
+                return False
+            else:
+                raise
+        except Exception as e:
+            logging.error(f"Error creating leaderboard in DynamoDB: {e}")
+            raise
+
+    def get_leaderboards(self) -> List[Leaderboard]:
+        """Get a list of leaderboards from the Leaderboards table.
+
+        Returns:
+            List[Leaderboard]: List of leaderboards in DDB.
+        """
+        try:
+            response = self._leaderboards_table.scan()
+            items =  response.get("Items", [])
+            if not items:
+                return []
+            leaderboards = [Leaderboard.from_dict(items[i]) for i in range(len(items))]
+            return leaderboards
+        except Exception as e:
+            logging.error(f"Error getting leaderboards from DynamoDB: {e}")
+            raise
+
+    def get_or_create_player_elo(self, tm_account_id: str, leaderboard_id: str) -> PlayerElo:
+        """Get the elo for a given leaderboard ID for a specific player. If it doesn't exist, will create a record with the default elo.
+
+        Args:
+            tm_account_id (str): The TM account ID for which to return the given player's elo.
+            leaderboard_id (str): The leaderboard ID for which to return the given player's elo.
+
+        Returns:
+            PlayerElo: The elo for a given leaderboard ID for a specific player.
+        """
+        try:
+            get_response = self._player_elos_table.get_item(
+                Key={
+                    KEY_TM_ACCOUNT_ID: tm_account_id,
+                    KEY_LEADERBOARD_ID: leaderboard_id
+                }
+            )
+            item = get_response.get("Item", {})
+            if not item:
+                logging.info(f"No elo found for account ID {tm_account_id} and leaderbord ID {leaderboard_id}. Creating default one.")
+                try:
+                    item = PlayerElo(
+                            tm_account_id=tm_account_id,
+                            leaderboard_id=leaderboard_id,
+                            elo=DEFAULT_ELO
+                        ).to_dict()
+                    _ = self._player_elos_table.put_item(
+                        Item=item,
+                        ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).not_exists() & Attr(KEY_LEADERBOARD_ID).not_exists(),
+                    )
+                except Exception as e:
+                    logging.error(f"Error creating player elo in DynamoDB: {e}")
+                    raise
+            player_elo = PlayerElo.from_dict(item)
+            return player_elo
+        except Exception as e:
+            logging.error(f"Error getting player elo from DynamoDB: {e}")
+            raise
+
+    def get_players_by_elo_descending(self, leaderboard_id: str) -> List[PlayerElo]:
+        """Get a sorted list of players by their elo in descending order for a given leaderboard.
+
+        Args:
+            leaderboard_id (str): The leaderboard ID to get player elos for.
+
+        Returns:
+            List[PlayerElo]: List of player elos for the leaderboard sorted in descending order.
+        """
+        try:
+            response = self._player_elos_table.query(
+                IndexName="leaderboard_id",
+                KeyConditionExpression=Key(KEY_LEADERBOARD_ID).eq(leaderboard_id),
+                ScanIndexForward=False,
+            )
+            items = response.get("Items", [])
+            if not items: 
+                return []
+            player_elos = [PlayerElo.from_dict(items[i]) for i in range(len(items))]
+            return player_elos
+        except Exception as e:
+            logging.error(f"Error getting player elos from DynamoDB: {e}")
             raise

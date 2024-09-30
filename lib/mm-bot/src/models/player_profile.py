@@ -3,7 +3,6 @@ from typing import Any, Dict
 
 from aws.constants import (
     KEY_DISCORD_ACCOUNT_ID,
-    KEY_ELO,
     KEY_MATCHES_PLAYED,
     KEY_TM_ACCOUNT_ID,
 )
@@ -13,17 +12,15 @@ from aws.constants import (
 class PlayerProfile:
     tm_account_id: str
     discord_account_id: int
-    elo: int
     matches_played: int
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
         tm_account_id = data.get(KEY_TM_ACCOUNT_ID)
         discord_account_id = data.get(KEY_DISCORD_ACCOUNT_ID)
-        elo = data.get(KEY_ELO)
         matches_played = data.get(KEY_MATCHES_PLAYED)
 
-        if not tm_account_id or not discord_account_id or elo is None or matches_played is None:
+        if not tm_account_id or not discord_account_id or not matches_played:
             raise ValueError("Missing required fields")
 
-        return cls(tm_account_id, int(discord_account_id), int(elo), int(matches_played))
+        return cls(tm_account_id, int(discord_account_id), int(matches_played))

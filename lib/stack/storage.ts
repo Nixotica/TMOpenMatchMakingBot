@@ -16,8 +16,10 @@ export interface StorageConstructProps {
 export class StorageConstruct extends Construct {
     public readonly secretsBucket: Bucket;
     public readonly playerProfilesTable: Table;
+    public readonly playerElosTable: Table;
     public readonly matchResultsTable: Table;
     public readonly matchQueuesTable: Table;
+    public readonly leaderboardsTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageConstructProps) {
         super(scope, id);
@@ -28,7 +30,6 @@ export class StorageConstruct extends Construct {
          * A table for storing player profiles consisting of:
          * - `tm_account_id`: Player's Trackmania account ID (Primary Key)
          * - `discord_account_id`: Player's linked discord account ID (GSI)
-         * - `elo`: Player's elo
          * - `matches_played`: Player's cached number of matches played, negates checking results table (Number)
          */
         this.playerProfilesTable = new Table(this, "PlayerProfilesTable", {
@@ -39,6 +40,26 @@ export class StorageConstruct extends Construct {
         this.playerProfilesTable.addGlobalSecondaryIndex({
             indexName: "discord_account_id",
             partitionKey: { name: "discord_account_id", type: AttributeType.NUMBER },
+        });
+
+        /**
+         * PlayerElos Table
+         * 
+         * A table for storing players' ELO for a given Leaderboard ID.
+         * - `tm_account_id`: Player's Trackmania account ID (Primary Key)
+         * - `leaderboard_id`: Leaderboard ID (Sort Key) (GSI)
+         * - `elo`: Player's ELO for a given leaderboard. 
+         */
+        this.playerElosTable = new Table(this, "PlayerElosTable", {
+            partitionKey: { name: "tm_account_id", type: AttributeType.STRING },
+            sortKey: { name: "leaderboard_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-player-elos-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+        this.playerElosTable.addGlobalSecondaryIndex({
+            indexName: "leaderboard_id",
+            partitionKey: { name: "leaderboard_id", type: AttributeType.STRING },
+            sortKey: { name: "elo", type: AttributeType.NUMBER },
         });
 
         /**
@@ -77,10 +98,24 @@ export class StorageConstruct extends Construct {
          * - `type`: Type of match queue (1v1v1v1, 2v2, etc)
          * - `active`: Boolean to enable/disable the queue
          * - `channel_id`: Channel ID to host queue view in Discord
+         * - `leaderboard_ids`: List of leadboard IDs for which elo is distributed to players. 
          */
         this.matchQueuesTable = new Table(this, "MatchQueuesTable", {
             partitionKey: { name: "queue_id", type: AttributeType.STRING },
             tableName: `tm-mm-bot-match-queues-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+
+        /**
+         * Leaderboards Table
+         * 
+         * A table for storing different leaderboards consisting of:
+         * - `leaderboard_id`: Leaderboard ID (Primary Key)
+         * - `channel_id`: Channel ID to host leaderboard view in Discord
+         */
+        this.leaderboardsTable = new Table(this, "LeaderboardsTable", {
+            partitionKey: { name: "leaderboard_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-leaderboards-${props.stage}-${props.account}`,
             billingMode: BillingMode.PAY_PER_REQUEST,
         });
 
