@@ -23,8 +23,10 @@ export class TmOpenMatchMakingBotStack extends Stack {
                 ...props,
                 secretsBucket: storage.secretsBucket,
                 playerProfilesTable: storage.playerProfilesTable,
+                playerElosTable: storage.playerElosTable,
                 matchResultsTable: storage.matchResultsTable,
                 matchQueuesTable: storage.matchQueuesTable,
+                leaderboardsTable: storage.leaderboardsTable,
             });
         }
     }

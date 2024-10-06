@@ -85,6 +85,6 @@ class JoinQueueView(ui.View):
         # TODO - display active matches count
 
         embed = discord.Embed(title=f"Better Matchmaking Queue - {self.queue_id}")
-        embed.add_field(name="Players", value=num_players_in_queue, inline=False)
+        embed.add_field(name="Players: ", value=num_players_in_queue)
 
         await self.message.edit(embed=embed) 

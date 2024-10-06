@@ -5,6 +5,7 @@ from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
 from views.leaderboard import LeaderboardView
 from models.leaderboard import Leaderboard
+from cogs.constants import ROLE_ADMIN
 
 class LeaderboardViewBuilder(commands.Cog):
     """ 
@@ -63,8 +64,60 @@ class LeaderboardViewBuilder(commands.Cog):
             await self.add_leaderboard_view(leaderboard)
 
 
-# TODO - command for admins to /create_leaderboard which takes a queue id and makes a new leaderboard
-# would require adding leaderboards table and adding field to match queues table for leaderboard
+    @commands.hybrid_command(
+        name="create_leaderboard",
+        description="Create a new leaderboard",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def create_leaderboard(
+        self,
+        ctx: commands.Context,
+        leaderboard_id: str,
+        channel_id: str, # Cannot be int - too long for discord bot
+    ) -> None:
+        logging.info(f"Processing command to create leaderboard {leaderboard_id} from user {ctx.message.author.name}.")
+
+        channel_id = eval(channel_id)
+        if not isinstance(channel_id, int):
+            await ctx.send(f"Invalid channel ID: {channel_id}.")
+            return
+
+        leaderboard = Leaderboard(
+            leaderboard_id=leaderboard_id,
+            channel_id=channel_id,
+        )
+
+        success = self.ddb_manager.create_leaderboard(leaderboard)
+
+        if success:
+            await self.add_leaderboard_view(leaderboard)
+            await ctx.send(f"Leaderboard {leaderboard_id} created.")
+        else:
+            await ctx.send(f"Failed to create leaderboard {leaderboard_id}, unknown error.")
+    
+    @commands.hybrid_command(
+        name="list_leaderboards",
+        description="List all leaderboards",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def list_leaderboards(
+        self,
+        ctx: commands.Context,
+    ) -> None:
+        logging.info(f"Processing command to list leaderboards from user {ctx.message.author.name}.")
+
+        leaderboards = self.ddb_manager.get_leaderboards()
+
+        if not leaderboards:
+            await ctx.send("No leaderboards found.")
+            return
+
+        embed = discord.Embed(title="Leaderboards")
+
+        for leaderboard in leaderboards:
+            embed.add_field(name=leaderboard.leaderboard_id, value=leaderboard.channel_id)
+
+        await ctx.send(embed=embed, ephemeral=True)
 
 async def setup(bot: commands.Bot) -> None:
     leaderboard_view_builders = LeaderboardViewBuilder(bot)

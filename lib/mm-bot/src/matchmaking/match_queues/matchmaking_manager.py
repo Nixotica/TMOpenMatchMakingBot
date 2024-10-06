@@ -9,6 +9,7 @@ from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from aws.dynamodb import DynamoDbManager
 from matchmaking.match_queues.constants import QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC, QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC
 from models.player_profile import PlayerProfile
+from models.leaderboard import Leaderboard
 from models.match_queue import QueueType
 from matchmaking.matches.team_2v2 import Team2v2
 import time
@@ -138,6 +139,22 @@ class MatchmakingManager:
             if queue.queue.queue_id == queue_id:
                 return queue
         return None
+    
+    def add_leaderboard_to_active_queue(self, queue_id: str, leaderboard_id: str):
+        """Adds a leaderboard to an active queue in the mm manager.
+
+        Args:
+            queue_id (str): The queue ID of the queue to add the leaderboard to.
+            leaderboard (Leaderboard): The leaderboard to add.
+
+        Returns:
+            bool: True if successfully added the leaderboard, False otherwise. 
+        """
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                if queue.queue.leaderboard_ids is None:
+                    queue.queue.leaderboard_ids = []
+                queue.queue.leaderboard_ids.append(leaderboard_id)
 
     async def _run_forever(self):
         """Run the matchmaking manager forever. 

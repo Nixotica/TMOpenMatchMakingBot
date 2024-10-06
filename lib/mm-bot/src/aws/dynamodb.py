@@ -1,9 +1,10 @@
+from datetime import datetime
 import logging
 import os
 from typing import List, Optional
 
 import boto3
-from aws.constants import KEY_LEADERBOARD_ID, KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID, KEY_QUEUE_ID
+from aws.constants import KEY_LEADERBOARD_ID, KEY_LEADERBOARD_IDS, KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID, KEY_QUEUE_ID
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
@@ -13,7 +14,6 @@ from models.leaderboard import Leaderboard
 from models.player_elo import PlayerElo
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from models.match_queue import MatchQueue
-from matchmaking.matches.completed_match import CompletedMatch
 
 
 class DynamoDbManager:
@@ -267,7 +267,41 @@ class DynamoDbManager:
             logging.error(f"Error getting active match queues from DynamoDB: {e}")
             raise
 
-    def put_match_results(self, completed_match: CompletedMatch) -> None:
+    def add_leaderboard_to_match_queue(self, queue_id: str, leaderboard_id: str) -> None:
+        """Add a leaderboard to a match queue.
+
+        Args:
+            queue_id (str): The ID of the match queue to add the leaderboard to.
+            leaderboard_id (str): The ID of the leaderboard to add to the match queue.
+
+        Returns:
+            None
+        """
+        try:
+            self._match_queues_table.update_item(
+                Key={KEY_QUEUE_ID: queue_id},
+                UpdateExpression="SET #leaderboard_ids = list_append(if_not_exists(#leaderboard_ids, :empty_list), :leaderboard)",
+                ExpressionAttributeNames={
+                    "#leaderboard_ids": KEY_LEADERBOARD_IDS,
+                },
+                ExpressionAttributeValues={
+                    ":leaderboard": [leaderboard_id],
+                    ":empty_list": [],
+                },
+                ReturnValues="UPDATED_NEW",
+            )
+        except Exception as e:
+            logging.error(f"Error adding leaderboard to match queue in DynamoDB: {e}")
+            raise
+
+    def put_match_results(
+            self, 
+            queue_id: str,
+            match_id: int,
+            match_live_id: str,
+            time_played: datetime,
+            results_as_str: str,
+            ) -> None:
         """Puts match results into the MatchResults table.
 
         Returns:
@@ -276,12 +310,12 @@ class DynamoDbManager:
         try:
             self._match_results_table.put_item(
                 Item=DdbMatchResults(
-                    bot_match_id=completed_match.active_match.match_id,
-                    queue_id=completed_match.active_match.match_queue.queue_id, 
-                    tm_match_id=completed_match.active_match.match_id,
-                    tm_match_live_id=completed_match.active_match.match_live_id,
-                    time_played=completed_match.time_completed.isoformat(),
-                    results=completed_match.match_results.__str__(),
+                    bot_match_id=match_id,
+                    queue_id=queue_id, 
+                    tm_match_id=match_id,
+                    tm_match_live_id=match_live_id,
+                    time_played=time_played.isoformat(),
+                    results=results_as_str,
                 ).to_dict()
             )
         except Exception as e:

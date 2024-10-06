@@ -119,6 +119,60 @@ class QueueViewBuilder(commands.Cog):
         else: 
             await ctx.send(f"Failed to create queue {queue_id}, unknown error.")
 
+
+    @commands.hybrid_command(
+        name="add_queue_to_leaderboard",
+        description="Add a queue to a leaderboard. Elo is shared among queues for a single leaderboard",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def add_queue_to_leaderboard(
+        self,
+        ctx: commands.Context,
+        queue_id: str,
+        leaderboard_id: str,
+    ) -> None:
+        logging.info(f"Processing command to add queue {queue_id} to leaderboard {leaderboard_id} from user {ctx.message.author.name}.")
+
+        leaderboards = self.ddb_manager.get_leaderboards()
+        if leaderboard_id not in [leaderboard.leaderboard_id for leaderboard in leaderboards]:
+            await ctx.send(f"Leaderboard {leaderboard_id} not found.")
+            return
+        
+        queues = self.ddb_manager.get_active_match_queues()
+        if queue_id not in [queue.queue_id for queue in queues]:
+            await ctx.send(f"Queue {queue_id} not found.")
+            return
+        
+        # Update the ddb table
+        self.ddb_manager.add_leaderboard_to_match_queue(queue_id, leaderboard_id)
+
+        # Update the active match
+        self.mm_manager.add_leaderboard_to_active_queue(queue_id, leaderboard_id)
+
+        await ctx.send(f"Queue {queue_id} added to leaderboard {leaderboard_id}. Verify with /list_queues.")
+
+    @commands.hybrid_command(
+        name="list_queues",
+        description="List all active matchmaking queues",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def list_queues(self, ctx: commands.Context) -> None:
+        logging.info(f"Processing command to list queues from user {ctx.message.author.name}.")
+
+        # Assume MM manager is up to date
+        queues = self.mm_manager.active_queues
+
+        if not queues:
+            await ctx.send("No active queues found.")
+            return
+
+        embed = discord.Embed(title="Active Queues")
+
+        for queue in queues:
+            embed.add_field(name=queue.queue.queue_id, value=f"Channel ID: {queue.queue.channel_id}")
+
+        await ctx.send(embed=embed, ephemeral=True)
+
 async def setup(bot: commands.Bot) -> None:
     queue_view_builder = QueueViewBuilder(bot)
     await bot.add_cog(queue_view_builder)

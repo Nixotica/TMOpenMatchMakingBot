@@ -19,6 +19,7 @@ from matchmaking.matches.team_2v2 import Teams2v2
 from models.player_profile import PlayerProfile
 from nadeo.ubi_token_vendor import UbiTokenRefresher
 from matchmaking.matches.created_match_info import CreatedMatchInfo
+from matchmaking.constants import POINTS_LIMIT_1v1v1v1
 import datetime as dt
 
 def get_random_map(match_queue: MatchQueue) -> Map:
@@ -74,7 +75,7 @@ def create_1v1v1v1_match(match_queue: MatchQueue, players: List[PlayerProfile]) 
                     points_repartition="10,6,4,3",
                     number_of_winners=3,
                     finish_timeout=10,
-                    points_limit=40,
+                    points_limit=POINTS_LIMIT_1v1v1v1,
                     rounds_per_map=99,
                 ),
                 plugin_settings=ClassicPluginSettings(

@@ -58,7 +58,7 @@ class LeaderboardView(ui.View):
                 if guild_member is not None:
                     player_discord_name = guild_member.display_name                
 
-            embed.add_field(name=f"{player_pos}. {player_discord_name}", value=f"{player.elo}", inline=False)
+            embed.add_field(name=f"{player_pos}. {player_discord_name}", value=f"{player.elo}")
             
             player_pos += 1
 

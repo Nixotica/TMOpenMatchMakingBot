@@ -20,7 +20,7 @@ class PlayerProfile:
         discord_account_id = data.get(KEY_DISCORD_ACCOUNT_ID)
         matches_played = data.get(KEY_MATCHES_PLAYED)
 
-        if not tm_account_id or not discord_account_id or not matches_played:
+        if not tm_account_id or not discord_account_id or matches_played is None:
             raise ValueError("Missing required fields")
 
         return cls(tm_account_id, int(discord_account_id), int(matches_played))

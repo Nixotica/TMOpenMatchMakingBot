@@ -39,5 +39,6 @@ class MatchQueue:
             KEY_MATCH_CLUB_ID: self.match_club_id,
             KEY_QUEUE_TYPE: self.type.value,
             KEY_ACTIVE: self.active,
-            KEY_CHANNEL_ID: self.channel_id
+            KEY_CHANNEL_ID: self.channel_id,
+            KEY_LEADERBOARD_IDS: self.leaderboard_ids
         }   
