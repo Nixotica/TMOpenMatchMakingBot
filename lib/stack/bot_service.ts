@@ -1,11 +1,10 @@
-import { CfnOutput } from "aws-cdk-lib";
-import { AutoScalingGroup } from "aws-cdk-lib/aws-autoscaling";
+import { BlockDeviceVolume, EbsDeviceVolumeType } from "aws-cdk-lib/aws-autoscaling";
 import { Table } from "aws-cdk-lib/aws-dynamodb";
-import { AmazonLinuxCpuType, AmazonLinuxGeneration, CloudFormationInit, InitCommand, InitFile, InitService, InitSource, Instance, InstanceClass, InstanceSize, InstanceType, LaunchTemplate, MachineImage, Peer, Port, SecurityGroup, ServiceManager, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { Instance, InstanceClass, InstanceSize, InstanceType, MachineImage, Peer, Port, RouterType, SecurityGroup, Subnet, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { BlockDevice } from "aws-cdk-lib/aws-autoscaling";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
-import { AsgCapacityProvider, AwsLogDriver, Cluster, ContainerImage, Ec2Service, Ec2TaskDefinition, FargateService, FargateTaskDefinition, PlacementConstraint, Protocol } from "aws-cdk-lib/aws-ecs";
-import { ApplicationLoadBalancedFargateService } from "aws-cdk-lib/aws-ecs-patterns";
-import { ManagedPolicy, PolicyStatement, Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
+import { AwsLogDriver, Cluster, ContainerImage, Ec2Service, Ec2TaskDefinition, PlacementConstraint, Protocol } from "aws-cdk-lib/aws-ecs";
+import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import path = require("path");
@@ -45,23 +44,37 @@ export class BotServiceConstruct extends Construct {
          */
         const vpc = new Vpc(this, 'MM-Bot-VPC', {
             maxAzs: 1,
+            subnetConfiguration: [
+                {
+                    name: 'Public',
+                    subnetType: SubnetType.PUBLIC,
+                },
+            ],
+            natGateways: 0,
         });
 
-        // /**
-        //  * Security Group
-        //  */
-        // const securityGroup = new SecurityGroup(this, 'MM-Bot-SG', {
-        //     vpc,
-        //     description: 'Allow ECS instances to communicate with ECS control plane and other APIs',
-        //     allowAllOutbound: true, // Allow all outbound traffic
-        // });
+        /**
+         * Security Group
+         */
+        const ecsSecurityGroup = new SecurityGroup(this, 'EcsSecurityGroup', {
+            vpc,
+            description: 'Allow inbound HTTP/HTTPS traffic to ECS instances',
+            allowAllOutbound: true,
+        });
 
-        // // Allow inbound SSH traffic from EC2 Instance Connect IP range (replace with your region's IP range)
-        // securityGroup.addIngressRule(
-        //     Peer.ipv4('18.237.140.160/29'), // This is the range for EC2 Instance Connect in the Oregon region
-        //     Port.tcp(22),
-        //     'Allow SSH access for EC2 Instance Connect'
-        // );
+        // Allow inbound traffic on port 80 (HTTP) from any IP
+        ecsSecurityGroup.addIngressRule(
+            Peer.anyIpv4(), // Accepts traffic from any IP
+            Port.tcp(80),   // HTTP port
+            'Allow inbound HTTP traffic'
+        );
+
+        // (Optional) Allow HTTPS traffic if your app needs it
+        ecsSecurityGroup.addIngressRule(
+            Peer.anyIpv4(), // Accepts traffic from any IP
+            Port.tcp(443),  // HTTPS port
+            'Allow inbound HTTPS traffic'
+        );
 
         /**
          * ECS Cluster
@@ -69,34 +82,23 @@ export class BotServiceConstruct extends Construct {
         const cluster = new Cluster(this, 'MM-Bot-Cluster', {
             vpc,
         });
-        cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
-            instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.NANO), // <- if this doesn't work, go back to micro
+        const rootVolume: BlockDevice = {
+            deviceName: '/dev/xvda',
+            volume: BlockDeviceVolume.ebs(
+                30,
+                {
+                    volumeType: EbsDeviceVolumeType.STANDARD,
+                }
+            )
+        };
+        const autoScalingGroup = cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
+            instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.NANO), 
+            blockDevices: [rootVolume],
+            vpcSubnets: { subnetType: SubnetType.PUBLIC },
+            associatePublicIpAddress: true,
         });
-        // const instanceRole = new Role(this, 'MM-Bot-InstanceRole', {
-        //     assumedBy: new ServicePrincipal('ec2.amazonaws.com'),
-        // });
-        // instanceRole.addManagedPolicy(ManagedPolicy.fromAwsManagedPolicyName('service-role/AmazonEC2ContainerServiceforEC2Role'));
-        // const launchTemplate = new LaunchTemplate(this, 'MM-Bot-LaunchTemplate', {
-        //     instanceType: InstanceType.of(InstanceClass.T4G, InstanceSize.NANO),
-        //     machineImage: MachineImage.latestAmazonLinux2023({
-        //         cpuType: AmazonLinuxCpuType.ARM_64,
-        //     }),
-        //     securityGroup: securityGroup,
-        //     role: instanceRole,
-        //     blockDevices: [],
-        // });
-        // const autoscalingGroup = new AutoScalingGroup(this, 'MM-Bot-AutoScalingGroup', {
-        //     desiredCapacity: 1,
-        //     vpcSubnets: { subnetType: SubnetType.PUBLIC },
-        //     vpc: vpc,
-        //     launchTemplate: launchTemplate,
-        // });
-        // const capacityProvider = new AsgCapacityProvider(this, 'MM-Bot-AsgCapProvider', {
-        //     autoScalingGroup: autoscalingGroup,
-        //     canContainersAccessInstanceRole: true,
-        // });
-        // cluster.addAsgCapacityProvider(capacityProvider);
-  
+        autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
+
         /**
          * Task Definition
          */
