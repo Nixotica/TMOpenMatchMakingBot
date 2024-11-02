@@ -1,8 +1,9 @@
+import { Stack, StackProps } from 'aws-cdk-lib';
 import { AttributeType, BillingMode, Table } from 'aws-cdk-lib/aws-dynamodb';
 import { Bucket, BucketAccessControl, BucketEncryption } from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 
-export interface StorageConstructProps {
+export interface StorageStackProps extends StackProps {
     /** The stage of this stack (dev, prod). */
     stage: string,
 
@@ -11,9 +12,9 @@ export interface StorageConstructProps {
 }
 
 /**
- * A construct for tables and buckets accessed by the bot.  
+ * A stack for tables and buckets accessed by the bot.  
  */
-export class StorageConstruct extends Construct {
+export class StorageStack extends Stack {
     public readonly secretsBucket: Bucket;
     public readonly playerProfilesTable: Table;
     public readonly playerElosTable: Table;
@@ -21,8 +22,8 @@ export class StorageConstruct extends Construct {
     public readonly matchQueuesTable: Table;
     public readonly leaderboardsTable: Table;
 
-    constructor(scope: Construct, id: string, props: StorageConstructProps) {
-        super(scope, id);
+    constructor(scope: Construct, id: string, props: StorageStackProps) {
+        super(scope, id, props);
 
         /**
          * PlayerProfiles Table

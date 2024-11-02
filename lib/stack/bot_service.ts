@@ -8,8 +8,9 @@ import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
 import path = require("path");
+import { Duration, Stack, StackProps } from "aws-cdk-lib";
 
-export interface BotServiceConstructProps {
+export interface BotServiceStackProps extends StackProps {
     /** The stage of this stack (dev, prod). */
     stage: string,
 
@@ -35,9 +36,9 @@ export interface BotServiceConstructProps {
 /**
  * A construct for deploying a container to host the bot. 
  */
-export class BotServiceConstruct extends Construct {
-    constructor(scope: Construct, id: string, props: BotServiceConstructProps) {
-        super(scope, id);
+export class BotServiceStack extends Stack {
+    constructor(scope: Construct, id: string, props: BotServiceStackProps) {
+        super(scope, id, props);
 
         /**
          * VPC 
@@ -140,9 +141,10 @@ export class BotServiceConstruct extends Construct {
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
-            // memoryReservationMiB: 256,
             memoryLimitMiB: 256,
-            // cpu: 256,
+            healthCheck: {
+                command: ['CMD-SHELL', 'exit 0'] // Forced healthy for now
+            }
         });
     
         container.addPortMappings({

@@ -11,6 +11,7 @@ from aws.s3 import S3ClientManager
 from aws.dynamodb import DynamoDbManager
 from discord import Intents
 from discord.ext.commands import Bot
+from health_check import start_health_check_in_thread
 from models.bot_secrets import Secrets
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
@@ -67,10 +68,13 @@ class DiscordBot(Bot):
 
 # Configure logging
 logging.basicConfig(
-    level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s"
+    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
 
 async def main():
+    # Set up health checks and run (don't do for now)
+    # start_health_check_in_thread()
+
     # Retrieve secrets from S3
     secrets: Secrets = S3ClientManager().get_secrets()
 
