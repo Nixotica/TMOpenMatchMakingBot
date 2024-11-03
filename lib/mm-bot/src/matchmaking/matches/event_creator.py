@@ -7,6 +7,7 @@ from nadeo_event_api.api.structure.round.round import Round, RoundConfig
 from nadeo_event_api.api.structure.enums import ScriptType, ParticipantType
 from nadeo_event_api.api.structure.settings.script_settings import (
     CupScriptSettings,
+    RoundsScriptSettings,
     BaseScriptSettings,
     TMWTScriptSettings,
 )
@@ -188,6 +189,67 @@ def create_2v2_match(match_queue: MatchQueue, teams: Teams2v2) -> CreatedMatchIn
         [teams.team_b.player_a.tm_account_id, teams.team_b.player_b.tm_account_id],
         2,
     )
+
+    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
+    matches = get_matches_for_round(round_id, 1, 0)
+    while matches == []:
+        time.sleep(5)
+        matches = get_matches_for_round(round_id, 1, 0)
+    match_id = matches[0].id
+    match_live_id = matches[0].club_match_live_id
+
+    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
+
+
+def create_solo_match(
+    match_queue: MatchQueue,
+    player: PlayerProfile,
+) -> CreatedMatchInfo:
+    """Create a solo match using Trackmania competition tool for testing purposes.
+
+    Returns:
+        (int, int, int, str): The event ID, round ID, match ID, and match Live ID of the created match.
+    """
+
+    event_name = "Better MM Match"
+    match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
+
+    map_to_use = get_random_map(match_queue)
+
+    event = Event(
+        name=event_name,
+        club_id=match_queue.match_club_id,
+        rounds=[
+            Round(
+                name="Match",
+                start_date=match_start_time,
+                end_date=match_start_time + dt.timedelta(hours=1),
+                matches=[Match(spots=[SeedMatchSpot(1)])],
+                config=RoundConfig(
+                    map_pool=[map_to_use],
+                    script=ScriptType.ROUNDS,
+                    max_players=2,
+                    script_settings=RoundsScriptSettings(
+                        base_script_settings=BaseScriptSettings(
+                            warmup_number=0,
+                        ),
+                        points_repartition="1,0",
+                        points_limit=1,
+                        rounds_per_map=1,
+                    ),
+                    plugin_settings=ClassicPluginSettings(
+                        auto_start_mode=AutoStartMode.DISABLED,
+                    ),
+                ),
+            )
+        ],
+    )
+
+    # TODO - error handling
+    event_id = post_event(event)
+
+    # Add player before event actually start
+    event.add_participant(player.tm_account_id, 1)
 
     round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
     matches = get_matches_for_round(round_id, 1, 0)

@@ -127,5 +127,12 @@ class ActiveMatchQueue:
                 teams_in_match = self.teams[:2]
                 teams = Teams2v2(teams_in_match[0], teams_in_match[1])
                 return ActiveMatch.create_2v2(self.queue, teams)
+        elif self.queue.type == QueueType.QueueSoloTest.value:
+            logging.debug(
+                f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
+            )
+            if len(self.players) >= 1:
+                player_in_match = self.players[0]
+                return ActiveMatch.create_solo(self.queue, player_in_match.profile)
         else:
             return None

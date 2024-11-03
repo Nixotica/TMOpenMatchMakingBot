@@ -8,7 +8,11 @@ from nadeo_event_api.objects.inbound.match_info import MatchInfo
 from nadeo_event_api.api.structure.event import Event
 from models.match_queue import MatchQueue
 from matchmaking.matches.team_2v2 import Teams2v2
-from matchmaking.matches.event_creator import create_1v1v1v1_match, create_2v2_match
+from matchmaking.matches.event_creator import (
+    create_1v1v1v1_match,
+    create_2v2_match,
+    create_solo_match,
+)
 
 
 class ActiveMatch:
@@ -64,6 +68,23 @@ class ActiveMatch:
             match_info.match_id,
             match_info.match_live_id,
             teams,
+            match_queue,
+        )
+
+    @staticmethod
+    def create_solo(
+        match_queue: MatchQueue,
+        player: PlayerProfile,
+    ) -> ActiveMatch:
+        logging.info(f"Creating new solo match for player {player}")
+        match_info = create_solo_match(match_queue, player)
+
+        return ActiveMatch(
+            match_info.event_id,
+            match_info.round_id,
+            match_info.match_id,
+            match_info.match_live_id,
+            [player],
             match_queue,
         )
 

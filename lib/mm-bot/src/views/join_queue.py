@@ -69,7 +69,8 @@ class JoinQueueView(ui.View):
             )
             return
 
-        if player_profile not in requested_queue.players:
+        player_profiles = [p.profile for p in requested_queue.players]
+        if player_profile not in player_profiles:
             await interaction.response.send_message(
                 f"You are not in queue {self.queue_id}.", ephemeral=True
             )

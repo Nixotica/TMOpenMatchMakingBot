@@ -32,5 +32,6 @@ if (process.env.STAGE == 'dev') {
     matchResultsTable: storage.matchResultsTable,
     matchQueuesTable: storage.matchQueuesTable,
     leaderboardsTable: storage.leaderboardsTable,
+    ranksTable: storage.ranksTable,
   })
 }

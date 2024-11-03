@@ -211,44 +211,52 @@ class MatchmakingManager:
 
         self._last_check_queues_time = now
         logging.debug("Checking queues for sufficient size to generate matches...")
+        new_active_matches: List[ActiveMatch] = []
         for active_queue in self.active_queues:
             active_match = active_queue.try_generate_match()
-            if active_match is not None:
-                logging.info(
-                    f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}."
+
+            if active_match is None:
+                logging.debug(
+                    f"Queue {active_queue.queue.queue_id} does not have enough players to generate a match."
                 )
-                # Remove players in new active match from all queues
-                for active_queue in self.active_queues:
-                    # Remove all independent players
-                    for player in active_queue.players:
-                        if isinstance(active_match.player_profiles, List):
-                            if player in active_match.player_profiles:
-                                active_queue.remove_player(player)
-                        else:
-                            if (
-                                active_match.player_profiles.team_a.player_a == player
-                                or active_match.player_profiles.team_a.player_b
-                                == player
-                                or active_match.player_profiles.team_b.player_a
-                                == player
-                                or active_match.player_profiles.team_b.player_b
-                                == player
-                            ):
-                                active_queue.remove_player(player)
-                    # Remove all teams (joined as parties)
-                    for team in active_queue.teams:
-                        if isinstance(active_match.player_profiles, List):
-                            logging.warning(
-                                "Found individual player in an active queue team, this should not happen."
-                            )
-                            continue
+                continue
+
+            logging.info(
+                f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}."
+            )
+            new_active_matches.append(active_match)
+
+        for active_match in new_active_matches:
+            # Remove players in new active match from all queues
+            for active_queue in self.active_queues:
+                # Remove all independent players
+                players_to_remove = active_queue.players.copy()
+                for player in players_to_remove:
+                    if isinstance(active_match.player_profiles, List):
+                        if player.profile in active_match.player_profiles:
+                            active_queue.remove_player(player)
+                    else:
                         if (
-                            team == active_match.player_profiles.team_a
-                            or team == active_match.player_profiles.team_b
+                            active_match.player_profiles.team_a.player_a == player
+                            or active_match.player_profiles.team_a.player_b == player
+                            or active_match.player_profiles.team_b.player_a == player
+                            or active_match.player_profiles.team_b.player_b == player
                         ):
-                            active_queue.remove_team(team)
-                self.new_active_matches.append(active_match)
-                self.active_matches.append(active_match)
+                            active_queue.remove_player(player)
+                # Remove all teams (joined as parties)
+                for team in active_queue.teams:
+                    if isinstance(active_match.player_profiles, List):
+                        logging.warning(
+                            "Found individual player in an active queue team, this should not happen."
+                        )
+                        continue
+                    if (
+                        team == active_match.player_profiles.team_a
+                        or team == active_match.player_profiles.team_b
+                    ):
+                        active_queue.remove_team(team)
+            self.new_active_matches.append(active_match)
+            self.active_matches.append(active_match)
 
     async def _check_active_matches(self):
         """Checks if the matchmaking manager can get results from ongoing/completed matches."""
