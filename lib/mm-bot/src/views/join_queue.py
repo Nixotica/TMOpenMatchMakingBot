@@ -5,35 +5,47 @@ from discord.ext import tasks, commands
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
 
+
 class JoinQueueView(ui.View):
     """
-    A view for joining and leaving a matchmaking queue, plus the players in the queue. 
+    A view for joining and leaving a matchmaking queue, plus the players in the queue.
     """
+
     def __init__(self, queue_id: str):
         super().__init__(timeout=None)
         self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
         self.queue_id = queue_id
-        
+
     @ui.button(label="Join Queue", style=discord.ButtonStyle.green)
     async def join_queue(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
 
-        logging.info(f"Processing button pressed to join queue {self.queue_id} for user {user.name}")
+        logging.info(
+            f"Processing button pressed to join queue {self.queue_id} for user {user.name}"
+        )
 
-        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(user.id)
+        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
+            user.id
+        )
 
         if not player_profile:
-            await interaction.response.send_message(f"You have not registered your account yet.", ephemeral=True)
+            await interaction.response.send_message(
+                f"You have not registered your account yet.", ephemeral=True
+            )
             return
 
         added_queue = self.mm_manager.add_player_to_queue(player_profile, self.queue_id)
-        
+
         if not added_queue:
-            await interaction.response.send_message(f"Failed to join queue {self.queue_id}.", ephemeral=True)
+            await interaction.response.send_message(
+                f"Failed to join queue {self.queue_id}.", ephemeral=True
+            )
             return
-        
-        await interaction.response.send_message(f"Joined queue {self.queue_id}.", ephemeral=True)
+
+        await interaction.response.send_message(
+            f"Joined queue {self.queue_id}.", ephemeral=True
+        )
 
         await self.update_embed()
 
@@ -41,23 +53,33 @@ class JoinQueueView(ui.View):
     async def leave_queue(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
 
-        logging.info(f"Processing button pressed to leave queue {self.queue_id} for user {user.name}")
+        logging.info(
+            f"Processing button pressed to leave queue {self.queue_id} for user {user.name}"
+        )
 
-        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(user.id)
+        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
+            user.id
+        )
 
         requested_queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
 
         if not requested_queue:
-            logging.error(f"When attempting to leave queue {self.queue_id}, queue was not found.")
+            logging.error(
+                f"When attempting to leave queue {self.queue_id}, queue was not found."
+            )
             return
 
         if player_profile not in requested_queue.players:
-            await interaction.response.send_message(f"You are not in queue {self.queue_id}.", ephemeral=True)
+            await interaction.response.send_message(
+                f"You are not in queue {self.queue_id}.", ephemeral=True
+            )
             return
 
         self.mm_manager.remove_player_from_queue(player_profile, self.queue_id)
 
-        await interaction.response.send_message(f"Left queue {self.queue_id}.", ephemeral=True)
+        await interaction.response.send_message(
+            f"Left queue {self.queue_id}.", ephemeral=True
+        )
 
         await self.update_embed()
 
@@ -75,7 +97,9 @@ class JoinQueueView(ui.View):
         queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
 
         if queue is None:
-            logging.error(f"When updating JoinQueueView embed, queue {self.queue_id} was not found.")
+            logging.error(
+                f"When updating JoinQueueView embed, queue {self.queue_id} was not found."
+            )
             raise ValueError(f"Queue {self.queue_id} not found.")
 
         num_players_in_queue = len(queue.players)
@@ -87,4 +111,4 @@ class JoinQueueView(ui.View):
         embed = discord.Embed(title=f"Better Matchmaking Queue - {self.queue_id}")
         embed.add_field(name="Players: ", value=num_players_in_queue)
 
-        await self.message.edit(embed=embed) 
+        await self.message.edit(embed=embed)

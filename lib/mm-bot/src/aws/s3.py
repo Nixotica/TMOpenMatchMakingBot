@@ -4,8 +4,10 @@ import os
 from typing import Any, Dict
 
 import boto3
+from botocore.exceptions import ClientError
 from aws.constants import *
 from models.bot_secrets import Secrets
+from models.bot_configs import BotConfigs
 from mypy_boto3_s3 import S3Client
 
 
@@ -67,3 +69,26 @@ class S3ClientManager:
         except Exception as e:
             logging.error(f"Error getting secrets: {e}")
             raise
+
+    def get_configs(self) -> BotConfigs:
+        try:
+            configs_json = self._get_json_as_dict(self._secrets_bucket, CONFIGS_JSON)
+            return BotConfigs.from_dict(configs_json)
+        except ClientError as e:
+            if e.response["Error"]["Code"] == "NoSuchKey":
+                return BotConfigs.from_dict({})
+            else:
+                logging.error(f"Error getting configs: {e}")
+                raise
+        except Exception as e:
+            logging.error(f"Error getting configs: {e}")
+            raise
+
+    def update_config(self, configs: BotConfigs) -> None:
+        """Creates or overwrites the configs file in s3.
+
+        Args:
+            configs (BotConfigs): The configs to overwrite current configs with.
+        """
+        config_data = json.dumps(configs.to_dict())
+        self._client.put_object(Bucket=self._secrets_bucket, Key=CONFIGS_JSON, Body=config_data)  # type: ignore

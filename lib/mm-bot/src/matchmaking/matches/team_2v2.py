@@ -6,7 +6,7 @@ from models.player_profile import PlayerProfile
 class Team2v2:
     player_a: PlayerProfile
     player_b: PlayerProfile
-    
+
 
 @dataclass
 class Teams2v2:

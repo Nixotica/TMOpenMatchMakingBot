@@ -31,6 +31,9 @@ export interface BotServiceStackProps extends StackProps {
 
     /** A table containing leaderboards. */
     leaderboardsTable: Table,
+
+    /** A table containing ranks. */
+    ranksTable: Table,
 }
 
 /**
@@ -119,6 +122,7 @@ export class BotServiceStack extends Stack {
         props.matchResultsTable.grantFullAccess(taskRole);
         props.matchQueuesTable.grantFullAccess(taskRole);
         props.leaderboardsTable.grantFullAccess(taskRole);
+        props.ranksTable.grantFullAccess(taskRole);
 
         // Define the EC2 task with container details
         const ec2TaskDefinition = new Ec2TaskDefinition(this, 'MM-Bot-Task', {
@@ -138,6 +142,7 @@ export class BotServiceStack extends Stack {
                 MATCH_RESULTS_TABLE: props.matchResultsTable.tableName,
                 MATCH_QUEUES_TABLE: props.matchQueuesTable.tableName,
                 LEADERBOARDS_TABLE: props.leaderboardsTable.tableName,
+                RANKS_TABLE: props.ranksTable.tableName,
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },

@@ -17,9 +17,9 @@ class Leaderboard:
         if not leaderboard_id or not channel_id:
             raise ValueError("Missing required fields")
         return cls(leaderboard_id, int(channel_id))
-    
+
     def to_dict(self):
         return {
             KEY_LEADERBOARD_ID: self.leaderboard_id,
-            KEY_CHANNEL_ID: self.channel_id
+            KEY_CHANNEL_ID: self.channel_id,
         }

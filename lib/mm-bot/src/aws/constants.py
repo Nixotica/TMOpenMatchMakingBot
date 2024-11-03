@@ -2,6 +2,9 @@ SECRETS_JSON = "secrets.json"
 SECRET_UBI_AUTHS = "UBI_AUTHS"
 SECRET_DISCORD_BOT_TOKEN = "DISCORD_BOT_TOKEN"
 
+CONFIGS_JSON = "configs.json"
+CONFIGS_GLOBAL_LEADERBOARD_ID = "GLOBAL_LEADERBOARD_ID"
+
 KEY_TM_ACCOUNT_ID = "tm_account_id"
 KEY_DISCORD_ACCOUNT_ID = "discord_account_id"
 KEY_ELO = "elo"
@@ -23,5 +26,8 @@ KEY_TIME_PLAYED = "time_played"
 KEY_RESULTS = "results"
 
 KEY_LEADERBOARD_ID = "leaderboard_id"
+
+KEY_RANK_ROLE_ID = "rank_role_id"
+KEY_MIN_ELO = "min_elo"
 
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

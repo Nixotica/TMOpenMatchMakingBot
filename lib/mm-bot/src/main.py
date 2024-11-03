@@ -15,6 +15,7 @@ from health_check import start_health_check_in_thread
 from models.bot_secrets import Secrets
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
+
 # Define bot
 class DiscordBot(Bot):
     def __init__(self) -> None:
@@ -60,16 +61,20 @@ class DiscordBot(Bot):
         # Register signal handlers for SIGINT and SIGTERM to gracefully shutdown
         loop = asyncio.get_running_loop()
         for signal_type in (signal.SIGINT, signal.SIGTERM):
-            loop.add_signal_handler(signal_type, lambda: asyncio.create_task(self.shutdown()))
+            loop.add_signal_handler(
+                signal_type, lambda: asyncio.create_task(self.shutdown())
+            )
 
     async def start_bot(self, token: str):
         """Run the bot with the given token."""
         await self.start(token)
 
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
 )
+
 
 async def main():
     # Set up health checks and run (don't do for now)
@@ -78,7 +83,7 @@ async def main():
     # Retrieve secrets from S3
     secrets: Secrets = S3ClientManager().get_secrets()
 
-    # Set up the matchmaking manager and run 
+    # Set up the matchmaking manager and run
     MatchmakingManager().start_run_forever_in_thread()
 
     # Set up and run bot
@@ -87,8 +92,12 @@ async def main():
     try:
         await bot.start_bot(secrets.discord_bot_token)
     except KeyboardInterrupt:
-        logging.info("Bot interrupted by keyboard, shutting down...")
-        await bot.shutdown()
+        logging.warn("Bot interrupted by keyboard, shutting down...")
+    except Exception as e:
+        logging.error(f"Got excepting during bot runtime {e}")
+
+    await bot.shutdown()
+
 
 if __name__ == "__main__":
     asyncio.run(main())

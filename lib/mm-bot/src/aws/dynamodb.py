@@ -4,7 +4,17 @@ import os
 from typing import List, Optional
 
 import boto3
-from aws.constants import KEY_LEADERBOARD_ID, KEY_LEADERBOARD_IDS, KEY_TM_ACCOUNT_ID, KEY_DISCORD_ACCOUNT_ID, KEY_ELO, KEY_MATCHES_PLAYED, KEY_ACTIVE, INDEX_DISCORD_ACCOUNT_ID, KEY_QUEUE_ID
+from aws.constants import (
+    KEY_LEADERBOARD_ID,
+    KEY_LEADERBOARD_IDS,
+    KEY_TM_ACCOUNT_ID,
+    KEY_DISCORD_ACCOUNT_ID,
+    KEY_ELO,
+    KEY_MATCHES_PLAYED,
+    KEY_ACTIVE,
+    INDEX_DISCORD_ACCOUNT_ID,
+    KEY_QUEUE_ID,
+)
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
 from botocore.exceptions import ClientError
@@ -58,6 +68,11 @@ class DynamoDbManager:
             raise ValueError("LEADERBOARDS_TABLE environment variable is not set")
         self._leaderboards_table = self._resource.Table(leaderboards_table)
 
+        ranks_table = os.environ.get("RANKS_TABLE")
+        if ranks_table is None:
+            raise ValueError("RANKS_TABLE environment variable is not set")
+        self._ranks_table = self._resource.Table(ranks_table)
+
     def _create_client(self) -> DynamoDBClient:
         try:
             dynamodb_client = boto3.client("dynamodb")
@@ -109,7 +124,9 @@ class DynamoDbManager:
         try:
             response = self._player_profiles_table.query(
                 IndexName=INDEX_DISCORD_ACCOUNT_ID,
-                KeyConditionExpression=Key(KEY_DISCORD_ACCOUNT_ID).eq(discord_account_id)
+                KeyConditionExpression=Key(KEY_DISCORD_ACCOUNT_ID).eq(
+                    discord_account_id
+                ),
             )
             items = response.get("Items", [])
             if not items:
@@ -124,31 +141,34 @@ class DynamoDbManager:
             raise
 
     def create_player_profile_for_tm_account_id(
-        self, tm_account_id: str, discord_account_id: int,
+        self,
+        tm_account_id: str,
+        discord_account_id: int,
     ) -> bool:
         """
-        Create a player profile record in the PlayerProfiles table for a given TM account ID and Discord account ID. 
+        Create a player profile record in the PlayerProfiles table for a given TM account ID and Discord account ID.
         :param tm_account_id: The TM account ID to create a player profile for
         :param discord_account_id: The Discord account ID to create a player profile for
-        :return: True if the profile was successfully created, False otherwise. 
+        :return: True if the profile was successfully created, False otherwise.
         """
         try:
             player_profile = PlayerProfile.from_dict(
                 {
                     KEY_TM_ACCOUNT_ID: tm_account_id,
                     KEY_DISCORD_ACCOUNT_ID: discord_account_id,
-                    KEY_MATCHES_PLAYED: 0
+                    KEY_MATCHES_PLAYED: 0,
                 }
             )
 
             self._player_profiles_table.put_item(
                 Item=player_profile.__dict__,
-                ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).not_exists() & Attr(KEY_DISCORD_ACCOUNT_ID).not_exists(),
+                ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).not_exists()
+                & Attr(KEY_DISCORD_ACCOUNT_ID).not_exists(),
             )
 
             return True
         except ClientError as e:
-            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":                
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
                 logging.warning(
                     f"Player profile already exists for TM account ID {tm_account_id} and Discord account ID {discord_account_id}"
                 )
@@ -170,14 +190,16 @@ class DynamoDbManager:
             items = response.get("Items", [])
             if not items:
                 return []
-            player_profiles = [PlayerProfile.from_dict(items[i]) for i in range(len(items))]
+            player_profiles = [
+                PlayerProfile.from_dict(items[i]) for i in range(len(items))
+            ]
             return player_profiles
         except Exception as e:
             logging.error(f"Error getting player profiles from DynamoDB: {e}")
             raise
 
     def update_player_matches_complete(self, tm_account_id: str) -> bool:
-        """Updates player profile for completing a new match by incrementing matches played by 1. 
+        """Updates player profile for completing a new match by incrementing matches played by 1.
 
         Args:
             tm_account_id (str): The TM acccount for which the match was completed.
@@ -201,7 +223,9 @@ class DynamoDbManager:
             return True
         except ClientError as e:
             if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
-                logging.warning(f"Player profile for TM account ID {tm_account_id} does not exist.")
+                logging.warning(
+                    f"Player profile for TM account ID {tm_account_id} does not exist."
+                )
                 return False
             else:
                 logging.error(f"ClientError when updating player profile: {e}")
@@ -210,22 +234,24 @@ class DynamoDbManager:
             logging.error(f"Error updating player profile in DynamoDB: {e}")
             raise
 
-    def update_player_elo(self, tm_account_id: str, leaderboard_id: str, new_elo: int) -> bool:
-        """Updates player elo for a given leaderboard. 
+    def update_player_elo(
+        self, tm_account_id: str, leaderboard_id: str, new_elo: int
+    ) -> bool:
+        """Updates player elo for a given leaderboard.
 
         Args:
-            tm_account_id (str): The TM account for which the elo should be updated. 
-            leaderboard_id (str): The leaderboard ID for which the elo should be updated. 
-            new_elo (int): The player's new elo. 
+            tm_account_id (str): The TM account for which the elo should be updated.
+            leaderboard_id (str): The leaderboard ID for which the elo should be updated.
+            new_elo (int): The player's new elo.
 
         Returns:
-            bool: True if the profile was successfully updated, False otherwise. 
+            bool: True if the profile was successfully updated, False otherwise.
         """
         try:
             self._player_elos_table.update_item(
                 Key={
                     KEY_TM_ACCOUNT_ID: tm_account_id,
-                    KEY_LEADERBOARD_ID: leaderboard_id
+                    KEY_LEADERBOARD_ID: leaderboard_id,
                 },
                 UpdateExpression="SET #elo = :new_elo",
                 ExpressionAttributeNames={
@@ -239,7 +265,9 @@ class DynamoDbManager:
             return True
         except ClientError as e:
             if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
-                logging.warning(f"Player profile for TM account ID {tm_account_id} does not exist.")
+                logging.warning(
+                    f"Player profile for TM account ID {tm_account_id} does not exist."
+                )
                 return False
             else:
                 logging.error(f"ClientError when updating player profile: {e}")
@@ -252,7 +280,7 @@ class DynamoDbManager:
         """Get a list of active match queues from the MatchQueues table.
 
         Returns:
-            List[MatchQueue]: List of match queues marked as "active" in DDB. 
+            List[MatchQueue]: List of match queues marked as "active" in DDB.
         """
         try:
             response = self._match_queues_table.scan(
@@ -267,7 +295,9 @@ class DynamoDbManager:
             logging.error(f"Error getting active match queues from DynamoDB: {e}")
             raise
 
-    def add_leaderboard_to_match_queue(self, queue_id: str, leaderboard_id: str) -> None:
+    def add_leaderboard_to_match_queue(
+        self, queue_id: str, leaderboard_id: str
+    ) -> None:
         """Add a leaderboard to a match queue.
 
         Args:
@@ -295,13 +325,13 @@ class DynamoDbManager:
             raise
 
     def put_match_results(
-            self, 
-            queue_id: str,
-            match_id: int,
-            match_live_id: str,
-            time_played: datetime,
-            results_as_str: str,
-            ) -> None:
+        self,
+        queue_id: str,
+        match_id: int,
+        match_live_id: str,
+        time_played: datetime,
+        results_as_str: str,
+    ) -> None:
         """Puts match results into the MatchResults table.
 
         Returns:
@@ -311,7 +341,7 @@ class DynamoDbManager:
             self._match_results_table.put_item(
                 Item=DdbMatchResults(
                     bot_match_id=match_id,
-                    queue_id=queue_id, 
+                    queue_id=queue_id,
                     tm_match_id=match_id,
                     tm_match_live_id=match_live_id,
                     time_played=time_played.isoformat(),
@@ -323,13 +353,13 @@ class DynamoDbManager:
             raise
 
     def create_queue(self, queue: MatchQueue) -> bool:
-        """Create a new matchmaking queue. 
+        """Create a new matchmaking queue.
 
         Args:
             queue (MatchQueue): The queue to add to the database.
 
         Returns:
-            bool: True if the queue was successfully created, False otherwise. 
+            bool: True if the queue was successfully created, False otherwise.
         """
         try:
             self._match_queues_table.put_item(
@@ -340,9 +370,7 @@ class DynamoDbManager:
             return True
         except ClientError as e:
             if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
-                logging.warning(
-                    f"Queue already exists for queue ID {queue.queue_id}"
-                )
+                logging.warning(f"Queue already exists for queue ID {queue.queue_id}")
                 return False
             else:
                 raise
@@ -386,7 +414,7 @@ class DynamoDbManager:
         """
         try:
             response = self._leaderboards_table.scan()
-            items =  response.get("Items", [])
+            items = response.get("Items", [])
             if not items:
                 return []
             leaderboards = [Leaderboard.from_dict(items[i]) for i in range(len(items))]
@@ -395,7 +423,9 @@ class DynamoDbManager:
             logging.error(f"Error getting leaderboards from DynamoDB: {e}")
             raise
 
-    def get_or_create_player_elo(self, tm_account_id: str, leaderboard_id: str) -> PlayerElo:
+    def get_or_create_player_elo(
+        self, tm_account_id: str, leaderboard_id: str
+    ) -> PlayerElo:
         """Get the elo for a given leaderboard ID for a specific player. If it doesn't exist, will create a record with the default elo.
 
         Args:
@@ -409,21 +439,24 @@ class DynamoDbManager:
             get_response = self._player_elos_table.get_item(
                 Key={
                     KEY_TM_ACCOUNT_ID: tm_account_id,
-                    KEY_LEADERBOARD_ID: leaderboard_id
+                    KEY_LEADERBOARD_ID: leaderboard_id,
                 }
             )
             item = get_response.get("Item", {})
             if not item:
-                logging.info(f"No elo found for account ID {tm_account_id} and leaderbord ID {leaderboard_id}. Creating default one.")
+                logging.info(
+                    f"No elo found for account ID {tm_account_id} and leaderbord ID {leaderboard_id}. Creating default one."
+                )
                 try:
                     item = PlayerElo(
-                            tm_account_id=tm_account_id,
-                            leaderboard_id=leaderboard_id,
-                            elo=DEFAULT_ELO
-                        ).to_dict()
+                        tm_account_id=tm_account_id,
+                        leaderboard_id=leaderboard_id,
+                        elo=DEFAULT_ELO,
+                    ).to_dict()
                     _ = self._player_elos_table.put_item(
                         Item=item,
-                        ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).not_exists() & Attr(KEY_LEADERBOARD_ID).not_exists(),
+                        ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).not_exists()
+                        & Attr(KEY_LEADERBOARD_ID).not_exists(),
                     )
                 except Exception as e:
                     logging.error(f"Error creating player elo in DynamoDB: {e}")
@@ -450,7 +483,7 @@ class DynamoDbManager:
                 ScanIndexForward=False,
             )
             items = response.get("Items", [])
-            if not items: 
+            if not items:
                 return []
             player_elos = [PlayerElo.from_dict(items[i]) for i in range(len(items))]
             return player_elos

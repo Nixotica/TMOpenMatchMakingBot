@@ -1,6 +1,13 @@
 from dataclasses import dataclass
 from typing import Any, Dict
-from aws.constants import KEY_BOT_MATCH_ID, KEY_QUEUE_ID, KEY_TM_MATCH_ID, KEY_TM_MATCH_LIVE_ID, KEY_TIME_PLAYED, KEY_RESULTS
+from aws.constants import (
+    KEY_BOT_MATCH_ID,
+    KEY_QUEUE_ID,
+    KEY_TM_MATCH_ID,
+    KEY_TM_MATCH_LIVE_ID,
+    KEY_TIME_PLAYED,
+    KEY_RESULTS,
+)
 import datetime as dt
 
 
@@ -9,7 +16,7 @@ class DdbMatchResults:
     bot_match_id: int
     queue_id: str
     tm_match_id: int
-    tm_match_live_id: str 
+    tm_match_live_id: str
     time_played: str
     results: str
 
@@ -20,5 +27,5 @@ class DdbMatchResults:
             KEY_TM_MATCH_ID: self.tm_match_id,
             KEY_TM_MATCH_LIVE_ID: self.tm_match_live_id,
             KEY_TIME_PLAYED: self.time_played,
-            KEY_RESULTS: self.results
+            KEY_RESULTS: self.results,
         }

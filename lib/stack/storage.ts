@@ -21,6 +21,7 @@ export class StorageStack extends Stack {
     public readonly matchResultsTable: Table;
     public readonly matchQueuesTable: Table;
     public readonly leaderboardsTable: Table;
+    public readonly ranksTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageStackProps) {
         super(scope, id, props);
@@ -121,6 +122,19 @@ export class StorageStack extends Stack {
         });
 
         /**
+         * Ranks Table
+         * 
+         * A table for storing the elo cutoffs for each rank with respect to the "global" leaderboard consisting of:
+         * - `rank_role_id`: Rank ID as discord role (Primary Key)
+         * - `min_elo`: The minimum elo to get this role 
+         */
+        this.ranksTable = new Table(this, "RanksTable", {
+            partitionKey: { name: "rank_role_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-ranks-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+
+        /**
          * Secrets Bucket
          * 
          * A bucket to store encrypted data consisting of a file `secrets.json` of the form:
@@ -130,6 +144,8 @@ export class StorageStack extends Stack {
          *      "DISCORD_BOT_TOKEN": "bot_token"
          * }
          * ```
+         * 
+         * Also stores an updatable `configs.json`. Will create it if doesn't exist. 
          */
         this.secretsBucket = new Bucket(this, "MMBotSecretsBucket", {
             encryption: BucketEncryption.S3_MANAGED,

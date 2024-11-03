@@ -1,12 +1,14 @@
 import unittest
 from typing import Dict
 from src.models.player_elo import PlayerElo
-from src.matchmaking.match_complete.calculate_elo import calculate_elo_ratings  # Assuming this code is in a module called elo_system
+from src.matchmaking.match_complete.calculate_elo import (
+    calculate_elo_ratings,
+)  # Assuming this code is in a module called elo_system
+
 
 class TestEloSystem(unittest.TestCase):
-    
     def setUp(self):
-        # Create player profiles 
+        # Create player profiles
         self.player1 = PlayerElo(
             "tm_acc_1",
             "leaderboard_id",
