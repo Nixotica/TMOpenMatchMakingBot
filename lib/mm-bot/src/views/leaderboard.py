@@ -72,7 +72,7 @@ class LeaderboardView(ui.View):
                     player_discord_name = guild_member.display_name
 
             embed.add_field(
-                name=f"{player_pos}. {player_discord_name}", value=f"{player.elo}"
+                name=f"{player_pos}. {player_discord_name}", value=f"{player.elo}", inline=True,
             )
 
             player_pos += 1

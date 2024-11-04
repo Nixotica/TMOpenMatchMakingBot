@@ -14,6 +14,8 @@ from aws.constants import (
     KEY_ACTIVE,
     INDEX_DISCORD_ACCOUNT_ID,
     KEY_QUEUE_ID,
+    KEY_RANK_ROLE_ID,
+    KEY_MIN_ELO,
 )
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
@@ -24,6 +26,7 @@ from models.leaderboard import Leaderboard
 from models.player_elo import PlayerElo
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from models.match_queue import MatchQueue
+from models.rank_role import RankRole
 
 
 class DynamoDbManager:
@@ -489,4 +492,46 @@ class DynamoDbManager:
             return player_elos
         except Exception as e:
             logging.error(f"Error getting player elos from DynamoDB: {e}")
+            raise
+
+    def create_rank(self, rank_role: RankRole) -> bool:
+        """Create a new rank role.
+
+        Args:
+            rank_role (RankRole): The rank role to add to the database.
+
+        Returns:
+            bool: True if the rank role was successfully created, False otherwise.
+        """
+        try:
+            self._ranks_table.put_item(
+                Item=rank_role.to_dict(),
+                ConditionExpression=Attr(KEY_RANK_ROLE_ID).not_exists(),
+            )
+
+            return True
+        except ClientError as e:
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+                logging.warning(
+                    f"Rank role already exists for rank role ID {rank_role.rank_role_id}"
+                )
+                return False
+            else:
+                raise
+
+    def get_ranks(self) -> List[RankRole]:
+        """Get a list of ranks from the Ranks table.
+
+        Returns:
+            List[RankRole]: List of ranks in DDB.
+        """
+        try:
+            response = self._ranks_table.scan()
+            items = response.get("Items", [])
+            if not items:
+                return []
+            ranks = [RankRole.from_dict(items[i]) for i in range(len(items))]
+            return ranks
+        except Exception as e:
+            logging.error(f"Error getting ranks from DynamoDB: {e}")
             raise

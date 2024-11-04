@@ -126,10 +126,11 @@ export class StorageStack extends Stack {
          * 
          * A table for storing the elo cutoffs for each rank with respect to the "global" leaderboard consisting of:
          * - `rank_role_id`: Rank ID as discord role (Primary Key)
+         * - `display_name`: Display name of the role
          * - `min_elo`: The minimum elo to get this role 
          */
         this.ranksTable = new Table(this, "RanksTable", {
-            partitionKey: { name: "rank_role_id", type: AttributeType.STRING },
+            partitionKey: { name: "rank_role_id", type: AttributeType.NUMBER },
             tableName: `tm-mm-bot-ranks-${props.stage}-${props.account}`,
             billingMode: BillingMode.PAY_PER_REQUEST,
         });
