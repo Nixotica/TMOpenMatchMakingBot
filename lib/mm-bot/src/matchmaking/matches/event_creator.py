@@ -6,7 +6,7 @@ from nadeo_event_api.api.structure.event import Event
 from nadeo_event_api.api.structure.round.round import Round, RoundConfig
 from nadeo_event_api.api.structure.enums import ScriptType, ParticipantType
 from nadeo_event_api.api.structure.settings.script_settings import (
-    CupScriptSettings,
+    CupSpecialScriptSettings,
     RoundsScriptSettings,
     BaseScriptSettings,
     TMWTScriptSettings,
@@ -86,9 +86,9 @@ def create_1v1v1v1_match(
                 ],
                 config=RoundConfig(
                     map_pool=[map_to_use],
-                    script=ScriptType.CUP,
+                    script=ScriptType.CUP_CLASSIC,
                     max_players=len(players) + 1,
-                    script_settings=CupScriptSettings(
+                    script_settings=CupSpecialScriptSettings(
                         base_script_settings=BaseScriptSettings(
                             warmup_number=1,
                         ),
@@ -96,7 +96,9 @@ def create_1v1v1v1_match(
                         number_of_winners=3,
                         finish_timeout=10,
                         points_limit=POINTS_LIMIT_1v1v1v1,
+                        cup_points_limit=POINTS_LIMIT_1v1v1v1,
                         rounds_per_map=99,
+                        ko_checkpoint_number=0,
                     ),
                     plugin_settings=ClassicPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,
