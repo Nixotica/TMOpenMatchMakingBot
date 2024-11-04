@@ -4,7 +4,7 @@ from models.player_elo import PlayerElo
 
 
 def calculate_elo_ratings(
-    match_positions: Dict[PlayerElo, int], K=7
+    match_positions: Dict[PlayerElo, int], K=20
 ) -> tuple[Dict[PlayerElo, int], Dict[PlayerElo, int]]:
     """
     Calculate updated Elo ratings for all players based on their match positions.
