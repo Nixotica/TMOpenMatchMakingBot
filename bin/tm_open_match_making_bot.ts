@@ -22,17 +22,17 @@ if (process.env.STAGE == 'dev') {
     env: env,
     stage: 'prod',
     account: env.account,
+  }) 
+  new BotServiceStack(app, 'TmOpenMatchMakingBotStack-BotService-prod', {
+    env: env,
+    stage: 'prod',
+    secretsBucket: storage.secretsBucket,
+    playerProfilesTable: storage.playerProfilesTable,
+    playerElosTable: storage.playerElosTable,
+    matchResultsTable: storage.matchResultsTable,
+    matchQueuesTable: storage.matchQueuesTable,
+    leaderboardsTable: storage.leaderboardsTable,
+    ranksTable: storage.ranksTable,
+    leaderboardRanksTable: storage.leaderboardRanksTable,
   })
-  // TODO - fix issue where agent keeps disconnecting 
-  // new BotServiceStack(app, 'TmOpenMatchMakingBotStack-BotService-prod', {
-  //   env: env,
-  //   stage: 'prod',
-  //   secretsBucket: storage.secretsBucket,
-  //   playerProfilesTable: storage.playerProfilesTable,
-  //   playerElosTable: storage.playerElosTable,
-  //   matchResultsTable: storage.matchResultsTable,
-  //   matchQueuesTable: storage.matchQueuesTable,
-  //   leaderboardsTable: storage.leaderboardsTable,
-  //   ranksTable: storage.ranksTable,
-  // })
 }

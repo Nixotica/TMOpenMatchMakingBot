@@ -51,13 +51,6 @@ export class BotServiceStack extends Stack {
          */
         const vpc = new Vpc(this, 'MM-Bot-VPC', {
             maxAzs: 1,
-            subnetConfiguration: [
-                {
-                    name: 'Public',
-                    subnetType: SubnetType.PUBLIC,
-                },
-            ],
-            natGateways: 0,
         });
 
         /**
@@ -101,8 +94,6 @@ export class BotServiceStack extends Stack {
         const autoScalingGroup = cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
             instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.NANO), 
             blockDevices: [rootVolume],
-            vpcSubnets: { subnetType: SubnetType.PUBLIC },
-            associatePublicIpAddress: true,
         });
         autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
 
@@ -151,9 +142,6 @@ export class BotServiceStack extends Stack {
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
             memoryLimitMiB: 256,
-            healthCheck: {
-                command: ['CMD-SHELL', 'exit 0'] // Forced healthy for now
-            }
         });
     
         container.addPortMappings({
