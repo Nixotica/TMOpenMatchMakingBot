@@ -22,6 +22,7 @@ export class StorageStack extends Stack {
     public readonly matchQueuesTable: Table;
     public readonly leaderboardsTable: Table;
     public readonly ranksTable: Table;
+    public readonly leaderboardRanksTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageStackProps) {
         super(scope, id, props);
@@ -133,6 +134,27 @@ export class StorageStack extends Stack {
             partitionKey: { name: "rank_role_id", type: AttributeType.NUMBER },
             tableName: `tm-mm-bot-ranks-${props.stage}-${props.account}`,
             billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+
+        /**
+         * LeaderboardRanks Table
+         * 
+         * A table for storing the elo cutoffs for each rank with respect to individual leaderboards consisting of:
+         * - `rank_id`: Rank ID (Primary Key)
+         * - `leaderboard_id`: Leaderboard ID associated with this rank (GSI)
+         * - `display_name`: Display name of the role in profile, leaderboard, etc
+         * - `min_elo`: The minimum elo to have this rank 
+         */
+        this.leaderboardRanksTable = new Table(this, "LeaderboardRanksTable", {
+            partitionKey: { name: "rank_id", type: AttributeType.STRING },
+            sortKey: { name: "leaderboard_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-leaderboard-ranks-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+        this.leaderboardRanksTable.addGlobalSecondaryIndex({
+            indexName: "leaderboard_id",
+            partitionKey: { name: "leaderboard_id", type: AttributeType.STRING },
+            sortKey: { name: "min_elo", type: AttributeType.NUMBER },
         });
 
         /**

@@ -4,6 +4,8 @@ from discord import ui
 from discord.ext import commands, tasks
 import discord
 from aws.dynamodb import DynamoDbManager
+from helpers import get_rank_for_player
+from cogs.constants import COLOR_EMBED
 
 
 class LeaderboardView(ui.View):
@@ -34,29 +36,67 @@ class LeaderboardView(ui.View):
 
     @tasks.loop(minutes=15)
     async def update_embed(self) -> None:
-        """Updates the embed with the latest global leaderboard state."""
+        """Updates the embed with the latest leaderboard state."""
         logging.debug(f"Updating embed for leaderboard: {self.leaderboard_id}.")
 
         players_sorted_by_elo = self.ddb_manager.get_players_by_elo_descending(
             self.leaderboard_id
         )
 
-        top_25_players = players_sorted_by_elo[: min(len(players_sorted_by_elo), 25)]
+        if len(players_sorted_by_elo) == 0:
+            logging.warning(
+                f"No players found for leaderboard {self.leaderboard_id} while updating leaderboard..."
+            )
+            return
+
+        top_25_player_elos = players_sorted_by_elo[: min(len(players_sorted_by_elo), 25)]
+
+        leaderboard_ranks_descending = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(self.leaderboard_id)
+        logging.info(f"Leaderboard ranks: {leaderboard_ranks_descending}")
+        prev_player_rank = get_rank_for_player(
+            top_25_player_elos[0].elo, self.leaderboard_id, leaderboard_ranks_descending
+        )
+        logging.info(f"Initial player rank: {prev_player_rank} for player {top_25_player_elos[0]}")
+
+        if prev_player_rank is None:
+            logging.error(
+                f"No rank found for player with elo {top_25_player_elos[0].elo} while updating leaderboard..."
+            )
+            return
 
         embed = discord.Embed(
             title=f"Leaderboard - {self.leaderboard_id}",
+            color=COLOR_EMBED,
             timestamp=datetime.utcnow(),
         )
         embed.set_footer(text="Last updated")
         player_pos = 1
-        for player in top_25_players:
+        rank_group_msg = ""
+        for player_elo in top_25_player_elos:
+            player_rank = get_rank_for_player(
+                player_elo.elo, self.leaderboard_id, leaderboard_ranks_descending
+            )
+            if player_rank is None:
+                logging.error(
+                    f"No rank found for player with elo {player_elo.elo} while updating leaderboard, skipping..."
+                )
+                continue
+            
+            # If this is a new section of players of same rank, complete the previous section using the rank above
+            if player_rank != prev_player_rank:
+                embed.add_field(
+                    name=prev_player_rank.display_name, value=rank_group_msg,
+                )
+                rank_group_msg = ""
+                prev_player_rank = player_rank
+
             player_profile = self.ddb_manager.query_player_profile_for_tm_account_id(
-                player.tm_account_id
+                player_elo.tm_account_id
             )
 
             if player_profile is None:
                 logging.error(
-                    f"No player profile found for TM account ID {player.tm_account_id} while updating leaderboard..."
+                    f"No player profile found for TM account ID {player_elo.tm_account_id} while updating leaderboard..."
                 )
                 continue
 
@@ -71,10 +111,13 @@ class LeaderboardView(ui.View):
                 if guild_member is not None:
                     player_discord_name = guild_member.display_name
 
-            embed.add_field(
-                name=f"{player_pos}. {player_discord_name}", value=f"{player.elo}", inline=True,
-            )
+            rank_group_msg += f"**{player_pos}.** ({player_elo.elo}) {player_discord_name}\n"
 
             player_pos += 1
+
+        # Final section of message
+        embed.add_field(
+            name=prev_player_rank.display_name, value=rank_group_msg, inline=False,
+        )
 
         await self.message.edit(embed=embed)

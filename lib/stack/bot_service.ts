@@ -32,8 +32,11 @@ export interface BotServiceStackProps extends StackProps {
     /** A table containing leaderboards. */
     leaderboardsTable: Table,
 
-    /** A table containing ranks. */
+    /** A table containing ranks for the global leaderboard. */
     ranksTable: Table,
+
+    /** A table containing ranks associated to leaderboards by ID. */
+    leaderboardRanksTable: Table,
 }
 
 /**
@@ -143,6 +146,7 @@ export class BotServiceStack extends Stack {
                 MATCH_QUEUES_TABLE: props.matchQueuesTable.tableName,
                 LEADERBOARDS_TABLE: props.leaderboardsTable.tableName,
                 RANKS_TABLE: props.ranksTable.tableName,
+                LEADERBOARD_RANKS_TABLE: props.leaderboardRanksTable.tableName,
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },

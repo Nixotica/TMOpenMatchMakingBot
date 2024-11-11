@@ -1,1 +1,3 @@
 ROLE_ADMIN = "Admin"
+
+COLOR_EMBED = 0xED4245

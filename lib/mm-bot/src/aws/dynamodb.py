@@ -16,6 +16,7 @@ from aws.constants import (
     KEY_QUEUE_ID,
     KEY_RANK_ROLE_ID,
     KEY_MIN_ELO,
+    KEY_RANK_ID,
 )
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
@@ -27,6 +28,7 @@ from models.player_elo import PlayerElo
 from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from models.match_queue import MatchQueue
 from models.rank_role import RankRole
+from models.leaderboard_rank import LeaderboardRank
 
 
 class DynamoDbManager:
@@ -75,6 +77,11 @@ class DynamoDbManager:
         if ranks_table is None:
             raise ValueError("RANKS_TABLE environment variable is not set")
         self._ranks_table = self._resource.Table(ranks_table)
+
+        leaderboard_ranks_table = os.environ.get("LEADERBOARD_RANKS_TABLE")
+        if leaderboard_ranks_table is None:
+            raise ValueError("LEADERBOARD_RANKS_TABLE environment variable is not set")
+        self._leaderboard_ranks_table = self._resource.Table(leaderboard_ranks_table)
 
     def _create_client(self) -> DynamoDBClient:
         try:
@@ -494,7 +501,7 @@ class DynamoDbManager:
             logging.error(f"Error getting player elos from DynamoDB: {e}")
             raise
 
-    def create_rank(self, rank_role: RankRole) -> bool:
+    def create_rank_role(self, rank_role: RankRole) -> bool:
         """Create a new rank role.
 
         Args:
@@ -519,7 +526,7 @@ class DynamoDbManager:
             else:
                 raise
 
-    def get_ranks(self) -> List[RankRole]:
+    def get_rank_roles(self) -> List[RankRole]:
         """Get a list of ranks from the Ranks table.
 
         Returns:
@@ -531,6 +538,45 @@ class DynamoDbManager:
             if not items:
                 return []
             ranks = [RankRole.from_dict(items[i]) for i in range(len(items))]
+            return ranks
+        except Exception as e:
+            logging.error(f"Error getting ranks from DynamoDB: {e}")
+            raise
+
+    def create_leaderboard_rank(self, leaderboard_rank: LeaderboardRank) -> None:
+        """Create a new leaderboard rank.
+
+        Args:
+            leaderboard_rank (LeaderboardRank): The leaderboard rank to add to the database.
+        """
+        try:
+            self._leaderboard_ranks_table.put_item(
+                Item=leaderboard_rank.to_dict(),
+                ConditionExpression=Attr(KEY_RANK_ID).not_exists(),
+            )
+        except Exception as e:
+            logging.error(f"Error creating leaderboard rank in DynamoDB: {e}")
+            raise
+
+    def get_ranks_for_leaderboard_by_min_elo_descending(self, leaderboard_id: str) -> List[LeaderboardRank]:
+        """Get a list of ranks from the LeaderboardRanks table in descending order of minimum elo.
+
+        Args:
+            leaderboard_id (str): The leaderboard ID to get ranks for.
+
+        Returns:
+            List[LeaderboardRank]: List of ranks for the leaderboard sorted in descending order of minimum elo.
+        """
+        try:
+            response = self._leaderboard_ranks_table.query(
+                IndexName="leaderboard_id",
+                KeyConditionExpression=Key(KEY_LEADERBOARD_ID).eq(leaderboard_id),
+                ScanIndexForward=False,
+            )
+            items = response.get("Items", [])
+            if not items:
+                return []
+            ranks = [LeaderboardRank.from_dict(items[i]) for i in range(len(items))]
             return ranks
         except Exception as e:
             logging.error(f"Error getting ranks from DynamoDB: {e}")

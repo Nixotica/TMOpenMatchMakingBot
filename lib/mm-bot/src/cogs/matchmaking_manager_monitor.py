@@ -221,7 +221,7 @@ class MonitorMatchmakingManager(commands.Cog):
             return
         
         player_elo = player_elo_update[0]
-        rank_roles = self.ddb_manager.get_ranks()
+        rank_roles = self.ddb_manager.get_rank_roles()
 
         # Find the rank role the user should have now
         new_rank_role = None

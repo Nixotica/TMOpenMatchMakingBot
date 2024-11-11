@@ -1,8 +1,10 @@
+from datetime import datetime
 import logging
+import discord
 from discord.ext import commands
 
 from aws.s3 import S3ClientManager
-from cogs.constants import ROLE_ADMIN
+from cogs.constants import COLOR_EMBED, ROLE_ADMIN
 
 
 class General(commands.Cog, name="general"):
@@ -30,7 +32,12 @@ class General(commands.Cog, name="general"):
             return
 
         ping_channel = self.bot.get_channel(configs.bot_messages_channel_id) 
-        await ping_channel.send("Pong!") # type: ignore
+
+        pong_embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+        pong_embed.add_field(name="⚠️", value="Pong!", inline=True)
+
+        await ping_channel.send(embed=pong_embed) # type: ignore
+        await ctx.send("Pinged the bot messages channel.", ephemeral=True)
 
     @commands.hybrid_command(
         name="set_bot_messages_channel",

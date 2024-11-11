@@ -36,7 +36,7 @@ class Roles(commands.Cog, name="roles"):
             return
         
         rank_role = RankRole(role.id, role.name, min_elo)
-        success = self.ddb_manager.create_rank(rank_role)
+        success = self.ddb_manager.create_rank_role(rank_role)
 
         if success:
             await ctx.send(
@@ -80,7 +80,7 @@ class Roles(commands.Cog, name="roles"):
             return
 
         player_elo = self.ddb_manager.get_or_create_player_elo(player_profile.tm_account_id, global_leaderboard)
-        rank_roles = self.ddb_manager.get_ranks()
+        rank_roles = self.ddb_manager.get_rank_roles()
 
         # Find the rank role the user should have now
         new_rank_role = None

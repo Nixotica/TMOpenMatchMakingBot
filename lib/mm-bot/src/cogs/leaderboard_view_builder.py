@@ -6,6 +6,7 @@ from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from views.leaderboard import LeaderboardView
 from models.leaderboard import Leaderboard
+from models.leaderboard_rank import LeaderboardRank
 from cogs.constants import ROLE_ADMIN
 
 
@@ -135,8 +136,27 @@ class LeaderboardViewBuilder(commands.Cog):
         await ctx.send(embed=embed, ephemeral=True)
 
     @commands.hybrid_command(
+        name="refresh_leaderboards",
+        description="Refresh all leaderboards to get the latest elo and ranks"
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def refresh_leaderboards(
+        self,
+        ctx: commands.Context,
+    ) -> None:
+        logging.info(
+            f"Processing command to refresh leaderboards from user {ctx.message.author.name}."
+        )
+
+        for leaderboard in self.views:
+            await leaderboard.update_embed()
+
+        leaderboard_ids = [v.leaderboard_id for v in self.views]        
+        await ctx.send(f"Refreshed leaderboards: {leaderboard_ids}")
+
+    @commands.hybrid_command(
         name="set_main_leaderboard",
-        description="Set the main leaderboard for which ranks are assigned",
+        description="Set the main leaderboard for which rank roles are assigned",
     )
     @commands.has_role(ROLE_ADMIN)
     async def set_main_leaderboard(
@@ -162,6 +182,47 @@ class LeaderboardViewBuilder(commands.Cog):
         self.s3_manager.update_config(configs)
 
         await ctx.send(f"Updated main leaderboard to {leaderboard_id}")
+
+
+    @commands.hybrid_command(
+        name="create_rank",
+        description="Create a new rank for a leaderboard",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def create_rank(
+        self,
+        ctx: commands.Context,
+        rank_id: str,
+        display_name: str,
+        leaderboard_id: str,
+        min_elo: int,
+    ) -> None:
+        logging.info(
+            f"Processing command to create rank {rank_id} from user {ctx.message.author.name}."
+        )
+
+        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboard_ids = [l.leaderboard_id for l in leaderboards]
+
+        if leaderboard_id not in leaderboard_ids:
+            await ctx.send(
+                "Could not find leaderboard with matching ID. Check with /list_leaderboards."
+            )
+            return
+        
+        leaderboard_rank = LeaderboardRank(
+            rank_id=rank_id,
+            display_name=display_name,
+            leaderboard_id=leaderboard_id,
+            min_elo=min_elo,
+        )
+        
+        try:
+            self.ddb_manager.create_leaderboard_rank(leaderboard_rank)
+            await ctx.send(f"Rank {rank_id} created for leaderboard {leaderboard_id}.")
+        except Exception as e:
+            await ctx.send(f"Failed to create rank {rank_id}, error: {e}.")
+
 
 
 async def setup(bot: commands.Bot) -> None:

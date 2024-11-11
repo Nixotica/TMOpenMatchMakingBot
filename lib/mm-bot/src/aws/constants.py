@@ -32,4 +32,6 @@ KEY_RANK_ROLE_ID = "rank_role_id"
 KEY_DISPLAY_NAME = "display_name"
 KEY_MIN_ELO = "min_elo"
 
+KEY_RANK_ID = "rank_id"
+
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"
