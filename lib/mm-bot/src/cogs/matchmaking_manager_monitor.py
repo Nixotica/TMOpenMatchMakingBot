@@ -141,8 +141,8 @@ class MonitorMatchmakingManager(commands.Cog):
 
         for (player, queue) in players_in_queues:
             embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-            embed.add_field(name="❗ Queue Activated", value=f"{pings_role.mention} {queue.queue.queue_id} queue started by <@{player.discord_account_id}>.", inline=True)
-            await ping_channel.send(embed=embed)
+            embed.add_field(name="❗ Queue Activated", value=f"{queue.queue.queue_id} queue started by <@{player.discord_account_id}>.", inline=True)
+            await ping_channel.send(content=f"{pings_role.mention}", embed=embed)
 
     async def upload_match_results_and_cleanup_event(self, match: CompletedMatch) -> None:
         logging.debug(f"Uploading match results for match {match.active_match.match_id} and deleting event {match.active_match.event_id}...")

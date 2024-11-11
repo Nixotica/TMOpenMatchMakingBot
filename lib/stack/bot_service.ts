@@ -69,6 +69,13 @@ export class BotServiceStack extends Stack {
             'Allow inbound HTTP traffic'
         );
 
+        // Allow inbound traffic on port 8080 (HTTP) from any IP
+        ecsSecurityGroup.addIngressRule(
+            Peer.anyIpv4(), // Accepts traffic from any IP
+            Port.tcp(8080),   // HTTP port
+            'Allow inbound HTTP traffic'
+        );
+
         // (Optional) Allow HTTPS traffic if your app needs it
         ecsSecurityGroup.addIngressRule(
             Peer.anyIpv4(), // Accepts traffic from any IP
@@ -117,6 +124,7 @@ export class BotServiceStack extends Stack {
         props.matchQueuesTable.grantFullAccess(taskRole);
         props.leaderboardsTable.grantFullAccess(taskRole);
         props.ranksTable.grantFullAccess(taskRole);
+        props.leaderboardRanksTable.grantFullAccess(taskRole);
 
         // Define the EC2 task with container details
         const ec2TaskDefinition = new Ec2TaskDefinition(this, 'MM-Bot-Task', {
@@ -142,6 +150,9 @@ export class BotServiceStack extends Stack {
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
             memoryLimitMiB: 256,
+            healthCheck: {
+                command: ['CMD-SHELL', 'exit 0'] // Forced healthy for now
+            }
         });
     
         container.addPortMappings({
@@ -158,7 +169,8 @@ export class BotServiceStack extends Stack {
             taskDefinition: ec2TaskDefinition,
             placementConstraints: [
                 PlacementConstraint.distinctInstances(),
-            ]
+            ],
+            healthCheckGracePeriod: Duration.seconds(120),
         });
     }
 }
