@@ -60,7 +60,25 @@ class General(commands.Cog, name="general"):
         configs.bot_messages_channel_id = channel_id
         self.s3_manager.update_config(configs)
 
-        await ctx.send(f"Bot messages channel set to {channel_id}.")
+        await ctx.send(f"Bot messages channel set to {channel_id}.", ephemeral=True)
+
+    @commands.hybrid_command(
+        name="link_pings_role",
+        description="Link a role to a pingable role used by the bot instead of @everyone",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def link_pings_role(
+        self, ctx: commands.Context, role: discord.Role
+    ) -> None:
+        logging.info(
+            f"Processing command to link pings role from user {ctx.message.author.name}."
+        )
+
+        configs = self.s3_manager.get_configs()
+        configs.pings_role_id = role.id
+        self.s3_manager.update_config(configs)
+
+        await ctx.send(f"Pings role set to {role.name}.", ephemeral=True)
         
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(General(bot))

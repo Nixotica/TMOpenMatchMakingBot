@@ -1,3 +1,4 @@
+from datetime import datetime
 import logging
 from typing import Dict, List, Optional
 import discord
@@ -8,6 +9,7 @@ from models.player_profile import PlayerProfile
 from models.player_elo import PlayerElo
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.matches.completed_match import CompletedMatch
+from cogs.constants import *
 
 
 class MonitorMatchmakingManager(commands.Cog):
@@ -25,12 +27,14 @@ class MonitorMatchmakingManager(commands.Cog):
         logging.info("Matchmaking Manager Monitor loading...")
         self.check_for_new_matches.start()
         self.check_for_completed_matches.start()
+        self.check_for_new_first_players_joined_queue.start()
 
     def cog_unload(self):
         """Stop the task when the cog is unloaded."""
         logging.info("Matchmaking Manager Monitor unloading...")
         self.check_for_new_matches.cancel()
         self.check_for_completed_matches.cancel()
+        self.check_for_new_first_players_joined_queue.cancel()
 
     async def get_ping_channel(self) -> Optional[discord.TextChannel]:
         configs = self.s3_manager.get_configs()
@@ -92,7 +96,7 @@ class MonitorMatchmakingManager(commands.Cog):
         except Exception as e:
             logging.error(f"Error sending message to {player.discord_account_id}: {e}")
 
-    @tasks.loop(seconds=10)  # Run every 10 seconds
+    @tasks.loop(seconds=3)  # Run every 3 seconds
     async def check_for_new_matches(self):
         """Periodically checks if new matches have been created."""
         logging.debug(f"Bot checking for new matches...")
@@ -109,7 +113,36 @@ class MonitorMatchmakingManager(commands.Cog):
             await self.send_players_match_start_notification(
                 match.player_profiles
             )
-            
+
+    @tasks.loop(seconds=3)
+    async def check_for_new_first_players_joined_queue(self):
+        """Periodically checks for new players to took intiative to join an empty queue."""
+        logging.debug(f"Bot checking for players joining an empty queue...")
+        players_in_queues = self.matchmaking_manager.process_first_player_joined_queue()
+        if len(players_in_queues) == 0:
+            return
+        
+        ping_channel = await self.get_ping_channel()
+        if not ping_channel:
+            logging.warning("No ping channel found.")
+            return
+        
+        configs = self.s3_manager.get_configs()
+        pings_role_id = configs.pings_role_id
+
+        if not pings_role_id:
+            logging.warning("No pings role found in config.")
+            return
+        
+        pings_role = ping_channel.guild.get_role(pings_role_id)
+        if not pings_role:
+            logging.error("Pings role not found in the server.")
+            return
+
+        for (player, queue) in players_in_queues:
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(name="❗ Queue Activated", value=f"{pings_role.mention} {queue.queue.queue_id} queue started by <@{player.discord_account_id}>.", inline=True)
+            await ping_channel.send(embed=embed)
 
     async def upload_match_results_and_cleanup_event(self, match: CompletedMatch) -> None:
         logging.debug(f"Uploading match results for match {match.active_match.match_id} and deleting event {match.active_match.event_id}...")
@@ -241,7 +274,7 @@ class MonitorMatchmakingManager(commands.Cog):
         await member.add_roles(guild.get_role(new_rank_role.rank_role_id)) # type: ignore
         logging.info(f"Updated rank role for user {player_profile.discord_account_id} to {new_rank_role.display_name}") # type: ignore
 
-    @tasks.loop(seconds=10)  # Run every 10 seconds
+    @tasks.loop(seconds=3)  # Run every 10 seconds
     async def check_for_completed_matches(self):
         """Periodically checks if matches have been completed."""
         logging.debug(f"Bot checking for completed matches...")

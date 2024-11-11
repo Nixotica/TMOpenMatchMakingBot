@@ -39,6 +39,13 @@ class LeaderboardView(ui.View):
         """Updates the embed with the latest leaderboard state."""
         logging.debug(f"Updating embed for leaderboard: {self.leaderboard_id}.")
 
+        embed = discord.Embed(
+            title=f"Leaderboard - {self.leaderboard_id}",
+            color=COLOR_EMBED,
+            timestamp=datetime.utcnow(),
+        )
+        embed.set_footer(text="Last updated")
+
         players_sorted_by_elo = self.ddb_manager.get_players_by_elo_descending(
             self.leaderboard_id
         )
@@ -47,6 +54,7 @@ class LeaderboardView(ui.View):
             logging.warning(
                 f"No players found for leaderboard {self.leaderboard_id} while updating leaderboard..."
             )
+            await self.message.edit(embed=embed)
             return
 
         top_25_player_elos = players_sorted_by_elo[: min(len(players_sorted_by_elo), 25)]
@@ -64,12 +72,6 @@ class LeaderboardView(ui.View):
             )
             return
 
-        embed = discord.Embed(
-            title=f"Leaderboard - {self.leaderboard_id}",
-            color=COLOR_EMBED,
-            timestamp=datetime.utcnow(),
-        )
-        embed.set_footer(text="Last updated")
         player_pos = 1
         rank_group_msg = ""
         for player_elo in top_25_player_elos:

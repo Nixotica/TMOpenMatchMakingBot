@@ -50,6 +50,9 @@ class MatchmakingManager:
             self.completed_matches: List[
                 CompletedMatch
             ] = []  # Only completed and not processed by bot
+            self.new_first_players_joined_queue: List[
+                tuple[PlayerProfile, ActiveMatchQueue]
+            ] = []  # Only detected internally and not processed by bot
 
             self._last_check_queues_time = 0
             self._last_check_matches_time = 0
@@ -94,8 +97,18 @@ class MatchmakingManager:
                         f"Player {player.tm_account_id} already in queue {queue_id}."
                     )
                     return None
+                
+                # If this was the first person to join queue, trigger a ping to the discord
+                if len(queue.players) == 1:
+                    logging.info(
+                        f"First player {player.tm_account_id} joined queue {queue_id}."
+                    )
+                    self.new_first_players_joined_queue.append(
+                        (player, queue)
+                    )
+
                 return queue
-        logging.warn(
+        logging.warning(
             f"Attempted to add player to a queue which doesn't exist: {queue_id}"
         )
         return None
@@ -157,6 +170,12 @@ class MatchmakingManager:
         new_active_matches = self.new_active_matches
         self.new_active_matches = []
         return new_active_matches
+    
+    def process_first_player_joined_queue(self) -> List[tuple[PlayerProfile, ActiveMatchQueue]]:
+        """Returns a list of players who took the initiative to join a match queue with zero players in it."""
+        new_first_players_joined_queue = self.new_first_players_joined_queue
+        self.new_first_players_joined_queue = []
+        return new_first_players_joined_queue
 
     def get_active_queue_by_id(self, queue_id: str) -> Optional[ActiveMatchQueue]:
         """Returns an active queue with the given ID, else None"""
