@@ -11,7 +11,7 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install git and any other dependencies
-RUN apt-get update && apt-get install -y git
+RUN apt-get update && apt-get install -y git curl
 
 # Install any needed packages specified in requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt

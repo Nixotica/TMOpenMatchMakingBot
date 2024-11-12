@@ -3,7 +3,7 @@ import { Table } from "aws-cdk-lib/aws-dynamodb";
 import { Instance, InstanceClass, InstanceSize, InstanceType, MachineImage, Peer, Port, RouterType, SecurityGroup, Subnet, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { BlockDevice } from "aws-cdk-lib/aws-autoscaling";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
-import { AwsLogDriver, Cluster, ContainerImage, Ec2Service, Ec2TaskDefinition, PlacementConstraint, Protocol } from "aws-cdk-lib/aws-ecs";
+import { AwsLogDriver, Cluster, ContainerImage, DeploymentControllerType, Ec2Service, Ec2TaskDefinition, PlacementConstraint, Protocol } from "aws-cdk-lib/aws-ecs";
 import { Role, ServicePrincipal } from "aws-cdk-lib/aws-iam";
 import { Bucket } from "aws-cdk-lib/aws-s3";
 import { Construct } from "constructs";
@@ -149,9 +149,10 @@ export class BotServiceStack extends Stack {
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
-            memoryLimitMiB: 256,
+            memoryReservationMiB: 128, // Soft limit
+            memoryLimitMiB: 256, // Hard limit
             healthCheck: {
-                command: ['CMD-SHELL', 'exit 0'] // Forced healthy for now
+                command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
             }
         });
     
@@ -167,6 +168,10 @@ export class BotServiceStack extends Stack {
         const ec2Service = new Ec2Service(this, 'MM-Bot-Service', {
             cluster, 
             taskDefinition: ec2TaskDefinition,
+            desiredCount: 1,
+            deploymentController: {
+                type: DeploymentControllerType.ECS,
+            },
             placementConstraints: [
                 PlacementConstraint.distinctInstances(),
             ],

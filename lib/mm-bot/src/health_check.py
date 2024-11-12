@@ -17,7 +17,8 @@ def listen_for_health_checks() -> None:
         logging.info(f"Registered route: {rule}")
 
     logging.info("Starting Flask app...")
-    app.run(host="0.0.0.0", port=80, use_reloader=False)
+    from waitress import serve
+    serve(app, host="0.0.0.0", port=8080)
 
 
 def start_health_check_in_thread() -> None:

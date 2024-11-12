@@ -78,7 +78,7 @@ logging.basicConfig(
 
 async def main():
     # Set up health checks and run (don't do for now)
-    # start_health_check_in_thread()
+    start_health_check_in_thread()
 
     # Retrieve secrets from S3
     secrets: Secrets = S3ClientManager().get_secrets()
