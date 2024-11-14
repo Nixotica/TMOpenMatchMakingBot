@@ -65,27 +65,6 @@ export class BotServiceStack extends Stack {
             allowAllOutbound: true,
         });
 
-        // Allow inbound traffic on port 80 (HTTP) from any IP
-        ecsSecurityGroup.addIngressRule(
-            Peer.anyIpv4(), // Accepts traffic from any IP
-            Port.tcp(80),   // HTTP port
-            'Allow inbound HTTP traffic'
-        );
-
-        // Allow inbound traffic on port 8080 (HTTP) from any IP
-        ecsSecurityGroup.addIngressRule(
-            Peer.anyIpv4(), // Accepts traffic from any IP
-            Port.tcp(8080),   // HTTP port
-            'Allow inbound HTTP traffic'
-        );
-
-        // (Optional) Allow HTTPS traffic if your app needs it
-        ecsSecurityGroup.addIngressRule(
-            Peer.anyIpv4(), // Accepts traffic from any IP
-            Port.tcp(443),  // HTTPS port
-            'Allow inbound HTTPS traffic'
-        );
-
         /**
          * ECS Cluster
          */
@@ -154,16 +133,19 @@ export class BotServiceStack extends Stack {
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
+            memoryReservationMiB: 256,
+            memoryLimitMiB: 512,
             healthCheck: {
                 command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
             }
         });
     
         container.addPortMappings({
-            containerPort: 80, // Match this with the port exposed in Dockerfile
-            hostPort: 8080,
-            protocol: Protocol.TCP,
+            containerPort: 80,  // This is the port that your application listens to inside the container
+            hostPort: 0,        // Setting hostPort to 0 allows ECS to assign an available port dynamically
+            protocol: Protocol.TCP,  // Protocol can be TCP or UDP
         });
+        
     
         /**
          * EC2 Service
@@ -179,6 +161,8 @@ export class BotServiceStack extends Stack {
                 PlacementConstraint.distinctInstances(),
             ],
             healthCheckGracePeriod: Duration.seconds(120),
+            minHealthyPercent: 0,
+            maxHealthyPercent: 200,
         });
     }
 }
