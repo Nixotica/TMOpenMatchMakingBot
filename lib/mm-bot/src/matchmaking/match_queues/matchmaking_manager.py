@@ -72,6 +72,22 @@ class MatchmakingManager:
         active_queue = ActiveMatchQueue(queue)
         self.active_queues.append(active_queue)
         return active_queue
+    
+    def is_player_in_match(self, player: PlayerProfile) -> bool:
+        """Checks if a player is in an active match.
+
+        Args:
+            player (PlayerProfile): The player to check.
+
+        Returns:
+            bool: True if player is in an active match, False otherwise. 
+        """
+        for match in self.active_matches:
+            for match_player in match.player_profiles:
+                if player == match_player:
+                    return True
+            
+        return False
 
     def add_player_to_queue(
         self, player: PlayerProfile, queue_id: str
@@ -91,6 +107,13 @@ class MatchmakingManager:
                     logging.error(f"Attempted to add player to a 2v2 queue: {queue_id}")
                     # TODO - this should not be an error, we should allow free agents
                     return None
+                
+                if self.is_player_in_match(player):
+                    logging.info(
+                        f"Player {player.tm_account_id} already in an active match."
+                    )
+                    return None
+
                 player_added = queue.add_player(player)
                 if not player_added:
                     logging.info(
@@ -232,7 +255,13 @@ class MatchmakingManager:
         logging.debug("Checking queues for sufficient size to generate matches...")
         new_active_matches: List[ActiveMatch] = []
         for active_queue in self.active_queues:
-            active_match = active_queue.try_generate_match()
+            should_generate_match = active_queue.should_generate_match()
+            if not should_generate_match:
+                continue
+
+            bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
+
+            active_match = active_queue.generate_match(bot_match_id)
 
             if active_match is None:
                 logging.debug(

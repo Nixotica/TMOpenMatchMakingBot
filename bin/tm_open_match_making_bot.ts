@@ -12,11 +12,24 @@ const env = {
 
 // For local testing, make sure you've run `export STAGE=dev`
 if (process.env.STAGE == 'dev') {
-  new StorageStack(app, 'TmOpenMatchMakingBotStack-Storage-dev', {
+  const storage = new StorageStack(app, 'TmOpenMatchMakingBotStack-Storage-dev', {
     env: env,
     stage: 'dev',
     account: env.account,
   })
+  // NOTE this costs significant money, keep it commented out when not testing changes to the deployed service
+  // new BotServiceStack(app, 'TmOpenMatchMakingBotStack-BotService-dev', {
+  //   env: env,
+  //   stage: 'dev',
+  //   secretsBucket: storage.secretsBucket,
+  //   playerProfilesTable: storage.playerProfilesTable,
+  //   playerElosTable: storage.playerElosTable,
+  //   matchResultsTable: storage.matchResultsTable,
+  //   matchQueuesTable: storage.matchQueuesTable,
+  //   leaderboardsTable: storage.leaderboardsTable,
+  //   ranksTable: storage.ranksTable,
+  //   leaderboardRanksTable: storage.leaderboardRanksTable,
+  // })
 } else {
   const storage = new StorageStack(app, 'TmOpenMatchMakingBotStack-Storage-prod', {
     env: env,
@@ -34,5 +47,6 @@ if (process.env.STAGE == 'dev') {
     leaderboardsTable: storage.leaderboardsTable,
     ranksTable: storage.ranksTable,
     leaderboardRanksTable: storage.leaderboardRanksTable,
+    nextBotMatchIdTable: storage.nextBotMatchIdTable,
   })
 }

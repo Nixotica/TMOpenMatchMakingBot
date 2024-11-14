@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from typing import Iterator
 from models.player_profile import PlayerProfile
 
 
@@ -12,3 +13,7 @@ class Team2v2:
 class Teams2v2:
     team_a: Team2v2
     team_b: Team2v2
+
+    def __iter__(self) -> Iterator[Team2v2]:
+        yield self.team_a
+        yield self.team_b

@@ -18,6 +18,18 @@ def calculate_elo_ratings(
     - elo_differences: A dictionary with player names as keys and the change in their Elo ratings.
     """
 
+    if len(match_positions) < 2:
+        # Work-around for solo queue testing - just give player 1 elo
+        player_elo_obj = next(iter(match_positions))
+        return (
+            {
+                player_elo_obj: player_elo_obj.elo + 1
+            },
+            {
+                player_elo_obj: 1
+            }
+        )
+
     def expected_score(elo_i: int, elo_j: int):
         """
         Calculate the expected score for player i against player j.

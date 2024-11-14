@@ -16,7 +16,7 @@ class JoinQueue(commands.Cog, name="join"):
         self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
 
-    @commands.hybrid_command(name="join", description="Join a queue for matchmaking.")
+    # @commands.hybrid_command(name="join", description="Join a queue for matchmaking.")
     async def join(self, ctx: commands.Context, queue_id: str) -> None:
         logging.info(
             f"Processing command to join queue {queue_id} for user {ctx.message.author.name}."
@@ -35,9 +35,9 @@ class JoinQueue(commands.Cog, name="join"):
             f"Joined queue {queue_id} along with {len(added_queue.players) - 1} others."
         )
 
-    @commands.hybrid_command(
-        name="join_team", description="Join a queue for 2v2 matchmaking."
-    )
+    # @commands.hybrid_command(
+    #     name="join_team", description="Join a queue for 2v2 matchmaking."
+    # )
     async def join_team(
         self, ctx: commands.Context, queue_id: str, member: discord.Member
     ) -> None:

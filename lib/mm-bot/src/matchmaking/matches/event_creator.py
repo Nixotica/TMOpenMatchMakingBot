@@ -60,7 +60,7 @@ def get_random_map(match_queue: MatchQueue) -> Map:
 
 
 def create_1v1v1v1_match(
-    match_queue: MatchQueue, players: List[PlayerProfile]
+    match_queue: MatchQueue, bot_match_id: int, players: List[PlayerProfile]
 ) -> CreatedMatchInfo:
     """Create a 1v1v1v1 match using Trackmania competition tool.
 
@@ -68,7 +68,7 @@ def create_1v1v1v1_match(
         (int, int, int, str): The event ID, round ID, match ID, and match Live ID of the created match.
     """
 
-    event_name = "Better MM Match"
+    event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
     map_to_use = get_random_map(match_queue)
@@ -126,7 +126,7 @@ def create_1v1v1v1_match(
     return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
 
 
-def create_2v2_match(match_queue: MatchQueue, teams: Teams2v2) -> CreatedMatchInfo:
+def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2) -> CreatedMatchInfo:
     """Create a 2v2 match using Trackmania competition tool.
 
     Args:
@@ -138,7 +138,7 @@ def create_2v2_match(match_queue: MatchQueue, teams: Teams2v2) -> CreatedMatchIn
         CreatedMatchInfo: The info for the created match.
     """
 
-    event_name = "Better MM 2v2"
+    event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
     map_to_use = get_random_map(match_queue)
@@ -205,6 +205,7 @@ def create_2v2_match(match_queue: MatchQueue, teams: Teams2v2) -> CreatedMatchIn
 
 def create_solo_match(
     match_queue: MatchQueue,
+    bot_match_id: int,
     player: PlayerProfile,
 ) -> CreatedMatchInfo:
     """Create a solo match using Trackmania competition tool for testing purposes.
@@ -213,7 +214,7 @@ def create_solo_match(
         (int, int, int, str): The event ID, round ID, match ID, and match Live ID of the created match.
     """
 
-    event_name = "Better MM Match"
+    event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
     map_to_use = get_random_map(match_queue)

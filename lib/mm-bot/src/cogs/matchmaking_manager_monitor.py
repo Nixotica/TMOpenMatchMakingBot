@@ -7,6 +7,7 @@ from aws.s3 import S3ClientManager
 from discord.ext import commands, tasks
 from models.player_profile import PlayerProfile
 from models.player_elo import PlayerElo
+from matchmaking.matches.team_2v2 import Team2v2
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.matches.completed_match import CompletedMatch
 from cogs.constants import *
@@ -55,44 +56,64 @@ class MonitorMatchmakingManager(commands.Cog):
         return ping_channel
 
     async def send_players_match_start_notification(
-        self, players: List[PlayerProfile],
+        self, players: List[PlayerProfile], bot_match_id: int,
     ) -> None:
         try:
             ping_channel = await self.get_ping_channel()
-            
-            message = "Match created for the following players: "
-            for player in players:
-                message += f"<@{player.discord_account_id}> "
 
-            await ping_channel.send(message) # type: ignore
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name="❗ Match Found",
+                value=f"Pinged players, join \"BMM - #{bot_match_id}\" in the Live -> Events tab in-game."
+            )
+            
+            content = ""
+            for player in players:
+                content += f"<@{player.discord_account_id}> "
+
+            await ping_channel.send(content=content, embed=embed) # type: ignore
         except:
             logging.error(f"Error sending message for match start to players {players}")
 
-    async def send_player_match_complete_notification(
+    async def send_players_match_complete_notification(
         self,
-        player: PlayerProfile,
-        leaderboard_to_elos_and_diffs: Dict[str, tuple[int, int]],
+        bot_match_id: int,
+        player_profile_to_leaderboard_elo_update_and_diff_map: Dict[PlayerProfile, Dict[str, tuple[int, int]]],
     ) -> None:
-        """Sends a player a match complete notification with their updated elo and difference for each leaderboard the match queue is in.
+        """Sends players from a match the complete notification with their updated elo and difference for each leaderboard the match queue is in.
 
         Args:
-            player (PlayerProfile): The player to send the notification to
-            leaderboard_to_elos_and_diffs (Dict[str, tuple[int, int]]): A dictionary mapping leaderboard ID to a tuple of player elo and elo difference.
+            bot_match_id (int): The bot match ID completed.
+            player_profile_to_leaderboard_elo_update_and_diff_map (Dict[PlayerProfile, Dict[str, tuple[int, int]]]): A dictionary mapping players to a map of leaderboard ID to a tuple of player elo and elo difference.
         """
         try:
             ping_channel = await self.get_ping_channel()
-            match_finished_msg = f"Match finished, new elos calculated for <@{player.discord_account_id}>.\n"
 
-            for leaderboard, (
-                updated_elo,
-                elo_diff,
-            ) in leaderboard_to_elos_and_diffs.items():
-                elo_diff_prefix = "+" if elo_diff >= 0 else "-"
-                match_finished_msg += (
-                    f"{leaderboard}: {updated_elo} ({elo_diff_prefix}{elo_diff})\n"
-                )
+            if not ping_channel:
+                logging.warning("No ping channel found.")
+                return
+        
+            players = list(player_profile_to_leaderboard_elo_update_and_diff_map.keys())
+            content = ""
+            for player in players:
+                content += f"<@{player.discord_account_id}> "
 
-            await ping_channel.send(match_finished_msg) # type: ignore
+            value = "Updated elos have been calculated:\n"
+            value += f"-----------------------------------------\n"
+            for (player, leaderboard_to_elos) in player_profile_to_leaderboard_elo_update_and_diff_map.items():
+                value += f"<@{player.discord_account_id}>\n"
+                for (leaderboard, (updated_elo, elo_diff)) in leaderboard_to_elos.items():
+                    elo_diff_prefix = "+" if elo_diff >= 0 else ""
+                    value += f"{leaderboard}: {updated_elo} ({elo_diff_prefix}{elo_diff})\n"
+                value += f"-----------------------------------------\n"
+
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name=f"❗ Match Finished - #{bot_match_id}",
+                value=value
+            )
+
+            await ping_channel.send(content=content, embed=embed)
         except Exception as e:
             logging.error(f"Error sending message to {player.discord_account_id}: {e}")
 
@@ -104,14 +125,14 @@ class MonitorMatchmakingManager(commands.Cog):
 
         for match in new_matches:
             logging.info(f"New match {match.match_id}, notifying players.")
-            match_join_link = match.get_match_join_link()
+            bot_match_id = match.bot_match_id
             # Notify the players in the match
             if not isinstance(match.player_profiles, List):
                 # TODO - support for teams
                 return
             
             await self.send_players_match_start_notification(
-                match.player_profiles
+                match.player_profiles, bot_match_id
             )
 
     @tasks.loop(seconds=3)
@@ -148,12 +169,21 @@ class MonitorMatchmakingManager(commands.Cog):
         logging.debug(f"Uploading match results for match {match.active_match.match_id} and deleting event {match.active_match.event_id}...")
         
         self.ddb_manager.put_match_results(
+            match.active_match.bot_match_id,
             match.active_match.match_queue.queue_id,
             match.active_match.match_id,
             match.active_match.match_live_id,
             match.time_completed,
             match.match_results.__str__(),
         )
+
+        for player in match.active_match.player_profiles:
+            if isinstance(player, Team2v2):
+                logging.debug("Not implemented to count matches complete for teams...")
+                continue
+            
+            self.ddb_manager.update_player_matches_complete(player.tm_account_id)
+
         match.cleanup()
 
     async def calculate_elos_and_upload(self, match: CompletedMatch) -> Dict[PlayerProfile, Dict[str, tuple[int, int]]]:
@@ -293,13 +323,15 @@ class MonitorMatchmakingManager(commands.Cog):
             if global_leaderboard is None:
                 logging.info("No global leaderboard found, not updating player rank role.")
 
+            await self.send_players_match_complete_notification(
+                match.active_match.bot_match_id,
+                player_profile_to_leaderboard_elo_update_and_diff_map
+            )
+
             for (
                 player_profile,
                 updated_elos_by_leaderboard_id,
             ) in player_profile_to_leaderboard_elo_update_and_diff_map.items():
-                await self.send_player_match_complete_notification(
-                    player_profile, updated_elos_by_leaderboard_id
-                )
                 if global_leaderboard is not None:
                     await self.update_player_rank_role(
                         player_profile, updated_elos_by_leaderboard_id, global_leaderboard

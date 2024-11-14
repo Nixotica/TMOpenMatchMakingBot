@@ -34,6 +34,12 @@ class JoinQueueView(ui.View):
                 f"You have not registered your account yet.", ephemeral=True
             )
             return
+        
+        if self.mm_manager.is_player_in_match(player_profile):
+            await interaction.response.send_message(
+                f"You are already in a match.", ephemeral=True
+            )
+            return
 
         added_queue = self.mm_manager.add_player_to_queue(player_profile, self.queue_id)
 

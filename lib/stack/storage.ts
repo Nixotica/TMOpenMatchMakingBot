@@ -23,6 +23,7 @@ export class StorageStack extends Stack {
     public readonly leaderboardsTable: Table;
     public readonly ranksTable: Table;
     public readonly leaderboardRanksTable: Table;
+    public readonly nextBotMatchIdTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageStackProps) {
         super(scope, id, props);
@@ -155,6 +156,19 @@ export class StorageStack extends Stack {
             indexName: "leaderboard_id",
             partitionKey: { name: "leaderboard_id", type: AttributeType.STRING },
             sortKey: { name: "min_elo", type: AttributeType.NUMBER },
+        });
+
+        /**
+         * NextBotMatchId Table
+         * 
+         * A table for storing the next bot match ID consisting of:
+         * - `bot_match_id`: Required primary key to access it (Primary Key, String)
+         * - `current_value`: The current value of the next bot match ID (Number)
+         */ 
+        this.nextBotMatchIdTable = new Table(this, "NextBotMatchIdTable", {
+            partitionKey: { name: "bot_match_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-next-bot-match-id-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
         });
 
         /**

@@ -24,6 +24,7 @@ class ActiveMatch:
         round_id: int,
         match_id: int,
         match_live_id: str,
+        bot_match_id: int,
         player_profiles: List[PlayerProfile]
         | Teams2v2,  # TODO - this is terrible and not extensible
         match_queue: MatchQueue,
@@ -32,6 +33,7 @@ class ActiveMatch:
         self.round_id = round_id
         self.match_id = match_id
         self.match_live_id = match_live_id
+        self.bot_match_id = bot_match_id
         self.player_profiles = player_profiles
         self.match_queue = match_queue
 
@@ -40,16 +42,18 @@ class ActiveMatch:
     @staticmethod
     def create_1v1v1v1(
         match_queue: MatchQueue,
+        bot_match_id: int,
         players: List[PlayerProfile],
     ) -> ActiveMatch:
         logging.info(f"Creating new match for players: {players}")
-        match_info = create_1v1v1v1_match(match_queue, players)
+        match_info = create_1v1v1v1_match(match_queue, bot_match_id, players)
 
         return ActiveMatch(
             match_info.event_id,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            bot_match_id,
             players,
             match_queue,
         )
@@ -57,16 +61,18 @@ class ActiveMatch:
     @staticmethod
     def create_2v2(
         match_queue: MatchQueue,
+        bot_match_id: int,
         teams: Teams2v2,
     ) -> ActiveMatch:
         logging.info(f"Creating new 2v2 match for teams {teams}")
-        match_info = create_2v2_match(match_queue, teams)
+        match_info = create_2v2_match(match_queue, bot_match_id, teams)
 
         return ActiveMatch(
             match_info.event_id,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            bot_match_id,
             teams,
             match_queue,
         )
@@ -74,16 +80,18 @@ class ActiveMatch:
     @staticmethod
     def create_solo(
         match_queue: MatchQueue,
+        bot_match_id: int,
         player: PlayerProfile,
     ) -> ActiveMatch:
         logging.info(f"Creating new solo match for player {player}")
-        match_info = create_solo_match(match_queue, player)
+        match_info = create_solo_match(match_queue, bot_match_id, player)
 
         return ActiveMatch(
             match_info.event_id,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            bot_match_id,
             [player],
             match_queue,
         )

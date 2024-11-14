@@ -5,6 +5,7 @@ from typing import List, Optional
 
 import boto3
 from aws.constants import (
+    KEY_CURRENT_VALUE,
     KEY_LEADERBOARD_ID,
     KEY_LEADERBOARD_IDS,
     KEY_TM_ACCOUNT_ID,
@@ -15,8 +16,8 @@ from aws.constants import (
     INDEX_DISCORD_ACCOUNT_ID,
     KEY_QUEUE_ID,
     KEY_RANK_ROLE_ID,
-    KEY_MIN_ELO,
     KEY_RANK_ID,
+    KEY_BOT_MATCH_ID,
 )
 from matchmaking.constants import DEFAULT_ELO
 from boto3.dynamodb.conditions import Key, Attr
@@ -82,6 +83,11 @@ class DynamoDbManager:
         if leaderboard_ranks_table is None:
             raise ValueError("LEADERBOARD_RANKS_TABLE environment variable is not set")
         self._leaderboard_ranks_table = self._resource.Table(leaderboard_ranks_table)
+
+        next_bot_match_id_table = os.environ.get("NEXT_BOT_MATCH_ID_TABLE")
+        if next_bot_match_id_table is None:
+            raise ValueError("NEXT_BOT_MATCH_ID_TABLE environment variable is not set")
+        self._next_bot_match_id_table = self._resource.Table(next_bot_match_id_table)
 
     def _create_client(self) -> DynamoDBClient:
         try:
@@ -336,6 +342,7 @@ class DynamoDbManager:
 
     def put_match_results(
         self,
+        bot_match_id: int,
         queue_id: str,
         match_id: int,
         match_live_id: str,
@@ -350,7 +357,7 @@ class DynamoDbManager:
         try:
             self._match_results_table.put_item(
                 Item=DdbMatchResults(
-                    bot_match_id=match_id,
+                    bot_match_id=bot_match_id,
                     queue_id=queue_id,
                     tm_match_id=match_id,
                     tm_match_live_id=match_live_id,
@@ -581,3 +588,42 @@ class DynamoDbManager:
         except Exception as e:
             logging.error(f"Error getting ranks from DynamoDB: {e}")
             raise
+
+    def get_next_bot_match_id_and_increment(self) -> int:
+        """Get the next bot match ID and increment it in the database.
+
+        Returns:
+            int: The next bot match ID.
+        """
+        try:
+            # Attempt to increment the current value
+            response = self._next_bot_match_id_table.update_item(
+                Key={KEY_BOT_MATCH_ID: KEY_BOT_MATCH_ID},
+                UpdateExpression='SET #current_value = #current_value + :inc',
+                ExpressionAttributeNames={'#current_value': KEY_CURRENT_VALUE},
+                ExpressionAttributeValues={':inc': 1},
+                ReturnValues='UPDATED_OLD'  # Return the value before it was updated
+            )
+            return int(response['Attributes'][KEY_CURRENT_VALUE]) + 1 # type: ignore
+
+        except ClientError as e:
+            if e.response['Error']['Code'] == 'ValidationException':
+                # This error can indicate that the item doesn't exist, so initialize it
+                logging.info("Match ID not initialized yet. Initializing to 1.")
+                try:
+                    self._next_bot_match_id_table.put_item(
+                        Item={
+                            KEY_BOT_MATCH_ID: KEY_BOT_MATCH_ID,
+                            KEY_CURRENT_VALUE: 1
+                        },
+                        ConditionExpression=f'attribute_not_exists({KEY_BOT_MATCH_ID})'  # Avoid overwriting if race condition
+                    )
+                    return 1  # Return 1 since we are initializing it to 1
+                except ClientError as init_e:
+                    if init_e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                        # In the event of a race condition, just retry incrementing
+                        return self.get_next_bot_match_id_and_increment()
+                    else:
+                        raise
+            else:
+                raise

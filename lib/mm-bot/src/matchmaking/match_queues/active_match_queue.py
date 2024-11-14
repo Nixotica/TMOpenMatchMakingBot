@@ -105,34 +105,52 @@ class ActiveMatchQueue:
         self.teams.remove(team)
         logging.info(f"Removed team {team} from queue {self.queue.queue_id}.")
 
-    def try_generate_match(self) -> ActiveMatch | None:
-        """Generate a match if the current queue permits.
+    def should_generate_match(self) -> bool:
+        """Determines if a match should be generated from the current queue
 
         Returns:
-            int | None: Return match ID if a match was generated, otherwise None
+            bool: True if a match should be generated, False otherwise.
         """
         if self.queue.type == QueueType.Queue1v1v1v1.value:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
             )
             if len(self.players) >= NUM_1v1v1v1_PLAYERS:
-                players_in_match = self.players[:NUM_1v1v1v1_PLAYERS]
-                players_in_match = [p.profile for p in players_in_match]
-                return ActiveMatch.create_1v1v1v1(self.queue, players_in_match)
+                return True
         elif self.queue.type == QueueType.Queue2v2.value:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.teams)}."
             )
             if len(self.teams) >= 2:
-                teams_in_match = self.teams[:2]
-                teams = Teams2v2(teams_in_match[0], teams_in_match[1])
-                return ActiveMatch.create_2v2(self.queue, teams)
+                return True
         elif self.queue.type == QueueType.QueueSoloTest.value:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
             )
             if len(self.players) >= 1:
-                player_in_match = self.players[0]
-                return ActiveMatch.create_solo(self.queue, player_in_match.profile)
+                return True
+        
+        return False
+
+    def generate_match(self, bot_match_id: int) -> ActiveMatch:
+        """Generates a match with the given bot match ID. 
+
+        Args:
+            bot_match_id (int): The ID to give to the current match (used in its event name)
+
+        Returns:
+            ActiveMatch: The active match created as an event.
+        """
+        if self.queue.type == QueueType.Queue1v1v1v1.value:
+            players_in_match = self.players[:NUM_1v1v1v1_PLAYERS]
+            players_in_match = [p.profile for p in players_in_match]
+            return ActiveMatch.create_1v1v1v1(self.queue, bot_match_id, players_in_match)
+        elif self.queue.type == QueueType.Queue2v2.value:
+            teams_in_match = self.teams[:2]
+            teams = Teams2v2(teams_in_match[0], teams_in_match[1])
+            return ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
+        elif self.queue.type == QueueType.QueueSoloTest.value:
+            player_in_match = self.players[0]
+            return ActiveMatch.create_solo(self.queue, bot_match_id, player_in_match.profile)
         else:
-            return None
+            raise Exception("Invalid queue type")

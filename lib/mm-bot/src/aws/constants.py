@@ -35,4 +35,6 @@ KEY_MIN_ELO = "min_elo"
 
 KEY_RANK_ID = "rank_id"
 
+KEY_CURRENT_VALUE = "current_value"
+
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

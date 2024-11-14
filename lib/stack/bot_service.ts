@@ -37,6 +37,9 @@ export interface BotServiceStackProps extends StackProps {
 
     /** A table containing ranks associated to leaderboards by ID. */
     leaderboardRanksTable: Table,
+
+    /** A table containing the next bot match ID to be used when generating a match. */
+    nextBotMatchIdTable: Table,
 }
 
 /**
@@ -99,7 +102,7 @@ export class BotServiceStack extends Stack {
             )
         };
         const autoScalingGroup = cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
-            instanceType: InstanceType.of(InstanceClass.BURSTABLE3_AMD, InstanceSize.NANO), 
+            instanceType: InstanceType.of(InstanceClass.T3A, InstanceSize.MICRO), 
             blockDevices: [rootVolume],
         });
         autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
@@ -117,7 +120,7 @@ export class BotServiceStack extends Stack {
         const taskRole = new Role(this, 'MM-Bot-TaskRole', {
             assumedBy: new ServicePrincipal('ecs-tasks.amazonaws.com'),
         });
-        props.secretsBucket.grantRead(taskRole);
+        props.secretsBucket.grantReadWrite(taskRole);
         props.playerProfilesTable.grantFullAccess(taskRole);
         props.playerElosTable.grantFullAccess(taskRole);
         props.matchResultsTable.grantFullAccess(taskRole);
@@ -125,6 +128,7 @@ export class BotServiceStack extends Stack {
         props.leaderboardsTable.grantFullAccess(taskRole);
         props.ranksTable.grantFullAccess(taskRole);
         props.leaderboardRanksTable.grantFullAccess(taskRole);
+        props.nextBotMatchIdTable.grantFullAccess(taskRole);
 
         // Define the EC2 task with container details
         const ec2TaskDefinition = new Ec2TaskDefinition(this, 'MM-Bot-Task', {
@@ -146,11 +150,10 @@ export class BotServiceStack extends Stack {
                 LEADERBOARDS_TABLE: props.leaderboardsTable.tableName,
                 RANKS_TABLE: props.ranksTable.tableName,
                 LEADERBOARD_RANKS_TABLE: props.leaderboardRanksTable.tableName,
+                NEXT_BOT_MATCH_ID_TABLE: props.nextBotMatchIdTable.tableName,
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
-            memoryReservationMiB: 128, // Soft limit
-            memoryLimitMiB: 256, // Hard limit
             healthCheck: {
                 command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
             }
