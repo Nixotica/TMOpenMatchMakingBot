@@ -5,6 +5,7 @@ from discord.ext import commands
 
 from aws.s3 import S3ClientManager
 from cogs.constants import COLOR_EMBED, ROLE_ADMIN
+from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
 
 class General(commands.Cog, name="general"):
@@ -14,6 +15,7 @@ class General(commands.Cog, name="general"):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
+        self.mm_manager = MatchmakingManager()
         self.s3_manager = S3ClientManager()
 
     @commands.hybrid_command(
@@ -79,6 +81,32 @@ class General(commands.Cog, name="general"):
         self.s3_manager.update_config(configs)
 
         await ctx.send(f"Pings role set to {role.name}.", ephemeral=True)
+
+    @commands.hybrid_command(
+        name="cancel_match",
+        description="Cancel an onging match by providing the bot match ID"
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def cancel_match(
+        self, ctx: commands.Context, bot_match_id: int
+    ) -> None:
+        logging.info(
+            f"Processing command to cancel match from user {ctx.message.author.name}."
+        )
+
+        canceled_match = self.mm_manager.cancel_match(bot_match_id)
+
+        if not canceled_match:
+            await ctx.send(f"Failed to cancel match {bot_match_id}. Is it already finished?")
+            return
+        
+        players = canceled_match.player_profiles
+        player_discord_ids_str = ""
+        if isinstance(players, list):
+            for player in players:
+                player_discord_ids_str += f"<@{player.discord_account_id}> "
+
+        await ctx.send(f"Match {bot_match_id} cancelled. Affected players: {player_discord_ids_str}.")
         
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(General(bot))

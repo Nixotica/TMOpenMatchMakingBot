@@ -17,6 +17,7 @@ from models.player_profile import PlayerProfile
 from models.leaderboard import Leaderboard
 from models.match_queue import QueueType
 from matchmaking.matches.team_2v2 import Team2v2
+from nadeo_event_api.api.structure.event import Event
 import time
 
 
@@ -181,6 +182,25 @@ class MatchmakingManager:
 
     def remove_team_from_queue(self, team: Team2v2):
         pass  # TODO
+
+    def cancel_match(self, bot_match_id: int) -> Optional[ActiveMatch]:
+        """Cancels an active match, if one exists with the givne bot match ID.
+
+        Args:
+            bot_match_id (int): The bot match ID of the match to cancel.
+
+        Returns:
+            ActiveMatch: The canceled match.
+        """
+        for match in self.active_matches:
+            if match.bot_match_id == bot_match_id:
+                self.active_matches.remove(match)
+
+            Event.delete_from_id(match.event_id)
+            logging.info(f"Canceled match with bot match ID {bot_match_id} and event ID {match.event_id}.")
+
+            return match
+        return None
 
     def process_completed_matches(self) -> List[CompletedMatch]:
         """Returns a list of completed matches and clears the list."""
