@@ -24,3 +24,9 @@ class PlayerProfile:
             raise ValueError("Missing required fields")
 
         return cls(tm_account_id, int(discord_account_id), int(matches_played))
+
+    def __eq__(self, other) -> bool:
+        if not isinstance(other, PlayerProfile):
+            return False
+        return self.tm_account_id == other.tm_account_id and \
+            self.discord_account_id == other.discord_account_id
