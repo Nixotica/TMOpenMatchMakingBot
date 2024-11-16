@@ -54,6 +54,13 @@ export class BotServiceStack extends Stack {
          */
         const vpc = new Vpc(this, 'MM-Bot-VPC', {
             maxAzs: 1,
+            subnetConfiguration: [
+                {
+                    name: 'PublicSubnet',
+                    subnetType: SubnetType.PUBLIC,
+                }
+            ],
+            natGateways: 0,
         });
 
         /**
@@ -64,6 +71,8 @@ export class BotServiceStack extends Stack {
             description: 'Allow inbound HTTP/HTTPS traffic to ECS instances',
             allowAllOutbound: true,
         });
+        ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80), 'Allow HTTP traffic');
+        ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443), 'Allow HTTPS traffic');
 
         /**
          * ECS Cluster
@@ -83,6 +92,8 @@ export class BotServiceStack extends Stack {
         const autoScalingGroup = cluster.addCapacity('MM-Bot-DefaultAutoScalingGroup', {
             instanceType: InstanceType.of(InstanceClass.T3A, InstanceSize.MICRO), 
             blockDevices: [rootVolume],
+            vpcSubnets: { subnetType: SubnetType.PUBLIC },
+            associatePublicIpAddress: true,
         });
         autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
 

@@ -35,6 +35,7 @@ if (process.env.STAGE == 'dev') {
     env: env,
     stage: 'prod',
     account: env.account,
+    terminationProtection: true,
   }) 
   new BotServiceStack(app, 'TmOpenMatchMakingBotStack-BotService-prod', {
     env: env,
@@ -48,5 +49,6 @@ if (process.env.STAGE == 'dev') {
     ranksTable: storage.ranksTable,
     leaderboardRanksTable: storage.leaderboardRanksTable,
     nextBotMatchIdTable: storage.nextBotMatchIdTable,
+    terminationProtection: true,
   })
 }
