@@ -4,7 +4,7 @@ from discord import ui
 from discord.ext import commands, tasks
 import discord
 from aws.dynamodb import DynamoDbManager
-from helpers import get_rank_for_player
+from helpers import get_discord_user, get_rank_for_player
 from cogs.constants import COLOR_EMBED
 
 
@@ -102,18 +102,12 @@ class LeaderboardView(ui.View):
                 )
                 continue
 
-            player_discord_name = await self.bot.fetch_user(
-                player_profile.discord_account_id
+            player_discord_name = await get_discord_user(
+                self.bot, player_profile.discord_account_id
             )
 
-            guild = self.message.guild
-
-            if guild is not None:
-                guild_member = guild.get_member(player_profile.discord_account_id)
-                if guild_member is not None:
-                    player_discord_name = guild_member.display_name
-
-            rank_group_msg += f"**{player_pos}.** ({player_elo.elo}) {player_discord_name}\n"
+            if player_discord_name is not None:
+                rank_group_msg += f"**{player_pos}.** ({player_elo.elo}) {player_discord_name}\n"
 
             player_pos += 1
 

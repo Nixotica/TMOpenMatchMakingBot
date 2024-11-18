@@ -64,7 +64,8 @@ class LeaderboardViewBuilder(commands.Cog):
 
         await view.start_task(message)
 
-        await view.update_embed()
+        # Disabling this to avoid throttling issues on leaderboard loading
+        # await view.update_embed()
 
     async def setup_leaderboards(self) -> None:
         leaderboards = self.ddb_manager.get_leaderboards()

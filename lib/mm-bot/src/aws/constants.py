@@ -37,4 +37,6 @@ KEY_RANK_ID = "rank_id"
 
 KEY_CURRENT_VALUE = "current_value"
 
+KEY_PING_ROLE_ID = "ping_role_id"
+
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

@@ -64,7 +64,7 @@ class MonitorMatchmakingManager(commands.Cog):
             embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
             embed.add_field(
                 name="❗ Match Found",
-                value=f"Pinged players, join \"BMM - #{bot_match_id}\" in the Live -> Events tab in-game."
+                value=f"Pinged players, join the Better Matchmaking club and click activity \"BMM - #{bot_match_id}\"!"
             )
             
             content = ""
@@ -142,28 +142,37 @@ class MonitorMatchmakingManager(commands.Cog):
         players_in_queues = self.matchmaking_manager.process_first_player_joined_queue()
         if len(players_in_queues) == 0:
             return
-        
-        ping_channel = await self.get_ping_channel()
-        if not ping_channel:
-            logging.warning("No ping channel found.")
-            return
-        
-        configs = self.s3_manager.get_configs()
-        pings_role_id = configs.pings_role_id
-
-        if not pings_role_id:
-            logging.warning("No pings role found in config.")
-            return
-        
-        pings_role = ping_channel.guild.get_role(pings_role_id)
-        if not pings_role:
-            logging.error("Pings role not found in the server.")
-            return
 
         for (player, queue) in players_in_queues:
+            ping_role_id = queue.queue.ping_role_id
+
+            if not ping_role_id:
+                logging.debug(f"First player joined queue {queue.queue.queue_id} but no role to ping found.")
+                continue
+
+            # NOTE we are operating under the assumption this bot is only connected to one server
+            guild = self.bot.guilds[0]
+            ping_role = guild.get_role(ping_role_id)
+
+            if not ping_role:
+                logging.warning(f"Role {ping_role_id} not found in the guild {guild}.")
+                continue
+
+            ping_channel = self.bot.get_channel(queue.queue.channel_id)
+            if ping_channel is None:
+                logging.error(f"Ping channel not found with ID {queue.queue.channel_id}.")
+                continue
+            
+            if not isinstance(ping_channel, discord.TextChannel):
+                logging.error(f"Channel {queue.queue.channel_id} is not a text channel.")
+                continue
+
             embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
             embed.add_field(name="❗ Queue Activated", value=f"{queue.queue.queue_id} queue started by <@{player.discord_account_id}>.", inline=True)
-            await ping_channel.send(content=f"{pings_role.mention}", embed=embed)
+            msg = await ping_channel.send(content=f"{ping_role.mention}", embed=embed)
+
+            # Delete the message after 60 seconds
+            await msg.delete(delay=60)
 
     async def upload_match_results_and_cleanup_event(self, match: CompletedMatch) -> None:
         logging.debug(f"Uploading match results for match {match.active_match.match_id} and deleting event {match.active_match.event_id}...")

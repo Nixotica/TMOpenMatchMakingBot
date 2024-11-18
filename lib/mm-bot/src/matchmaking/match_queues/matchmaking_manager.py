@@ -1,7 +1,7 @@
 import asyncio
 import logging
 import threading
-from typing import List, Optional
+from typing import Dict, List, Optional
 from models.match_queue import MatchQueue
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
@@ -12,6 +12,7 @@ from matchmaking.match_queues.constants import (
     QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC,
     QUEUE_MANAGER_CHECK_KICK_QUEUED_PLAYERS_INTERVAL_SEC,
     QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC,
+    QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC,
 )
 from models.player_profile import PlayerProfile
 from models.leaderboard import Leaderboard
@@ -58,6 +59,7 @@ class MatchmakingManager:
             self._last_check_queues_time = 0
             self._last_check_matches_time = 0
             self._last_check_kick_players_time = 0
+            self._last_first_player_ping_time: Dict[str, float] = {} # queue_id : time
 
             self._thread = None
 
@@ -123,13 +125,20 @@ class MatchmakingManager:
                     return None
                 
                 # If this was the first person to join queue, trigger a ping to the discord
-                if len(queue.players) == 1:
+                time_of_last_ping = self._last_first_player_ping_time.get(queue_id)
+                now = time.time()
+
+                if len(queue.players) == 1 and (
+                    time_of_last_ping is None or
+                    now - time_of_last_ping > QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC
+                ):
                     logging.info(
                         f"First player {player.tm_account_id} joined queue {queue_id}."
                     )
                     self.new_first_players_joined_queue.append(
                         (player, queue)
                     )
+                    self._last_first_player_ping_time[queue_id] = now
 
                 return queue
         logging.warning(

@@ -311,6 +311,40 @@ class DynamoDbManager:
             logging.error(f"Error getting active match queues from DynamoDB: {e}")
             raise
 
+    def get_match_queue(self, queue_id: str) -> Optional[MatchQueue]:
+        """Get a match queue from the MatchQueues table.
+
+        Args:
+            queue_id (str): The ID of the match queue to get.
+
+        Returns:
+            Optional[MatchQueue]: The match queue if found, None otherwise.
+        """
+        try:
+            response = self._match_queues_table.get_item(Key={KEY_QUEUE_ID: queue_id})
+            item = response.get("Item")
+            if not item:
+                return None
+            return MatchQueue.from_dict(item)
+        except Exception as e:
+            logging.error(f"Error getting match queue from DynamoDB: {e}")
+            raise
+
+    def update_match_queue(self, queue: MatchQueue) -> None:
+        """Update a match queue in the MatchQueues table.
+
+        Args:
+            queue (MatchQueue): The match queue to update.
+
+        Returns:
+            None
+        """
+        try:
+            self._match_queues_table.put_item(Item=queue.to_dict())
+        except Exception as e:
+            logging.error(f"Error updating match queue in DynamoDB: {e}")
+            raise
+
     def add_leaderboard_to_match_queue(
         self, queue_id: str, leaderboard_id: str
     ) -> None:

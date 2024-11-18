@@ -111,6 +111,7 @@ class QueueViewBuilder(commands.Cog):
             type=queue_type,
             active=True,
             leaderboard_ids=[],  # Currently requires admin to add leaderboards
+            ping_role_id=None,  # Currently requires admin to add ping role
         )
 
         # Add a new queue to the matchmaking manager to activate it
@@ -189,6 +190,35 @@ class QueueViewBuilder(commands.Cog):
             )
 
         await ctx.send(embed=embed, ephemeral=True)
+
+
+    @commands.hybrid_command(
+        name="link_ping_role_to_queue",
+        description="Link a role to a queue used for general pings like players activating the queue."
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def link_ping_role_to_queue(self, ctx: commands.Context, queue_id: str, role: discord.Role) -> None:
+        logging.info(
+            f"Processing command to link ping role {role.name} to queue {queue_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+        if not queue:
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.")
+            return
+        
+        queue.ping_role_id = role.id
+
+        # Update the ddb table
+        self.ddb_manager.update_match_queue(queue)
+
+        # Update the active match
+        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        if active_queue:
+            active_queue.queue.ping_role_id = role.id
+
+        await ctx.send(f"Role {role.name} linked to queue {queue_id}.")
 
 
 async def setup(bot: commands.Bot) -> None:

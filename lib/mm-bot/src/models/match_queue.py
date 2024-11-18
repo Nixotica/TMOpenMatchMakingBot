@@ -1,8 +1,9 @@
 from dataclasses import dataclass
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from aws.constants import (
     KEY_LEADERBOARD_IDS,
+    KEY_PING_ROLE_ID,
     KEY_QUEUE_ID,
     KEY_ACTIVE,
     KEY_CAMPAIGN_ID,
@@ -24,6 +25,7 @@ class MatchQueue:
     active: bool
     channel_id: int
     leaderboard_ids: List[str] | None
+    ping_role_id: Optional[int]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
@@ -35,6 +37,7 @@ class MatchQueue:
         active = data.get(KEY_ACTIVE)
         channel_id = data.get(KEY_CHANNEL_ID)
         leaderboard_ids = data.get(KEY_LEADERBOARD_IDS)
+        ping_role_id = data.get(KEY_PING_ROLE_ID)
 
         if (
             not queue_id
@@ -55,6 +58,7 @@ class MatchQueue:
             active,
             int(channel_id),
             leaderboard_ids,
+            ping_role_id,
         )
 
     def to_dict(self):
@@ -63,8 +67,9 @@ class MatchQueue:
             KEY_CAMPAIGN_CLUB_ID: self.campaign_club_id,
             KEY_CAMPAIGN_ID: self.campaign_id,
             KEY_MATCH_CLUB_ID: self.match_club_id,
-            KEY_QUEUE_TYPE: self.type.value,
+            KEY_QUEUE_TYPE: self.type,
             KEY_ACTIVE: self.active,
             KEY_CHANNEL_ID: self.channel_id,
             KEY_LEADERBOARD_IDS: self.leaderboard_ids,
+            KEY_PING_ROLE_ID: self.ping_role_id,
         }
