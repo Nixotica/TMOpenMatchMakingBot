@@ -2,7 +2,7 @@ import logging
 from typing import List
 import discord
 from discord.ext import commands
-from views.join_queue import JoinQueueView
+from views.join_queue import MatchQueueView
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from matchmaking.match_queues.enum import QueueType
@@ -20,7 +20,7 @@ class QueueViewBuilder(commands.Cog):
         self.bot = bot
         self.ddb_manager = DynamoDbManager()
         self.mm_manager = MatchmakingManager()
-        self.views: List[JoinQueueView] = []
+        self.views: List[MatchQueueView] = []
 
     async def cog_load(self) -> None:
         logging.info("Queue View Builder loading...")
@@ -56,7 +56,7 @@ class QueueViewBuilder(commands.Cog):
         )
 
         # TODO - based on type, different queue views (2v2 should look different...)
-        view = JoinQueueView(queue.queue.queue_id)
+        view = MatchQueueView(queue.queue.queue_id, channel)
 
         self.views.append(view)
 

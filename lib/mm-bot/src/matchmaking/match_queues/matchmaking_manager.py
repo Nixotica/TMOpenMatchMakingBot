@@ -46,12 +46,21 @@ class MatchmakingManager:
                     ActiveMatchQueue(queue)
                 )  # TODO - it should also check DDB table if this updated on some cadence
             self.active_matches: List[ActiveMatch] = []
-            self.new_active_matches: List[
+
+            self.new_active_matches_monitor: List[
                 ActiveMatch
-            ] = []  # Only new and not processed by bot
-            self.completed_matches: List[
+            ] = []  # Only new and not processed by matchmaking monitor for bot
+            self.completed_matches_monitor: List[
                 CompletedMatch
-            ] = []  # Only completed and not processed by bot
+            ] = []  # Only completed and not processed by matchmaking monitor for bot
+
+            self.new_active_matches_queue_view: List[
+                ActiveMatch
+            ] = []  # Only new and not processed by match queue view
+            self.completed_matches_queue_view: List[
+                CompletedMatch
+            ] = []
+
             self.new_first_players_joined_queue: List[
                 tuple[PlayerProfile, ActiveMatchQueue]
             ] = []  # Only detected internally and not processed by bot
@@ -211,17 +220,57 @@ class MatchmakingManager:
             return match
         return None
 
-    def process_completed_matches(self) -> List[CompletedMatch]:
-        """Returns a list of completed matches and clears the list."""
-        completed_matches = self.completed_matches
-        self.completed_matches = []
+    def process_completed_matches_monitor(self) -> List[CompletedMatch]:
+        """Returns a list of completed matches for matchmaking manager and clears the list."""
+        completed_matches = self.completed_matches_monitor
+        self.completed_matches_monitor = []
         return completed_matches
 
-    def process_new_active_matches(self) -> List[ActiveMatch]:
-        """Returns a list of new active matches and clears the list."""
-        new_active_matches = self.new_active_matches
-        self.new_active_matches = []
+    def process_new_active_matches_monitor(self) -> List[ActiveMatch]:
+        """Returns a list of new active matches for matchmaking manager and clears the list."""
+        new_active_matches = self.new_active_matches_monitor
+        self.new_active_matches_monitor = []
         return new_active_matches
+    
+    def process_completed_matches_for_queue(self, queue_id: str) -> List[CompletedMatch]:
+        """Returns a list of completed matches for a given queue ID and removes from the list."""
+        matches_to_return = []
+        
+        for match in self.completed_matches_queue_view:
+            if match.active_match.match_queue.queue_id == queue_id:
+                matches_to_return.append(match)
+                self.completed_matches_queue_view.remove(match)
+
+        return matches_to_return
+    
+    def process_new_active_matches_for_queue(self, queue_id: str) -> List[ActiveMatch]:
+        """Returns a list of new active matches for a given queue ID and removes from the list."""
+        matches_to_return = []
+
+        for match in self.new_active_matches_queue_view:
+            if match.match_queue.queue_id == queue_id:
+                matches_to_return.append(match)
+                self.new_active_matches_queue_view.remove(match)
+
+        return matches_to_return
+    
+    def add_new_active_match(self, active_match: ActiveMatch) -> None:
+        """Adds a new active match to the list of new active matches, for all separate tasks requesting them."""
+        self.active_matches.append(active_match)
+
+        self.new_active_matches_monitor.append(active_match)
+        self.new_active_matches_queue_view.append(active_match)
+
+    def add_completed_match(self, active_match: ActiveMatch) -> None:
+        """Creates a completed match from an active match and adds to the list of completed matches,
+        for all separate tasks requesting them. Also removes from the list of active matches
+        """
+        self.active_matches.remove(active_match)
+        
+        completed_match = CompletedMatch(active_match)
+
+        self.completed_matches_monitor.append(completed_match)
+        self.completed_matches_queue_view.append(completed_match)
     
     def process_first_player_joined_queue(self) -> List[tuple[PlayerProfile, ActiveMatchQueue]]:
         """Returns a list of players who took the initiative to join a match queue with zero players in it."""
@@ -235,6 +284,16 @@ class MatchmakingManager:
             if queue.queue.queue_id == queue_id:
                 return queue
         return None
+    
+    def get_active_matches_by_queue_id(self, queue_id: str) -> List[ActiveMatch]:
+        """Returns a list of active matches for the given match queue ID."""
+        active_matches = []
+        
+        for active_match in self.active_matches:
+            if active_match.match_queue.queue_id == queue_id:
+                active_matches.append(active_match)
+
+        return active_matches
 
     def add_leaderboard_to_active_queue(self, queue_id: str, leaderboard_id: str):
         """Adds a leaderboard to an active queue in the mm manager.
@@ -332,8 +391,7 @@ class MatchmakingManager:
                         or team == active_match.player_profiles.team_b
                     ):
                         active_queue.remove_team(team)
-            self.new_active_matches.append(active_match)
-            self.active_matches.append(active_match)
+            self.add_new_active_match(active_match)
 
     async def _check_active_matches(self):
         """Checks if the matchmaking manager can get results from ongoing/completed matches."""
@@ -351,9 +409,7 @@ class MatchmakingManager:
                 logging.info(
                     f"Match {active_match.match_id} is complete. Adding to list of completed matches."
                 )
-                completed_match = CompletedMatch(active_match)
-                self.active_matches.remove(active_match)
-                self.completed_matches.append(completed_match)
+                self.add_completed_match(active_match)
 
     async def _check_if_should_kick_idle_players_from_queue(self):
         """Checks if players in queue have stayed in queue beyond acceptable idle time"""

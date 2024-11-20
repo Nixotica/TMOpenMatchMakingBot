@@ -121,7 +121,7 @@ class MonitorMatchmakingManager(commands.Cog):
     async def check_for_new_matches(self):
         """Periodically checks if new matches have been created."""
         logging.debug(f"Bot checking for new matches...")
-        new_matches = self.matchmaking_manager.process_new_active_matches()
+        new_matches = self.matchmaking_manager.process_new_active_matches_monitor()
 
         for match in new_matches:
             logging.info(f"New match {match.match_id}, notifying players.")
@@ -317,7 +317,7 @@ class MonitorMatchmakingManager(commands.Cog):
     async def check_for_completed_matches(self):
         """Periodically checks if matches have been completed."""
         logging.debug(f"Bot checking for completed matches...")
-        completed_matches = self.matchmaking_manager.process_completed_matches()
+        completed_matches = self.matchmaking_manager.process_completed_matches_monitor()
 
         for match in completed_matches:
             logging.info(

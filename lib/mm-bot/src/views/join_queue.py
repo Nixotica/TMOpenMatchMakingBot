@@ -1,21 +1,28 @@
+from datetime import datetime
 import logging
+from typing import Dict, List
 import discord
-from discord import ui
+from discord import TextChannel, ui
 from discord.ext import tasks, commands
+from cogs.constants import COLOR_EMBED
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
+from matchmaking.matches.active_match import ActiveMatch
+from matchmaking.matches.team_2v2 import Teams2v2
 
 
-class JoinQueueView(ui.View):
+class MatchQueueView(ui.View):
     """
-    A view for joining and leaving a matchmaking queue, plus the players in the queue.
+    A view for joining and leaving a matchmaking queue, plus the players in the queue and active queues. 
     """
 
-    def __init__(self, queue_id: str):
+    def __init__(self, queue_id: str, channel: TextChannel):
         super().__init__(timeout=None)
         self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
         self.queue_id = queue_id
+        self.channel = channel
+        self.active_match_messages: Dict[int, discord.message.Message] = {}
 
     @ui.button(label="Join Queue", style=discord.ButtonStyle.green)
     async def join_queue(self, interaction: discord.Interaction, button: ui.Button):
@@ -53,7 +60,7 @@ class JoinQueueView(ui.View):
             f"Joined queue {self.queue_id}.", ephemeral=True
         )
 
-        await self.update_embed()
+        await self.update_queue_embed()
 
     @ui.button(label="Leave Queue", style=discord.ButtonStyle.red)
     async def leave_queue(self, interaction: discord.Interaction, button: ui.Button):
@@ -88,24 +95,27 @@ class JoinQueueView(ui.View):
             f"Left queue {self.queue_id}.", ephemeral=True
         )
 
-        await self.update_embed()
+        await self.update_queue_embed()
 
     async def start_task(self, message: discord.message.Message):
-        self.message = message
-        self.update_embed_task = self.update_embed.start()
+        self.active_queue_message = message
+        self.update_embed_task = self.update_queue_embed.start()
+        self.update_active_matches_embeds_task = self.update_active_matches_embeds.start()
 
     async def stop_task(self):
-        await self.message.delete()
+        await self.active_queue_message.delete()
+        for (_, message) in self.active_match_messages.items():
+            await message.delete()
 
     @tasks.loop(seconds=15)
-    async def update_embed(self) -> None:
+    async def update_queue_embed(self) -> None:
         logging.debug(f"Updating embed for queue {self.queue_id}.")
 
         queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
 
         if queue is None:
             logging.error(
-                f"When updating JoinQueueView embed, queue {self.queue_id} was not found."
+                f"When updating MatchQueueView embed, queue {self.queue_id} was not found."
             )
             raise ValueError(f"Queue {self.queue_id} not found.")
 
@@ -118,4 +128,44 @@ class JoinQueueView(ui.View):
         embed = discord.Embed(title=f"Better Matchmaking Queue - {self.queue_id}")
         embed.add_field(name="Players: ", value=num_players_in_queue)
 
-        await self.message.edit(embed=embed)
+        await self.active_queue_message.edit(embed=embed)
+
+    @tasks.loop(seconds=15)
+    async def update_active_matches_embeds(self) -> None:
+        logging.debug(f"Updating embeds for active matches in queue {self.queue_id}.")
+
+        # Get new active matches and send the messages for them.
+        new_active_matches = self.mm_manager.process_new_active_matches_for_queue(self.queue_id)
+
+        for new_match in new_active_matches:
+            players = new_match.player_profiles
+
+            # TODO - support 2v2
+            if isinstance(players, Teams2v2):
+                logging.error("Not implemented to handle 2v2 matches...")
+                continue
+
+            value = ""
+            for player in players:
+                value += f"<@{player.discord_account_id}>\n"
+            
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name=f"🏎️ Match #{new_match.bot_match_id} in progress...",
+                value=value
+            )
+
+            message = await self.channel.send(embed=embed)
+            self.active_match_messages[new_match.bot_match_id] = message
+
+            logging.info(f"New match with bot match ID {new_match.bot_match_id} added to queue view {self.queue_id}")
+
+        # Get completed matches and delete the messages for them.
+        completed_matches = self.mm_manager.process_completed_matches_for_queue(self.queue_id)
+
+        for completed_match in completed_matches:
+            message = self.active_match_messages.pop(completed_match.active_match.bot_match_id)
+
+            await message.delete()
+
+            logging.info(f"Completed match with bot match ID {completed_match.active_match.bot_match_id} removed from queue view {self.queue_id}")
