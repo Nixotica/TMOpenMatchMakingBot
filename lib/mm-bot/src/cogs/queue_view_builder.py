@@ -111,6 +111,7 @@ class QueueViewBuilder(commands.Cog):
             type=queue_type,
             active=True,
             leaderboard_ids=[],  # Currently requires admin to add leaderboards
+            primary_leaderboard_id=None,  # Currently requires admin to add primary leaderboard
             ping_role_id=None,  # Currently requires admin to add ping role
         )
 
@@ -143,6 +144,7 @@ class QueueViewBuilder(commands.Cog):
             f"Processing command to add queue {queue_id} to leaderboard {leaderboard_id} from user {ctx.message.author.name}."
         )
 
+        # TODO - this is making pointless scans on dynamo
         leaderboards = self.ddb_manager.get_leaderboards()
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
@@ -219,6 +221,42 @@ class QueueViewBuilder(commands.Cog):
             active_queue.queue.ping_role_id = role.id
 
         await ctx.send(f"Role {role.name} linked to queue {queue_id}.")
+
+    
+    @commands.hybrid_command(
+        name="set_queue_primary_leaderboard",
+        description="Set the primary leaderboard for a queue, used when displaying rank counts in queue."
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def set_primary_leaderboard_for_queue(self, ctx: commands.Context, queue_id: str, leaderboard_id: str) -> None:
+        logging.info(
+            f"Processing command to set primary leaderboard {leaderboard_id} for queue {queue_id} from user {ctx.message.author.name}."
+        )
+        
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+        if not queue:
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.")
+            return
+        
+        # TODO - this is making pointless scans on dynamo
+        leaderboards = self.ddb_manager.get_leaderboards()
+        if leaderboard_id not in [
+            leaderboard.leaderboard_id for leaderboard in leaderboards
+        ]:
+            await ctx.send(f"Leaderboard {leaderboard_id} not found.")
+            return
+        
+        queue.primary_leaderboard_id = leaderboard_id
+        self.ddb_manager.update_match_queue(queue)
+
+        # Also update it in the matchmaking manager
+        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+
+        if active_queue is not None:
+            active_queue.queue.primary_leaderboard_id = leaderboard_id
+
+        await ctx.send(f"Primary leaderboard for queue {queue_id} set to {leaderboard_id}.")
 
 
 async def setup(bot: commands.Bot) -> None:

@@ -4,7 +4,7 @@ from typing import Any, Dict
 from aws.constants import KEY_LEADERBOARD_ID, KEY_RANK_ID, KEY_DISPLAY_NAME, KEY_MIN_ELO
 
 
-@dataclass
+@dataclass(unsafe_hash=True)
 class LeaderboardRank:
     rank_id: str
     leaderboard_id: str

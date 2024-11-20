@@ -5,10 +5,13 @@ import discord
 from discord import TextChannel, ui
 from discord.ext import tasks, commands
 from cogs.constants import COLOR_EMBED
+from helpers import get_rank_for_player
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
+from models.leaderboard_rank import LeaderboardRank
+from models.player_profile import PlayerProfile
 
 
 class MatchQueueView(ui.View):
@@ -119,14 +122,38 @@ class MatchQueueView(ui.View):
             )
             raise ValueError(f"Queue {self.queue_id} not found.")
 
-        num_players_in_queue = len(queue.players)
-
-        # TODO - display player count by rank
-
-        # TODO - display active matches count
-
         embed = discord.Embed(title=f"Better Matchmaking Queue - {self.queue_id}")
-        embed.add_field(name="Players: ", value=num_players_in_queue)
+
+        leaderboard_id = queue.queue.primary_leaderboard_id
+        num_players = len(queue.players)
+        if leaderboard_id is None or num_players == 0:
+            embed.add_field(name="Players:", value=num_players)
+        else:
+            leaderboard_ranks = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(
+                leaderboard_id
+            )
+            ranks_to_count: Dict[LeaderboardRank, int] = {}
+            for player in queue.players:
+                player_elo = self.ddb_manager.get_or_create_player_elo(
+                    player.profile.tm_account_id,
+                    leaderboard_id,
+                )
+                rank = get_rank_for_player(player_elo.elo, leaderboard_id, leaderboard_ranks)
+                if rank is None:
+                    logging.error(f"Failed to get rank for player with elo {player_elo.elo} on leaderboard {leaderboard_id}.")
+                    continue
+                if ranks_to_count.get(rank) is None:
+                    ranks_to_count[rank] = 1
+                else:
+                    ranks_to_count[rank] += 1
+
+            value = ""
+            for rank in leaderboard_ranks:
+                if ranks_to_count.get(rank) is None:
+                    continue
+                value += f"{rank.display_name}: {ranks_to_count[rank]}\n"
+
+            embed.add_field(name="Players:", value=value)
 
         await self.active_queue_message.edit(embed=embed)
 

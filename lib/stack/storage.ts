@@ -103,6 +103,7 @@ export class StorageStack extends Stack {
          * - `active`: Boolean to enable/disable the queue
          * - `channel_id`: Channel ID to host queue view in Discord
          * - `leaderboard_ids`: List of leadboard IDs for which elo is distributed to players. 
+         * - `primary_leaderboard_id`: The primary leaderboard ID for which a player's rank is determined to display for the queue.
          * - `ping_role_id`: The ping role for queue notifications directed at general queue audience. 
          */
         this.matchQueuesTable = new Table(this, "MatchQueuesTable", {
