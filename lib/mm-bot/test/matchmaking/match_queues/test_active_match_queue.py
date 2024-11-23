@@ -27,7 +27,9 @@ class TestActiveMatchQueues(unittest.TestCase):
                 type=QueueType.Queue1v1v1v1,
                 active=True,
                 channel_id=1,
-                leaderboard_ids=["l1"]
+                leaderboard_ids=["l1"],
+                primary_leaderboard_id=None,
+                ping_role_id=None,
             )
         )
 

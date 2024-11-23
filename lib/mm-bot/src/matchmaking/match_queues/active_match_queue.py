@@ -6,7 +6,7 @@ from models.match_queue import MatchQueue
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.queued_player import QueuedPlayer
 from matchmaking.matches.active_match import ActiveMatch
-from matchmaking.constants import NUM_1v1v1v1_PLAYERS
+from matchmaking.constants import NUM_1v1v1v1_PLAYERS, NUM_LSC_PLAYERS
 
 
 class ActiveMatchQueue:
@@ -111,23 +111,30 @@ class ActiveMatchQueue:
         Returns:
             bool: True if a match should be generated, False otherwise.
         """
-        if self.queue.type == QueueType.Queue1v1v1v1.value:
+        print(f"DEBUGME {self.queue.type}")
+        if self.queue.type == QueueType.Queue1v1v1v1:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
             )
             if len(self.players) >= NUM_1v1v1v1_PLAYERS:
                 return True
-        elif self.queue.type == QueueType.Queue2v2.value:
+        elif self.queue.type == QueueType.Queue2v2:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.teams)}."
             )
             if len(self.teams) >= 2:
                 return True
-        elif self.queue.type == QueueType.QueueSoloTest.value:
+        elif self.queue.type == QueueType.QueueSoloTest:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
             )
             if len(self.players) >= 1:
+                return True
+        elif self.queue.type == QueueType.QueueLSC:
+            logging.debug(
+                f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
+            )
+            if len(self.players) >= NUM_LSC_PLAYERS:
                 return True
         
         return False
@@ -141,16 +148,20 @@ class ActiveMatchQueue:
         Returns:
             ActiveMatch: The active match created as an event.
         """
-        if self.queue.type == QueueType.Queue1v1v1v1.value:
+        if self.queue.type == QueueType.Queue1v1v1v1:
             players_in_match = self.players[:NUM_1v1v1v1_PLAYERS]
             players_in_match = [p.profile for p in players_in_match]
             return ActiveMatch.create_1v1v1v1(self.queue, bot_match_id, players_in_match)
-        elif self.queue.type == QueueType.Queue2v2.value:
+        elif self.queue.type == QueueType.Queue2v2:
             teams_in_match = self.teams[:2]
             teams = Teams2v2(teams_in_match[0], teams_in_match[1])
             return ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
-        elif self.queue.type == QueueType.QueueSoloTest.value:
+        elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.players[0]
             return ActiveMatch.create_solo(self.queue, bot_match_id, player_in_match.profile)
+        elif self.queue.type == QueueType.QueueLSC:
+            players_in_match = self.players[:NUM_LSC_PLAYERS]
+            players_in_match = [p.profile for p in players_in_match]
+            return ActiveMatch.create_lsc(self.queue, bot_match_id, players_in_match)
         else:
             raise Exception("Invalid queue type")

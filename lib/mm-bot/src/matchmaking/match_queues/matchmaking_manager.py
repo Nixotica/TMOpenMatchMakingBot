@@ -83,6 +83,7 @@ class MatchmakingManager:
         """
         active_queue = ActiveMatchQueue(queue)
         self.active_queues.append(active_queue)
+        print(f"Added new queue {queue.queue_id} to mm manager: new active queues {self.active_queues}")
         return active_queue
     
     def is_player_in_match(self, player: PlayerProfile) -> bool:
@@ -115,7 +116,7 @@ class MatchmakingManager:
         """
         for queue in self.active_queues:
             if queue.queue.queue_id == queue_id:
-                if queue.queue.type == QueueType.Queue2v2.value:
+                if queue.queue.type == QueueType.Queue2v2:
                     logging.error(f"Attempted to add player to a 2v2 queue: {queue_id}")
                     # TODO - this should not be an error, we should allow free agents
                     return None
@@ -169,7 +170,7 @@ class MatchmakingManager:
         """
         for queue in self.active_queues:
             if queue.queue.queue_id == queue_id:
-                if queue.queue.type == QueueType.Queue1v1v1v1.value:
+                if queue.queue.type == QueueType.Queue1v1v1v1:
                     logging.error(
                         f"Attempt to add team {team} to single player queue {queue_id}."
                     )
@@ -190,7 +191,7 @@ class MatchmakingManager:
         """
         for queue in self.active_queues:
             if queue.queue.queue_id == queue_id:
-                if queue.queue.type == QueueType.Queue2v2.value:
+                if queue.queue.type == QueueType.Queue2v2:
                     logging.error(
                         f"Attempted to remove player from a 2v2 queue: {queue_id}"
                     )
@@ -213,6 +214,9 @@ class MatchmakingManager:
         for match in self.active_matches:
             if match.bot_match_id == bot_match_id:
                 self.active_matches.remove(match)
+
+                # Also add to the "completed" matches for a queue so it knows to delete the active match message
+                self.completed_matches_queue_view.append(CompletedMatch(match, canceled=True))
 
             Event.delete_from_id(match.event_id)
             logging.info(f"Canceled match with bot match ID {bot_match_id} and event ID {match.event_id}.")
@@ -342,9 +346,14 @@ class MatchmakingManager:
         self._last_check_queues_time = now
         logging.debug("Checking queues for sufficient size to generate matches...")
         new_active_matches: List[ActiveMatch] = []
+        print(f"_check_if_should_queue_matches has self.active_queues of {self.active_queues}")
         for active_queue in self.active_queues:
+            print(f"for-loop: {active_queue.queue.queue_id}")
             should_generate_match = active_queue.should_generate_match()
             if not should_generate_match:
+                logging.debug(
+                    f"Queue {active_queue.queue.queue_id} does not have enough players to generate a match."
+                )
                 continue
 
             bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
@@ -352,8 +361,8 @@ class MatchmakingManager:
             active_match = active_queue.generate_match(bot_match_id)
 
             if active_match is None:
-                logging.debug(
-                    f"Queue {active_queue.queue.queue_id} does not have enough players to generate a match."
+                logging.error(
+                    f"Failed to generate match for queue {active_queue.queue.queue_id}."
                 )
                 continue
 

@@ -24,15 +24,19 @@ class CompletedMatch:
     def __init__(
         self,
         active_match: ActiveMatch,
+        canceled: bool = False,
     ):
+        self.time_completed = dt.datetime.utcnow()
+        self.ddb_manager = DynamoDbManager()
+        self.active_match = active_match
+
+        if canceled:
+            return
+
         if not active_match.is_match_complete():
             raise ValueError(
                 f"Match {self.active_match.match_id} is not complete and cannot be converted to CompletedMatch."
             )
-
-        self.time_completed = dt.datetime.utcnow()
-        self.ddb_manager = DynamoDbManager()
-        self.active_match = active_match
 
         if isinstance(self.active_match.player_profiles, Teams2v2):
             self.match_results = get_match_results(
@@ -95,7 +99,7 @@ class CompletedMatch:
                 self.elo_differences.append(new_player_elo)
 
         logging.info(
-            f"Match {self.active_match.match_id} completed at {self.time_completed} with results: {self.match_results}. Elo updated: {self.updated_elo_ratings} ({elo_differences})."
+            f"Match {self.active_match.match_id} completed at {self.time_completed} with results: {self.match_results}. Elo updated: {self.updated_elo_ratings} ({self.elo_differences})."
         )
 
     def cleanup(self) -> None:

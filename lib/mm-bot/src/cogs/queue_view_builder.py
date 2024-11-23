@@ -94,7 +94,7 @@ class QueueViewBuilder(commands.Cog):
         try:
             queue_type = QueueType.from_str(type)
         except ValueError:
-            await ctx.send(f"Invalid queue type: {type}.")
+            await ctx.send(f"Invalid queue type: {type}. Possible: {[q.value for q in QueueType]}")
             return
 
         channel_id = eval(channel_id)
@@ -115,12 +115,6 @@ class QueueViewBuilder(commands.Cog):
             ping_role_id=None,  # Currently requires admin to add ping role
         )
 
-        # Add a new queue to the matchmaking manager to activate it
-        active_queue = self.mm_manager.add_queue(queue)
-
-        # Add the view to discord
-        await self.add_active_queue_view(active_queue)
-
         # Add to dynamo table so it will load automatically next time bot starts up
         success = self.ddb_manager.create_queue(queue=queue)
 
@@ -128,6 +122,13 @@ class QueueViewBuilder(commands.Cog):
             await ctx.send(f"Queue {queue_id} created successfully.")
         else:
             await ctx.send(f"Failed to create queue {queue_id}, unknown error.")
+            return
+
+        # Add a new queue to the matchmaking manager to activate it
+        active_queue = self.mm_manager.add_queue(queue)
+
+        # Add the view to discord
+        await self.add_active_queue_view(active_queue)
 
     @commands.hybrid_command(
         name="add_queue_to_leaderboard",

@@ -12,6 +12,7 @@ from matchmaking.matches.event_creator import (
     create_1v1v1v1_match,
     create_2v2_match,
     create_solo_match,
+    create_lsc_match,
 )
 
 
@@ -93,6 +94,25 @@ class ActiveMatch:
             match_info.match_live_id,
             bot_match_id,
             [player],
+            match_queue,
+        )
+    
+    @staticmethod
+    def create_lsc(
+        match_queue: MatchQueue,
+        bot_match_id: int,
+        players: List[PlayerProfile],
+    ) -> ActiveMatch:
+        logging.info(f"Creating new LSC match for players {players}")
+        match_info = create_lsc_match(match_queue, bot_match_id, players)
+
+        return ActiveMatch(
+            match_info.event_id,
+            match_info.round_id,
+            match_info.match_id,
+            match_info.match_live_id,
+            bot_match_id,
+            players,
             match_queue,
         )
 
