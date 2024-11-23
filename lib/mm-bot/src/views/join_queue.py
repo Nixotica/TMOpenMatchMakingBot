@@ -140,7 +140,7 @@ class MatchQueueView(ui.View):
                 )
                 rank = get_rank_for_player(player_elo.elo, leaderboard_id, leaderboard_ranks)
                 if rank is None:
-                    logging.error(f"Failed to get rank for player with elo {player_elo.elo} on leaderboard {leaderboard_id}.")
+                    logging.error(f"Failed to get rank for player {player_elo.tm_account_id} with elo {player_elo.elo} on leaderboard {leaderboard_id}.")
                     continue
                 if ranks_to_count.get(rank) is None:
                     ranks_to_count[rank] = 1

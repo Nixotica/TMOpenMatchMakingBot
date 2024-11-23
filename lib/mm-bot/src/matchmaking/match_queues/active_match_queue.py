@@ -111,7 +111,6 @@ class ActiveMatchQueue:
         Returns:
             bool: True if a match should be generated, False otherwise.
         """
-        print(f"DEBUGME {self.queue.type}")
         if self.queue.type == QueueType.Queue1v1v1v1:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."

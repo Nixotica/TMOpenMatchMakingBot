@@ -83,7 +83,6 @@ class MatchmakingManager:
         """
         active_queue = ActiveMatchQueue(queue)
         self.active_queues.append(active_queue)
-        print(f"Added new queue {queue.queue_id} to mm manager: new active queues {self.active_queues}")
         return active_queue
     
     def is_player_in_match(self, player: PlayerProfile) -> bool:
@@ -346,9 +345,7 @@ class MatchmakingManager:
         self._last_check_queues_time = now
         logging.debug("Checking queues for sufficient size to generate matches...")
         new_active_matches: List[ActiveMatch] = []
-        print(f"_check_if_should_queue_matches has self.active_queues of {self.active_queues}")
         for active_queue in self.active_queues:
-            print(f"for-loop: {active_queue.queue.queue_id}")
             should_generate_match = active_queue.should_generate_match()
             if not should_generate_match:
                 logging.debug(

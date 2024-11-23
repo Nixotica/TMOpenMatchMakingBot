@@ -169,6 +169,7 @@ def create_lsc_match(
                         points_limit=4,
                         rounds_per_map=1,
                         maps_per_match=1,
+                        finish_timeout=-1,
                     ),
                     plugin_settings=ClassicPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,
