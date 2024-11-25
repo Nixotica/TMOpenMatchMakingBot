@@ -518,9 +518,9 @@ class DynamoDbManager:
             logging.error(f"Error getting player elo from DynamoDB: {e}")
             raise
 
-    def get_players_by_elo_descending(self, leaderboard_id: str) -> List[PlayerElo]:
-        """Get a sorted list of players by their elo in descending order for a given leaderboard.
-
+    def get_top_25_players_by_elo(self, leaderboard_id: str) -> List[PlayerElo]:
+        """Get a sorted list of the top 25 players by their elo in descending order for a given leaderboard.
+        
         Args:
             leaderboard_id (str): The leaderboard ID to get player elos for.
 
@@ -532,14 +532,52 @@ class DynamoDbManager:
                 IndexName="leaderboard_id",
                 KeyConditionExpression=Key(KEY_LEADERBOARD_ID).eq(leaderboard_id),
                 ScanIndexForward=False,
+                Limit=25,
             )
             items = response.get("Items", [])
             if not items:
                 return []
-            player_elos = [PlayerElo.from_dict(items[i]) for i in range(len(items))]
-            return player_elos
+            return [PlayerElo.from_dict(item) for item in items]
         except Exception as e:
-            logging.error(f"Error getting player elos from DynamoDB: {e}")
+            logging.error(f"Error getting top 25 player elos from DynamoDB: {e}")
+            raise
+
+    def get_nearby_players_by_elo(self, leaderboard_id: str, tm_account_id: str) -> tuple[int, List[PlayerElo]]:
+        """Get the players 3 places above and below a specific player by elo in descending order.
+
+        Args:
+            leaderboard_id (str): The leaderboard ID to get player elos for.
+            player_id (str): The player ID to find nearby players for.
+
+        Returns:
+            tuple[int, List[PlayerElo]]: The first player's position in list and a list of 3 players above and 3 players below player. 
+        """
+        try:
+            # Query all players in the leaderboard sorted by elo
+            response = self._player_elos_table.query(
+                IndexName="leaderboard_id",
+                KeyConditionExpression=Key(KEY_LEADERBOARD_ID).eq(leaderboard_id),
+                ScanIndexForward=False,
+            )
+            items = response.get("Items", [])
+            if not items:
+                return (0, [])
+            
+            # Convert items to PlayerElo objects
+            player_elos = [PlayerElo.from_dict(item) for item in items]
+
+            # Find the target player index
+            target_index = next((i for i, player in enumerate(player_elos) if player.tm_account_id == tm_account_id), None)
+            if target_index is None:
+                logging.warning(f"Player {tm_account_id} not found in leaderboard {leaderboard_id}.")
+                return (0, [])
+
+            # Get players 3 places above and below
+            start_index = max(0, target_index - 3)
+            end_index = min(len(player_elos), target_index + 4)  # target + 3 (inclusive)
+            return (start_index + 1, player_elos[start_index:end_index])
+        except Exception as e:
+            logging.error(f"Error getting nearby players from DynamoDB: {e}")
             raise
 
     def create_rank_role(self, rank_role: RankRole) -> bool:

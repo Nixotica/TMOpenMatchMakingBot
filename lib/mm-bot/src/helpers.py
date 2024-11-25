@@ -32,6 +32,33 @@ def get_rank_for_player(
     return player_rank
 
 
+def get_next_rank_for_player(
+    player_elo: int,
+    leaderboard_id: str,
+    ranks: List[LeaderboardRank],
+) -> Optional[LeaderboardRank]:
+    """
+    Get the next rank for a player based on their Elo rating and the list of ranks.
+
+    Args:
+        player_elo (int): The player's Elo rating.
+        leaderboard_id (str): The ID of the leaderboard to get the rank for.
+        ranks (List[LeaderboardRank]): A list of LeaderboardRank objects representing the ranks.
+
+    Returns:
+        LeaderboardRank: The next rank for the player based on their Elo rating.
+    """
+    next_rank_for_player = None
+    least_distance_below_min_elo = float('inf')
+    for rank in ranks:
+        distance = rank.min_elo - player_elo
+        if distance >= 0 and distance <= least_distance_below_min_elo and rank.leaderboard_id == leaderboard_id:
+            least_distance_below_min_elo = distance
+            next_rank_for_player = rank
+
+    return next_rank_for_player
+
+
 async def get_discord_user(
         bot: commands.Bot,
         discord_account_id: int,

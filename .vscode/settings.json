@@ -3,4 +3,5 @@
     "python.analysis.extraPaths": [
         "lib/mm-bot/src"
     ]
+    
 }

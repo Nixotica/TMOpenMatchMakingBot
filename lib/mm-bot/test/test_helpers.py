@@ -1,6 +1,6 @@
 import unittest
 
-from src.helpers import get_rank_for_player
+from src.helpers import get_rank_for_player, get_next_rank_for_player
 from src.models.leaderboard_rank import LeaderboardRank
 
 class TestHelpers(unittest.TestCase):
