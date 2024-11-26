@@ -86,7 +86,12 @@ class LeaderboardView(ui.View):
         pos = first_listed_player_pos
         for player in nearby_players:
             player_profile = self.ddb_manager.query_player_profile_for_tm_account_id(player.tm_account_id)
-            nearby_players_value += f"**{pos}.** ({player.elo}) <@{player_profile.discord_account_id}>\n"
+            
+            if not player_profile:
+                nearby_players_value += f"**{pos}.** ({player.elo}) Deregistered Account\n"
+            else:
+                nearby_players_value += f"**{pos}.** ({player.elo}) <@{player_profile.discord_account_id}>\n"
+
             pos += 1
 
         # Display how much further player is away from their next rank

@@ -518,6 +518,27 @@ class DynamoDbManager:
             logging.error(f"Error getting player elo from DynamoDB: {e}")
             raise
 
+    def get_player_elo_on_all_leaderboards(self, tm_account_id: str) -> List[PlayerElo]:
+        """Get the elos for a specific player on all leaderboards. Omits leaderboards where player has no elo.
+
+        Args:
+            tm_account_id (str): The TM account ID for which to return the given player's elos.
+
+        Returns:
+            List[PlayerElo]: The elos for a specific player across all their played leaderboards.
+        """
+        try:
+            response = self._player_elos_table.query(
+                KeyConditionExpression=Key(KEY_TM_ACCOUNT_ID).eq(tm_account_id)
+            )
+            items = response.get("Items", [])
+            if not items:
+                return []
+            return [PlayerElo.from_dict(item) for item in items]
+        except Exception as e:
+            logging.error(f"Error getting player elos from DynamoDB: {e}")
+            return []
+
     def get_top_25_players_by_elo(self, leaderboard_id: str) -> List[PlayerElo]:
         """Get a sorted list of the top 25 players by their elo in descending order for a given leaderboard.
         

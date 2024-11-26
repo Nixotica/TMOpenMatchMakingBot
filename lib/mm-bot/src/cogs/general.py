@@ -3,8 +3,10 @@ import logging
 import discord
 from discord.ext import commands
 
+from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import COLOR_EMBED, ROLE_ADMIN
+from helpers import get_rank_for_player
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
 
@@ -17,6 +19,7 @@ class General(commands.Cog, name="general"):
         self.bot = bot
         self.mm_manager = MatchmakingManager()
         self.s3_manager = S3ClientManager()
+        self.ddb_manager = DynamoDbManager()
 
     @commands.hybrid_command(
         name="ping",
@@ -107,6 +110,52 @@ class General(commands.Cog, name="general"):
                 player_discord_ids_str += f"<@{player.discord_account_id}> "
 
         await ctx.send(f"Match {bot_match_id} cancelled. Affected players: {player_discord_ids_str}.")
+
+    @commands.hybrid_command(
+        name="profile",
+        description="See your profile"
+    )
+    async def profile(
+        self, ctx: commands.Context, member: discord.Member,
+    ) -> None:
+        logging.info(
+            f"Processing command to see profile for user {member.name} from {ctx.message.author.name}."
+        )
+
+        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
+            member.id
+        )
+
+        if not player_profile:
+            await ctx.send("No profile found.")
+            return
+        
+        player_elos = self.ddb_manager.get_player_elo_on_all_leaderboards(player_profile.tm_account_id)
+
+        profile_title = f"Player Profile"
+
+        matches_played_name = "Matches Played"
+        matches_played_value = player_profile.matches_played
+
+        embed = discord.Embed(title=profile_title, color=COLOR_EMBED, timestamp=datetime.utcnow(), description=member.mention)
+        embed.add_field(name=matches_played_name, value=matches_played_value)
+        
+        for player_elo in player_elos:
+            leaderboard_id = player_elo.leaderboard_id
+            leaderboard_ranks = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(leaderboard_id)
+
+            leaderboard_name = f"{leaderboard_id} Leaderboard"
+            player_rank = get_rank_for_player(player_elo.elo, leaderboard_id, leaderboard_ranks)
+
+            if player_rank is not None:
+                leaderboard_value = f"{player_rank.display_name} {player_elo.elo} elo"
+            else:
+                leaderboard_value = f"{player_elo.elo} elo"
+
+            embed.add_field(name=leaderboard_name, value=leaderboard_value)
+            
+        await ctx.send(embed=embed, ephemeral=True)
+        return
         
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(General(bot))

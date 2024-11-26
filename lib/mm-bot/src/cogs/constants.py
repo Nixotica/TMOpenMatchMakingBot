@@ -1,3 +1,4 @@
 ROLE_ADMIN = "Admin"
+ROLE_MOD = "Mods"
 
 COLOR_EMBED = 0xED4245
