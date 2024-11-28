@@ -7,7 +7,7 @@ from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from matchmaking.match_queues.enum import QueueType
 from models.match_queue import MatchQueue
-from cogs.constants import ROLE_ADMIN
+from cogs.constants import ROLE_ADMIN, ROLE_MOD
 from aws.dynamodb import DynamoDbManager
 
 
@@ -76,11 +76,12 @@ class QueueViewBuilder(commands.Cog):
         name="create_queue",
         description="Create a new matchmaking queue",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def create_queue(
         self,
         ctx: commands.Context,
         queue_id: str,
+        display_name: str,
         campaign_club_id: int,
         campaign_id: int,
         match_club_id: int,
@@ -94,12 +95,12 @@ class QueueViewBuilder(commands.Cog):
         try:
             queue_type = QueueType.from_str(type)
         except ValueError:
-            await ctx.send(f"Invalid queue type: {type}. Possible: {[q.value for q in QueueType]}")
+            await ctx.send(f"Invalid queue type: {type}. Possible: {[q.value for q in QueueType]}", ephemeral=True)
             return
 
         channel_id = eval(channel_id)
         if not isinstance(channel_id, int):
-            await ctx.send(f"Invalid channel ID: {channel_id}.")
+            await ctx.send(f"Invalid channel ID: {channel_id}.", ephemeral=True)
             return
 
         queue = MatchQueue(
@@ -113,6 +114,7 @@ class QueueViewBuilder(commands.Cog):
             leaderboard_ids=[],  # Currently requires admin to add leaderboards
             primary_leaderboard_id=None,  # Currently requires admin to add primary leaderboard
             ping_role_id=None,  # Currently requires admin to add ping role
+            display_name=display_name,
         )
 
         # Add to dynamo table so it will load automatically next time bot starts up
@@ -134,7 +136,7 @@ class QueueViewBuilder(commands.Cog):
         name="add_queue_to_leaderboard",
         description="Add a queue to a leaderboard. Elo is shared among queues for a single leaderboard",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def add_queue_to_leaderboard(
         self,
         ctx: commands.Context,
@@ -150,12 +152,12 @@ class QueueViewBuilder(commands.Cog):
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
         ]:
-            await ctx.send(f"Leaderboard {leaderboard_id} not found.")
+            await ctx.send(f"Leaderboard {leaderboard_id} not found.", ephemeral=True)
             return
 
         queues = self.ddb_manager.get_active_match_queues()
         if queue_id not in [queue.queue_id for queue in queues]:
-            await ctx.send(f"Queue {queue_id} not found.")
+            await ctx.send(f"Queue {queue_id} not found.", ephemeral=True)
             return
 
         # Update the ddb table
@@ -165,14 +167,15 @@ class QueueViewBuilder(commands.Cog):
         self.mm_manager.add_leaderboard_to_active_queue(queue_id, leaderboard_id)
 
         await ctx.send(
-            f"Queue {queue_id} added to leaderboard {leaderboard_id}. Verify with /list_queues."
+            f"Queue {queue_id} added to leaderboard {leaderboard_id}. Verify with /list_queues.",
+            ephemeral=True,
         )
 
     @commands.hybrid_command(
         name="list_queues",
         description="List all active matchmaking queues",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def list_queues(self, ctx: commands.Context) -> None:
         logging.info(
             f"Processing command to list queues from user {ctx.message.author.name}."
@@ -188,8 +191,12 @@ class QueueViewBuilder(commands.Cog):
         embed = discord.Embed(title="Active Queues")
 
         for queue in queues:
+            value = f"Channel ID: {queue.queue.channel_id}\n"
+            value += f"Display Name: {queue.queue.display_name if queue.queue.display_name else queue.queue.queue_id}\n"
+            value += f"Campaign Link: https://trackmania.io/#/campaigns/{queue.queue.campaign_club_id}/{queue.queue.campaign_id}\n"
+
             embed.add_field(
-                name=queue.queue.queue_id, value=f"Channel ID: {queue.queue.channel_id}"
+                name=queue.queue.queue_id, value=value, inline=False,
             )
 
         await ctx.send(embed=embed, ephemeral=True)
@@ -208,7 +215,7 @@ class QueueViewBuilder(commands.Cog):
         # Check if the queue exists
         queue = self.ddb_manager.get_match_queue(queue_id)
         if not queue:
-            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.")
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.", ephemeral=True)
             return
         
         queue.ping_role_id = role.id
@@ -221,14 +228,14 @@ class QueueViewBuilder(commands.Cog):
         if active_queue:
             active_queue.queue.ping_role_id = role.id
 
-        await ctx.send(f"Role {role.name} linked to queue {queue_id}.")
+        await ctx.send(f"Role {role.name} linked to queue {queue_id}.", ephemeral=True)
 
     
     @commands.hybrid_command(
         name="set_queue_primary_leaderboard",
         description="Set the primary leaderboard for a queue, used when displaying rank counts in queue."
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def set_primary_leaderboard_for_queue(self, ctx: commands.Context, queue_id: str, leaderboard_id: str) -> None:
         logging.info(
             f"Processing command to set primary leaderboard {leaderboard_id} for queue {queue_id} from user {ctx.message.author.name}."
@@ -245,7 +252,7 @@ class QueueViewBuilder(commands.Cog):
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
         ]:
-            await ctx.send(f"Leaderboard {leaderboard_id} not found.")
+            await ctx.send(f"Leaderboard {leaderboard_id} not found.", ephemeral=True)
             return
         
         queue.primary_leaderboard_id = leaderboard_id
@@ -257,7 +264,152 @@ class QueueViewBuilder(commands.Cog):
         if active_queue is not None:
             active_queue.queue.primary_leaderboard_id = leaderboard_id
 
-        await ctx.send(f"Primary leaderboard for queue {queue_id} set to {leaderboard_id}.")
+        await ctx.send(f"Primary leaderboard for queue {queue_id} set to {leaderboard_id}.", ephemeral=True)
+
+
+    @commands.hybrid_command(
+        name="rename_queue",
+        description="Rename a queue by giving it a new display field."
+    )
+    @commands.has_role(ROLE_MOD)
+    async def rename_queue(self, ctx: commands.Context, queue_id: str, new_name: str) -> None:
+        logging.info(
+            f"Processing command to rename queue {queue_id} to {new_name} from user {ctx.message.author.name}."
+        )
+
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+
+        if not queue:
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.", ephemeral=True)
+            return
+        
+        # Update the queue in dynamo
+        queue.display_name = new_name
+        self.ddb_manager.update_match_queue(queue)
+
+        # Update the queue in the bot
+        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+
+        if not active_queue:
+            logging.warning(
+                f"Queue {queue_id} not found in active queues while renaming."
+            )
+        else:
+            active_queue.queue.display_name = new_name
+
+        await ctx.send(f"Queue {queue_id} renamed to {new_name}.", ephemeral=True)
+
+
+    @commands.hybrid_command(
+        name="edit_queue_maps",
+        description="Edit the maps used for a queue."
+    )
+    @commands.has_role(ROLE_MOD)
+    async def edit_queue_maps(
+        self, 
+        ctx: commands.Context, 
+        queue_id: str, 
+        club_id: int, 
+        campaign_id: int, 
+    ) -> None:
+        logging.info(
+            f"Processing command to edit maps for queue {queue_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+
+        if not queue:
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.", ephemeral=True)
+            return
+        
+        # Update the queue in dynamo
+        queue.campaign_id = campaign_id
+        queue.campaign_club_id = club_id
+        self.ddb_manager.update_match_queue(queue)
+
+        # Update the queue in the bot
+        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+
+        if not active_queue:
+            logging.warning(
+                f"Queue {queue_id} not found in active queues while editing maps."
+            )
+        else:
+            active_queue.queue.campaign_id = campaign_id
+            active_queue.queue.campaign_club_id = club_id
+
+        await ctx.send(f"Queue {queue_id} maps updated to campaign {campaign_id} and club {club_id}.", ephemeral=True)
+
+
+    @commands.hybrid_command(
+        name="disable_queue",
+        description="Disable a queue so it can no longer be joined nor shows up in its channel."
+    )
+    @commands.has_role(ROLE_MOD)
+    async def disable_queue(self, ctx: commands.Context, queue_id: str) -> None:
+        logging.info(
+            f"Processing command to disable queue {queue_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+
+        if not queue:
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist.", ephemeral=True)
+            return
+
+        # Update the queue in dynamo
+        queue.active = False
+        self.ddb_manager.update_match_queue(queue)
+
+        # Remove the queue from the mm manager
+        removed = self.mm_manager.remove_queue(queue.queue_id)
+
+        if not removed:
+            logging.warning(
+                f"Queue {queue_id} not found in active queues while disabling."
+            )
+
+        # Stop the queue view task and remove it 
+        for view in self.views:
+            if view.queue_id == queue_id:
+                await view.stop_task()
+                self.views.remove(view)
+                break
+
+        await ctx.send(f"Queue {queue_id} disabled.", ephemeral=True)
+
+
+    @commands.hybrid_command(
+        name="reenable_queue",
+        description="Re-enable an existing queue to make it appear in its channel and becoming joinable."
+    )
+    @commands.has_role(ROLE_MOD)
+    async def reenable_queue(self, ctx: commands.Context, queue_id: str) -> None:
+        logging.info(
+            f"Processing command to re-enable queue {queue_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+
+        if not queue:
+            await ctx.send(f"Queue {queue_id} not found. Use /list_queues to check which ones exist or use /create_queue to make a new one.", ephemeral=True)
+            return
+        
+        # Update the queue in dynamo
+        queue.active = True
+        self.ddb_manager.update_match_queue(queue)
+
+        # Add the queue to the mm manager
+        active_queue = self.mm_manager.add_queue(queue)
+
+        # Add the queue view to discord
+        await self.add_active_queue_view(active_queue)
+
+        await ctx.send(f"Queue {queue_id} re-enabled.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

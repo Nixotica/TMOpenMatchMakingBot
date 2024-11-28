@@ -96,6 +96,7 @@ export class StorageStack extends Stack {
          * 
          * A table for storing different match queues consisting of:
          * - `queue_id`: Queue ID (Primary Key)
+         * - `display_name`: The displayed name of the queue by the bot
          * - `campaign_club_id`: Club ID containing campaign to use
          * - `campaign_id`: Campaign ID to use for maps
          * - `match_club_id`: Club ID in which the match is hosted
@@ -117,6 +118,7 @@ export class StorageStack extends Stack {
          * 
          * A table for storing different leaderboards consisting of:
          * - `leaderboard_id`: Leaderboard ID (Primary Key)
+         * - `display_name`: The displayed name of the leaderboard by the bot
          * - `channel_id`: Channel ID to host leaderboard view in Discord
          */
         this.leaderboardsTable = new Table(this, "LeaderboardsTable", {

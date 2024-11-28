@@ -111,13 +111,22 @@ class LeaderboardView(ui.View):
 
         await interaction.response.send_message(embed=embed, ephemeral=True)
 
-    @tasks.loop(minutes=15)
+    @tasks.loop(minutes=5)
     async def update_embed(self) -> None:
         """Updates the embed with the latest leaderboard state."""
         logging.debug(f"Updating embed for leaderboard: {self.leaderboard_id}.")
 
+        leaderboard = self.ddb_manager.query_leaderboard_by_id(self.leaderboard_id)
+
+        if leaderboard is None:
+            logging.error(
+                f"When updating LeaderboardView embed, leaderboard {self.leaderboard_id} was not found."
+            )
+            return
+
+        leaderboard_name = leaderboard.display_name if leaderboard.display_name else leaderboard.leaderboard_id
         embed = discord.Embed(
-            title=f"Leaderboard - {self.leaderboard_id}",
+            title=f"Leaderboard - {leaderboard_name}",
             color=COLOR_EMBED,
             timestamp=datetime.utcnow(),
         )

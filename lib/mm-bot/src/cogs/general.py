@@ -5,7 +5,7 @@ from discord.ext import commands
 
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
-from cogs.constants import COLOR_EMBED, ROLE_ADMIN
+from cogs.constants import COLOR_EMBED, ROLE_ADMIN, ROLE_MOD
 from helpers import get_rank_for_player
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
@@ -89,7 +89,7 @@ class General(commands.Cog, name="general"):
         name="cancel_match",
         description="Cancel an onging match by providing the bot match ID"
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def cancel_match(
         self, ctx: commands.Context, bot_match_id: int
     ) -> None:

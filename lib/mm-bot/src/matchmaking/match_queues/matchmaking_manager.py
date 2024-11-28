@@ -85,6 +85,23 @@ class MatchmakingManager:
         self.active_queues.append(active_queue)
         return active_queue
     
+    def remove_queue(self, queue_id: str) -> bool:
+        """Removes an active queue from the Matchmaking manager. 
+        If the bot reloads and the queue is "active" in DDB, it will re-activate.
+
+        Args:
+            queue (MatchQueue): The queue to remove.
+
+        Returns:
+            bool: True if the queue was removed, False otherwise.
+        """
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                self.active_queues.remove(queue)
+                return True
+            
+        return False
+    
     def is_player_in_match(self, player: PlayerProfile) -> bool:
         """Checks if a player is in an active match.
 
@@ -355,7 +372,13 @@ class MatchmakingManager:
 
             bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
 
-            active_match = active_queue.generate_match(bot_match_id)
+            try:
+                active_match = active_queue.generate_match(bot_match_id)
+            except Exception as e:
+                logging.error(
+                    f"Error generating match for queue {active_queue.queue.queue_id}: {e}"
+                )
+                continue
 
             if active_match is None:
                 logging.error(

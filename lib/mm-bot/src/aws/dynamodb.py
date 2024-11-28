@@ -474,6 +474,42 @@ class DynamoDbManager:
             logging.error(f"Error getting leaderboards from DynamoDB: {e}")
             raise
 
+    def query_leaderboard_by_id(self, leaderboard_id: str) -> Optional[Leaderboard]:
+        """Get a leaderboard from the Leaderboards table.
+
+        Args:
+            leaderboard_id (str): The ID of the leaderboard to get.
+
+        Returns:
+            Optional[Leaderboard]: The leaderboard if found, None otherwise.
+        """
+        try:
+            response = self._leaderboards_table.get_item(
+                Key={KEY_LEADERBOARD_ID: leaderboard_id}
+            )
+            item = response.get("Item")
+            if not item:
+                return None
+            return Leaderboard.from_dict(item)
+        except Exception as e:
+            logging.error(f"Error getting leaderboard from DynamoDB: {e}")
+            raise
+
+    def update_leaderboard(self, leaderboard: Leaderboard) -> None:
+        """Update a leaderboard in the Leaderboards table.
+
+        Args:
+            leaderboard (Leaderboard): The leaderboard to update.
+
+        Returns:
+            None
+        """
+        try:
+            self._leaderboards_table.put_item(Item=leaderboard.to_dict())
+        except Exception as e:
+            logging.error(f"Error updating leaderboard in DynamoDB: {e}")
+            raise
+
     def get_or_create_player_elo(
         self, tm_account_id: str, leaderboard_id: str
     ) -> PlayerElo:

@@ -27,6 +27,16 @@ class MatchQueueView(ui.View):
         self.channel = channel
         self.active_match_messages: Dict[int, discord.message.Message] = {}
 
+    async def start_task(self, message: discord.message.Message):
+        self.active_queue_message = message
+        self.update_embed_task = self.update_queue_embed.start()
+        self.update_active_matches_embeds_task = self.update_active_matches_embeds.start()
+
+    async def stop_task(self):
+        await self.active_queue_message.delete()
+        for (_, message) in self.active_match_messages.items():
+            await message.delete()
+            
     @ui.button(label="Join Queue", style=discord.ButtonStyle.green)
     async def join_queue(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
@@ -100,16 +110,6 @@ class MatchQueueView(ui.View):
 
         await self.update_queue_embed()
 
-    async def start_task(self, message: discord.message.Message):
-        self.active_queue_message = message
-        self.update_embed_task = self.update_queue_embed.start()
-        self.update_active_matches_embeds_task = self.update_active_matches_embeds.start()
-
-    async def stop_task(self):
-        await self.active_queue_message.delete()
-        for (_, message) in self.active_match_messages.items():
-            await message.delete()
-
     @tasks.loop(seconds=15)
     async def update_queue_embed(self) -> None:
         logging.debug(f"Updating embed for queue {self.queue_id}.")
@@ -122,7 +122,13 @@ class MatchQueueView(ui.View):
             )
             raise ValueError(f"Queue {self.queue_id} not found.")
 
-        embed = discord.Embed(title=f"Better Matchmaking Queue - {self.queue_id}")
+        queue_name = queue.queue.display_name if queue.queue.display_name else queue.queue.queue_id
+        embed = discord.Embed(
+            title=f"Better Matchmaking Queue - {queue_name}",
+            color=COLOR_EMBED,
+            timestamp=datetime.utcnow(),
+        )
+        embed.set_footer(text="Last updated")
 
         leaderboard_id = queue.queue.primary_leaderboard_id
         num_players = len(queue.players)

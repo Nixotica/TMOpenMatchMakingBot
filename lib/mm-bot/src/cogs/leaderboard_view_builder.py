@@ -7,7 +7,7 @@ from aws.s3 import S3ClientManager
 from views.leaderboard import LeaderboardView
 from models.leaderboard import Leaderboard
 from models.leaderboard_rank import LeaderboardRank
-from cogs.constants import ROLE_ADMIN
+from cogs.constants import ROLE_ADMIN, ROLE_MOD
 
 
 class LeaderboardViewBuilder(commands.Cog):
@@ -77,11 +77,12 @@ class LeaderboardViewBuilder(commands.Cog):
         name="create_leaderboard",
         description="Create a new leaderboard",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def create_leaderboard(
         self,
         ctx: commands.Context,
         leaderboard_id: str,
+        display_name: str,
         channel_id: str,  # Cannot be int - too long for discord bot
     ) -> None:
         logging.info(
@@ -90,29 +91,30 @@ class LeaderboardViewBuilder(commands.Cog):
 
         channel_id = eval(channel_id)
         if not isinstance(channel_id, int):
-            await ctx.send(f"Invalid channel ID: {channel_id}.")
+            await ctx.send(f"Invalid channel ID: {channel_id}.", ephemeral=True)
             return
 
         leaderboard = Leaderboard(
             leaderboard_id=leaderboard_id,
             channel_id=channel_id,
+            display_name=display_name,
         )
 
         success = self.ddb_manager.create_leaderboard(leaderboard)
 
         if success:
             await self.add_leaderboard_view(leaderboard)
-            await ctx.send(f"Leaderboard {leaderboard_id} created.")
+            await ctx.send(f"Leaderboard {leaderboard_id} created.", ephemeral=True)
         else:
             await ctx.send(
-                f"Failed to create leaderboard {leaderboard_id}, unknown error."
+                f"Failed to create leaderboard {leaderboard_id}, unknown error.", ephemeral=True,
             )
 
     @commands.hybrid_command(
         name="list_leaderboards",
         description="List all leaderboards",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def list_leaderboards(
         self,
         ctx: commands.Context,
@@ -124,23 +126,57 @@ class LeaderboardViewBuilder(commands.Cog):
         leaderboards = self.ddb_manager.get_leaderboards()
 
         if not leaderboards:
-            await ctx.send("No leaderboards found.")
+            await ctx.send("No leaderboards found.", ephemeral=True)
             return
 
         embed = discord.Embed(title="Leaderboards")
 
         for leaderboard in leaderboards:
+            value = f"Channel ID: {leaderboard.channel_id}\n"
+            value += f"Display Name: {leaderboard.display_name if leaderboard.display_name else leaderboard.leaderboard_id}\n"
+
+            ranks = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(leaderboard.leaderboard_id)
+            ranks_list = "Ranks:\n"
+            for rank in ranks:
+                ranks_list += f" - {rank.display_name} (Min Elo: {rank.min_elo})\n"
+            value += ranks_list
+
             embed.add_field(
-                name=leaderboard.leaderboard_id, value=leaderboard.channel_id
+                name=leaderboard.leaderboard_id, value=value, inline=False
             )
 
         await ctx.send(embed=embed, ephemeral=True)
+
+    
+    @commands.hybrid_command(
+        name="rename_leaderboard",
+        description="Rename a leaderboard",
+    )
+    async def rename_leaderboard(
+        self, ctx: commands.Context, leaderboard_id: str, new_name: str
+    ) -> None:
+        logging.info(
+            f"Processing command to rename leaderboard {leaderboard_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the leaderboard exists
+        leaderboard = self.ddb_manager.query_leaderboard_by_id(leaderboard_id)
+        if not leaderboard:
+            await ctx.send(f"Leaderboard {leaderboard_id} not found. Use /list_leaderboards to check which ones exist.", ephemeral=True)
+            return
+
+        # Update the leaderboard in dynamo
+        leaderboard.display_name = new_name
+        self.ddb_manager.update_leaderboard(leaderboard)
+
+        await ctx.send(f"Leaderboard {leaderboard_id} renamed to {new_name}.", ephemeral=True)
+
 
     @commands.hybrid_command(
         name="refresh_leaderboards",
         description="Refresh all leaderboards to get the latest elo and ranks"
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def refresh_leaderboards(
         self,
         ctx: commands.Context,
@@ -159,7 +195,7 @@ class LeaderboardViewBuilder(commands.Cog):
         name="set_main_leaderboard",
         description="Set the main leaderboard for which rank roles are assigned",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def set_main_leaderboard(
         self,
         ctx: commands.Context,
@@ -189,7 +225,7 @@ class LeaderboardViewBuilder(commands.Cog):
         name="create_rank",
         description="Create a new rank for a leaderboard",
     )
-    @commands.has_role(ROLE_ADMIN)
+    @commands.has_role(ROLE_MOD)
     async def create_rank(
         self,
         ctx: commands.Context,
@@ -207,7 +243,8 @@ class LeaderboardViewBuilder(commands.Cog):
 
         if leaderboard_id not in leaderboard_ids:
             await ctx.send(
-                "Could not find leaderboard with matching ID. Check with /list_leaderboards."
+                "Could not find leaderboard with matching ID. Check with /list_leaderboards.",
+                ephemeral=True,
             )
             return
         
@@ -220,10 +257,47 @@ class LeaderboardViewBuilder(commands.Cog):
         
         try:
             self.ddb_manager.create_leaderboard_rank(leaderboard_rank)
-            await ctx.send(f"Rank {rank_id} created for leaderboard {leaderboard_id}.")
+            await ctx.send(f"Rank {rank_id} created for leaderboard {leaderboard_id}.", ephemeral=True)
         except Exception as e:
-            await ctx.send(f"Failed to create rank {rank_id}, error: {e}.")
+            await ctx.send(f"Failed to create rank {rank_id}, error: {e}.", ephemeral=True)
 
+    @commands.hybrid_command(
+        name="list_ranks",
+        description="List all ranks for a leaderboard",
+    )
+    @commands.has_role(ROLE_MOD)
+    async def list_ranks(self, ctx: commands.Context, leaderboard_id: str) -> None:
+        logging.info(
+            f"Processing command to list ranks for leaderboard {leaderboard_id} from user {ctx.message.author.name}."
+        )
+
+        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboard_ids = [l.leaderboard_id for l in leaderboards]
+
+        if leaderboard_id not in leaderboard_ids:
+            await ctx.send(
+                "Could not find leaderboard with matching ID. Check with /list_leaderboards.",
+                ephemeral=True,
+            )
+            return
+
+        ranks = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(leaderboard_id)
+
+        if not ranks:
+            await ctx.send(f"No ranks found for leaderboard {leaderboard_id}.", ephemeral=True)
+            return
+
+        embed = discord.Embed(title=f"Ranks for leaderboard {leaderboard_id}")
+
+        for rank in ranks:
+            value = f"Display Name: {rank.display_name}\n"
+            value += f"Min Elo: {rank.min_elo}\n"
+
+            embed.add_field(
+                name=rank.rank_id, value=value, inline=False
+            )
+
+        await ctx.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:

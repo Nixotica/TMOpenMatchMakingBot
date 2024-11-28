@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from aws.constants import (
+    KEY_DISPLAY_NAME,
     KEY_LEADERBOARD_IDS,
     KEY_PING_ROLE_ID,
     KEY_PRIMARY_LEADERBOARD_ID,
@@ -28,6 +29,7 @@ class MatchQueue:
     leaderboard_ids: List[str] | None
     primary_leaderboard_id: Optional[str]
     ping_role_id: Optional[int]
+    display_name: Optional[str]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
@@ -41,14 +43,15 @@ class MatchQueue:
         leaderboard_ids = data.get(KEY_LEADERBOARD_IDS)
         primary_leaderboard_id = data.get(KEY_PRIMARY_LEADERBOARD_ID)
         ping_role_id = data.get(KEY_PING_ROLE_ID)
+        display_name = data.get(KEY_DISPLAY_NAME)
 
         if (
             not queue_id
-            or not campaign_club_id
-            or not campaign_id
-            or not match_club_id
+            or campaign_club_id is None
+            or campaign_id is None
+            or match_club_id is None
             or not type
-            or not active
+            or active is None
             or not channel_id
         ):
             raise ValueError("Missing required fields")
@@ -63,6 +66,7 @@ class MatchQueue:
             leaderboard_ids,
             primary_leaderboard_id,
             ping_role_id,
+            display_name,
         )
 
     def to_dict(self):
@@ -77,4 +81,5 @@ class MatchQueue:
             KEY_LEADERBOARD_IDS: self.leaderboard_ids,
             KEY_PRIMARY_LEADERBOARD_ID: self.primary_leaderboard_id,
             KEY_PING_ROLE_ID: self.ping_role_id,
+            KEY_DISPLAY_NAME: self.display_name,
         }
