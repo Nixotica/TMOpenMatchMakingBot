@@ -8,6 +8,10 @@ class Team2v2:
     player_a: PlayerProfile
     player_b: PlayerProfile
 
+    def __iter__(self) -> Iterator[PlayerProfile]:
+        yield self.player_a
+        yield self.player_b
+
 
 @dataclass
 class Teams2v2:

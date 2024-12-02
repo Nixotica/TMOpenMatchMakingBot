@@ -35,7 +35,8 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
     ```
         {
             "UBI_AUTHS": ["Basic <user:pass base64>"],
-            "DISCORD_BOT_TOKEN": "<token>"
+            "DISCORD_BOT_TOKEN": "<token>",
+            "PASTEBIN_API_DEV_KEY": "<key>"
         }
     ```
     For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. 

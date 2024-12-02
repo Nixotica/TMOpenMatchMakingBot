@@ -163,6 +163,55 @@ class MatchQueueView(ui.View):
 
         await self.active_queue_message.edit(embed=embed)
 
+    async def process_new_active_solo_match(self, active_match: ActiveMatch) -> None:
+        if not isinstance(active_match.player_profiles, List):
+            logging.error(
+                f"Expected player profiles to be a list, got {type(active_match.player_profiles)} instead."
+            )
+            return
+
+        players = active_match.player_profiles
+
+        value = ""
+        for player in players:
+            value += f"<@{player.discord_account_id}>\n"
+
+        embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+        embed.add_field(
+            name=f"🏎️ Match #{active_match.bot_match_id} in progress...",
+            value=value
+        )
+
+        message = await self.channel.send(embed=embed)
+        self.active_match_messages[active_match.bot_match_id] = message
+
+    async def process_new_active_teams_match(self, active_match: ActiveMatch) -> None:
+        if not isinstance(active_match.player_profiles, Teams2v2):
+            logging.error(
+                f"Expected player profiles to be a Teams2v2, got {type(active_match.player_profiles)} instead."
+            )
+            return
+        
+        embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+        embed.title(
+            name=f"🏎️ Match #{active_match.bot_match_id} in progress...",
+        )
+
+        team_a = active_match.player_profiles.team_a
+        embed.add_field(
+            name="Blue Team",
+            value=f"<@{team_a.player_a.discord_account_id}> & <@{team_a.player_b.discord_account_id}>"
+        )
+
+        team_b = active_match.player_profiles.team_b
+        embed.add_field(
+            name="Red Team",
+            value=f"<@{team_b.player_a.discord_account_id}> & <@{team_b.player_b.discord_account_id}>"
+        )
+
+        message = await self.channel.send(embed=embed)
+        self.active_match_messages[active_match.bot_match_id] = message
+
     @tasks.loop(seconds=15)
     async def update_active_matches_embeds(self) -> None:
         logging.debug(f"Updating embeds for active matches in queue {self.queue_id}.")
@@ -171,25 +220,13 @@ class MatchQueueView(ui.View):
         new_active_matches = self.mm_manager.process_new_active_matches_for_queue(self.queue_id)
 
         for new_match in new_active_matches:
-            players = new_match.player_profiles
-
-            # TODO - support 2v2
-            if isinstance(players, Teams2v2):
-                logging.error("Not implemented to handle 2v2 matches...")
+            if isinstance(new_match, List):
+                await self.process_new_active_solo_match(new_match)
+            elif isinstance(new_match, Teams2v2):
+                await self.process_new_active_teams_match(new_match)
+            else:
+                logging.error(f"Unknown match type {type(new_match)}")
                 continue
-
-            value = ""
-            for player in players:
-                value += f"<@{player.discord_account_id}>\n"
-            
-            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-            embed.add_field(
-                name=f"🏎️ Match #{new_match.bot_match_id} in progress...",
-                value=value
-            )
-
-            message = await self.channel.send(embed=embed)
-            self.active_match_messages[new_match.bot_match_id] = message
 
             logging.info(f"New match with bot match ID {new_match.bot_match_id} added to queue view {self.queue_id}")
 

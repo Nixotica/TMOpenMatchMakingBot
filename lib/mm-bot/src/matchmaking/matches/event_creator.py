@@ -25,7 +25,10 @@ from nadeo_event_api.api.event_api import (
     get_rounds_for_event,
     get_matches_for_round,
 )
+from nadeo_event_api.api.pastebin.pastebin_api import post_tmwt_2v2
+from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import Tmwt2v2Pastebin, Tmwt2v2PastebinTeam
 from nadeo_event_api.api.structure.round.match_spot import TeamMatchSpot
+from aws.s3 import S3ClientManager
 from models.match_queue import MatchQueue
 from matchmaking.matches.team_2v2 import Teams2v2
 from models.player_profile import PlayerProfile
@@ -214,6 +217,28 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
 
     map_to_use = get_random_map(match_queue)
 
+    pastebin_api_dev_key = S3ClientManager().get_secrets().pastebin_api_dev_key
+
+    team_a_name = "Blue"
+    team_b_name = "Red"
+
+    team_a = Tmwt2v2PastebinTeam(
+        team_a_name,
+        teams.team_a.player_a.tm_account_id,
+        teams.team_a.player_b.tm_account_id,
+    )
+    team_b = Tmwt2v2PastebinTeam(
+        team_b_name,
+        teams.team_b.player_a.tm_account_id,
+        teams.team_b.player_b.tm_account_id,
+    )
+
+    paste = Tmwt2v2Pastebin(
+        team_a,
+        team_b,
+    )
+    teams_url = post_tmwt_2v2(paste, pastebin_api_dev_key)
+
     event = Event(
         name=event_name,
         club_id=match_queue.match_club_id,
@@ -236,9 +261,10 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
                             warmup_number=1,
                         ),
                         match_points_limit=1,
+                        teams_url=teams_url,
                     ),
                     plugin_settings=TMWTPluginSettings(
-                        ready_minimum_team_size=1,
+                        ready_minimum_team_size=2,
                         pick_ban_start_auto=False,
                         pick_ban_order="",
                     ),
@@ -253,13 +279,13 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
 
     # Add players before event actually starts
     event.add_team(
-        "team_a",
-        [teams.team_a.player_a.tm_account_id, teams.team_a.player_b.tm_account_id],
+        team_a_name,
+        team_a.members(),
         1,
     )
     event.add_team(
-        "team_b",
-        [teams.team_b.player_a.tm_account_id, teams.team_b.player_b.tm_account_id],
+        team_b_name,
+        team_b.members(),
         2,
     )
 

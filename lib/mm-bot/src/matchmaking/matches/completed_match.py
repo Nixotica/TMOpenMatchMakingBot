@@ -37,26 +37,30 @@ class CompletedMatch:
             raise ValueError(
                 f"Match {self.active_match.match_id} is not complete and cannot be converted to CompletedMatch."
             )
-
-        if isinstance(self.active_match.player_profiles, Teams2v2):
-            self.match_results = get_match_results(
-                self.active_match.match_id, length=4, offset=0
-            )
-        else:
-            self.match_results = get_match_results(
-                self.active_match.match_id,
-                length=len(self.active_match.player_profiles),
-                offset=0,
-            )
-
+        
         if isinstance(self.active_match.player_profiles, List):
-            match_positions = get_match_positions_1v1v1v1(
-                self.active_match.player_profiles, self.match_results
-            )
-        # TODO - handle this case...
+            self._complete_solo_match()
+        elif isinstance(self.active_match.player_profiles, Teams2v2):
+            self._complete_2v2_match()
         else:
-            logging.error("Elo calculation for 2v2 is not supported yet.")
-        #     match_positions = get_match_positions_2v2(self.active_match.player_profiles, self.match_results)
+            logging.error(
+                f"Unknown player profile type {type(self.active_match.player_profiles)}"
+            )
+            return
+
+
+    def _complete_solo_match(
+        self,
+    ) -> None:
+        self.match_results = get_match_results(
+            self.active_match.match_id,
+            length=len(self.active_match.player_profiles),
+            offset=0,
+        )
+
+        match_positions = get_match_positions_1v1v1v1(
+            self.active_match.player_profiles, self.match_results
+        )
 
         if self.active_match.match_queue.leaderboard_ids is None:
             logging.info(
@@ -101,6 +105,13 @@ class CompletedMatch:
         logging.info(
             f"Match {self.active_match.match_id} completed at {self.time_completed} with results: {self.match_results}. Elo updated: {self.updated_elo_ratings} ({self.elo_differences})."
         )
+        
+    def _complete_teams_match(
+        self,
+    ) -> None:
+        # TODO
+
+        pass
 
     def cleanup(self) -> None:
         logging.info(

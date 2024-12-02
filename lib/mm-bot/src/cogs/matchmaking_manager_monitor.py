@@ -7,7 +7,7 @@ from aws.s3 import S3ClientManager
 from discord.ext import commands, tasks
 from models.player_profile import PlayerProfile
 from models.player_elo import PlayerElo
-from matchmaking.matches.team_2v2 import Team2v2
+from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.matches.completed_match import CompletedMatch
 from cogs.constants import *
@@ -75,6 +75,63 @@ class MonitorMatchmakingManager(commands.Cog):
         except:
             logging.error(f"Error sending message for match start to players {players}")
 
+    async def send_2v2_players_match_start_notification(
+        self, teams: Teams2v2, bot_match_id: int,
+    ) -> None:
+        # This is a unique work-around of a Nadeo bug where we ping players Blue-Red-Blue-Red to ensure they join in the right order.
+
+        try:
+            ping_channel = await self.get_ping_channel()
+
+            if not ping_channel:
+                logging.warning("No ping channel found.")
+                return
+            
+            player_join_order = [teams.team_a.player_a, teams.team_b.player_a, teams.team_a.player_b, teams.team_b.player_b]
+
+            for player in player_join_order:
+                # Add match joined ack button
+                button = discord.Button(label="I'm in the Server", style=discord.ButtonStyle.primary)
+                view = discord.ui.View(timeout=120) # 120 seconds to respond
+                view.add_item(button)
+
+                # Corouting to await button interaction
+                def check(interaction: discord.Interaction):
+                    return (
+                        interaction.user.id == player.discord_account_id and
+                        interaction.channel.id == ping_channel.id
+                    )
+                
+                message = await ping_channel.send(
+                    content=f"<@{player.discord_account_id}> Your 2v2 match is ready. Please join BMM - #{bot_match_id} in-game **then click the button** once you're in.",
+                    view=view,
+                )
+
+                try:
+                    # Wait for player ack
+                    interaction = await self.bot.wait_for(
+                        "interaction", check=check, timeout=120
+                    )
+                    await interaction.response.send_message(f"<@{player.discord_account_id}> joined match, pinging next player.")
+                except:
+                    logging.warning(f"Player {player.discord_account_id} did not join in time.")
+                    await ping_channel.send(
+                        content=f"<@{player.discord_account_id}> did not join in time for BMM - #{bot_match_id}, please ping for a Mod.",
+                    )
+                    return
+                
+            # Match is ready to go
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name="❗ Match Ready",
+                value=f"All players have joined BMM - #{bot_match_id}, starting match."
+            )
+
+            await ping_channel.send(embed=embed)
+
+        except Exception as e:
+            logging.error(f"Error sending message for match start to players: {e}")
+
     async def send_players_match_complete_notification(
         self,
         bot_match_id: int,
@@ -127,13 +184,14 @@ class MonitorMatchmakingManager(commands.Cog):
             logging.info(f"New match {match.match_id}, notifying players.")
             bot_match_id = match.bot_match_id
             # Notify the players in the match
-            if not isinstance(match.player_profiles, List):
-                # TODO - support for teams
-                return
-            
-            await self.send_players_match_start_notification(
-                match.player_profiles, bot_match_id
-            )
+            if isinstance(match.player_profiles, List):
+                await self.send_players_match_start_notification(
+                    match.player_profiles, bot_match_id
+                )
+            else:
+                await self.send_2v2_players_match_start_notification(
+                    match.player_profiles, bot_match_id
+                )
 
     @tasks.loop(seconds=3)
     async def check_for_new_first_players_joined_queue(self):

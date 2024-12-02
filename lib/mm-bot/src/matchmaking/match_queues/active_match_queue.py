@@ -13,8 +13,7 @@ class ActiveMatchQueue:
     """An active queue of players awaiting a match for the given MatchQueue."""
 
     def __init__(self, match_queue: MatchQueue):
-        self.players: List[QueuedPlayer] = []
-        self.teams: List[Team2v2] = []
+        self.players: List[QueuedPlayer] = [] # TODO List[QueuedParty] ABC for solos or teams
         self.queue = match_queue
 
     def is_player_queued(self, player: PlayerProfile) -> bool:
@@ -28,10 +27,6 @@ class ActiveMatchQueue:
         """
         for queued_player in self.players:
             if queued_player.profile == player:
-                return True
-
-        for queued_team in self.teams:
-            if queued_team.player_a == player or queued_team.player_b == player:
                 return True
 
         return False
@@ -87,41 +82,18 @@ class ActiveMatchQueue:
                 f"Removed player {player.tm_account_id} from queue {self.queue.queue_id}."
             )
 
-    def add_team(self, team: Team2v2) -> None:
-        """Add a team to the queue.
-
-        Args:
-            team (Team2v2): The team to add to the queue
-        """
-        logging.info(f"Added team {team} to queue {self.queue.queue_id}.")
-        self.teams.append(team)
-
-    def remove_team(self, team: Team2v2) -> None:
-        """Remove a team from the queue.
-
-        Args:
-            team (Team2v2): The team to remove from the queue.
-        """
-        self.teams.remove(team)
-        logging.info(f"Removed team {team} from queue {self.queue.queue_id}.")
-
     def should_generate_match(self) -> bool:
         """Determines if a match should be generated from the current queue
 
         Returns:
             bool: True if a match should be generated, False otherwise.
         """
-        if self.queue.type == QueueType.Queue1v1v1v1:
+        # TODO - separate logic for 1's and 2v2's once parties are supported
+        if self.queue.type == QueueType.Queue1v1v1v1 or self.queue.type == QueueType.Queue2v2:
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.players)}."
             )
             if len(self.players) >= NUM_1v1v1v1_PLAYERS:
-                return True
-        elif self.queue.type == QueueType.Queue2v2:
-            logging.debug(
-                f"Checking if should generate match for {self.queue.queue_id} length {len(self.teams)}."
-            )
-            if len(self.teams) >= 2:
                 return True
         elif self.queue.type == QueueType.QueueSoloTest:
             logging.debug(
@@ -152,8 +124,11 @@ class ActiveMatchQueue:
             players_in_match = [p.profile for p in players_in_match]
             return ActiveMatch.create_1v1v1v1(self.queue, bot_match_id, players_in_match)
         elif self.queue.type == QueueType.Queue2v2:
-            teams_in_match = self.teams[:2]
-            teams = Teams2v2(teams_in_match[0], teams_in_match[1])
+            # TODO - once we support a mix of solo and teams in queue, consider that when making the teams
+            teams = Teams2v2(
+                Team2v2(self.players[0].profile, self.players[1].profile),
+                Team2v2(self.players[2].profile, self.players[3].profile),
+            )
             return ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
         elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.players[0]

@@ -120,6 +120,9 @@ class ActiveMatch:
         if not self._match_info:
             self._match_info = get_match_info(self.match_live_id)
         return self._match_info
+    
+    def has_player(self, player: PlayerProfile) -> bool:
+        return player in self.player_profiles
 
     def is_match_complete(self) -> bool:
         self._match_info = get_match_info(self.match_live_id)
