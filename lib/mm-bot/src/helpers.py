@@ -1,6 +1,9 @@
 from asyncio import sleep
 import logging
 from typing import List, Optional
+
+import discord
+from aws.s3 import S3ClientManager
 from models.leaderboard_rank import LeaderboardRank
 from discord.ext import commands
 from discord.user import User
@@ -97,3 +100,34 @@ async def get_discord_user(
             continue
 
     return None
+
+
+async def get_ping_channel(
+    bot: commands.Bot,
+    s3_manager: S3ClientManager,
+) -> Optional[discord.TextChannel]:
+    """Gets the ping channel for generic bot messages (not queue-specific)
+
+    Args:
+        bot (commands.Bot): The discord bot
+        s3_manager (S3ClientManager): The s3 client manager for retrieving configs
+
+    Returns:
+        Optional[discord.TextChannel]: _description_
+    """
+    configs = s3_manager.get_configs()
+    ping_channel_id = configs.bot_messages_channel_id
+
+    if ping_channel_id is None:
+        logging.error("No ping channel set.")
+        return
+    
+    ping_channel = bot.get_channel(ping_channel_id)
+    if ping_channel is None:
+        logging.error(f"Ping channel not found with ID {ping_channel_id}.")
+        return
+    if not isinstance(ping_channel, discord.TextChannel):
+        logging.error(f"Channel {ping_channel_id} is not a text channel.")
+        return
+    
+    return ping_channel

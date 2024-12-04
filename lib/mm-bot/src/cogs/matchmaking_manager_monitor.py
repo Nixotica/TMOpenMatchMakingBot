@@ -5,6 +5,7 @@ import discord
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from discord.ext import commands, tasks
+from helpers import get_ping_channel
 from models.player_profile import PlayerProfile
 from models.player_elo import PlayerElo
 from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
@@ -37,29 +38,11 @@ class MonitorMatchmakingManager(commands.Cog):
         self.check_for_completed_matches.cancel()
         self.check_for_new_first_players_joined_queue.cancel()
 
-    async def get_ping_channel(self) -> Optional[discord.TextChannel]:
-        configs = self.s3_manager.get_configs()
-        ping_channel_id = configs.bot_messages_channel_id
-
-        if ping_channel_id is None:
-            logging.error("No ping channel set.")
-            return
-        
-        ping_channel = self.bot.get_channel(ping_channel_id)
-        if ping_channel is None:
-            logging.error(f"Ping channel not found with ID {ping_channel_id}.")
-            return
-        if not isinstance(ping_channel, discord.TextChannel):
-            logging.error(f"Channel {ping_channel_id} is not a text channel.")
-            return
-        
-        return ping_channel
-
     async def send_players_match_start_notification(
         self, players: List[PlayerProfile], bot_match_id: int,
     ) -> None:
         try:
-            ping_channel = await self.get_ping_channel()
+            ping_channel = await get_ping_channel(self.bot, self.s3_manager)
 
             embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
             embed.add_field(
@@ -81,17 +64,22 @@ class MonitorMatchmakingManager(commands.Cog):
         # This is a unique work-around of a Nadeo bug where we ping players Blue-Red-Blue-Red to ensure they join in the right order.
 
         try:
-            ping_channel = await self.get_ping_channel()
+            ping_channel = await get_ping_channel(self.bot, self.s3_manager)
 
             if not ping_channel:
                 logging.warning("No ping channel found.")
                 return
             
-            player_join_order = [teams.team_a.player_a, teams.team_b.player_a, teams.team_a.player_b, teams.team_b.player_b]
+            player_join_order = [
+                teams.team_a.player_a, 
+                teams.team_b.player_a, 
+                teams.team_a.player_b, 
+                teams.team_b.player_b
+            ]
 
             for player in player_join_order:
                 # Add match joined ack button
-                button = discord.Button(label="I'm in the Server", style=discord.ButtonStyle.primary)
+                button = discord.ui.Button(label="I joined the Server", style=discord.ButtonStyle.green)
                 view = discord.ui.View(timeout=120) # 120 seconds to respond
                 view.add_item(button)
 
@@ -99,7 +87,7 @@ class MonitorMatchmakingManager(commands.Cog):
                 def check(interaction: discord.Interaction):
                     return (
                         interaction.user.id == player.discord_account_id and
-                        interaction.channel.id == ping_channel.id
+                        interaction.channel.id == ping_channel.id # type: ignore
                     )
                 
                 message = await ping_channel.send(
@@ -112,7 +100,7 @@ class MonitorMatchmakingManager(commands.Cog):
                     interaction = await self.bot.wait_for(
                         "interaction", check=check, timeout=120
                     )
-                    await interaction.response.send_message(f"<@{player.discord_account_id}> joined match, pinging next player.")
+                    await interaction.response.send_message(f"<@{player.discord_account_id}> joined match, pinging next player.", ephemeral=True)
                 except:
                     logging.warning(f"Player {player.discord_account_id} did not join in time.")
                     await ping_channel.send(
@@ -144,7 +132,7 @@ class MonitorMatchmakingManager(commands.Cog):
             player_profile_to_leaderboard_elo_update_and_diff_map (Dict[PlayerProfile, Dict[str, tuple[int, int]]]): A dictionary mapping players to a map of leaderboard ID to a tuple of player elo and elo difference.
         """
         try:
-            ping_channel = await self.get_ping_channel()
+            ping_channel = await get_ping_channel(self.bot, self.s3_manager)
 
             if not ping_channel:
                 logging.warning("No ping channel found.")
@@ -254,17 +242,17 @@ class MonitorMatchmakingManager(commands.Cog):
         match.cleanup()
 
     async def calculate_elos_and_upload(self, match: CompletedMatch) -> Dict[PlayerProfile, Dict[str, tuple[int, int]]]:
-        # TODO support for 2v2 - only handling 1v1v1v1 for now...
-        if not isinstance(match.active_match.player_profiles, List):
-            logging.error("Tried calculating elos with unsupported match type (not List of players...)")
-            return {}
+        if isinstance(match.active_match.player_profiles, List):
+            match_players = match.active_match.player_profiles
+        else:
+            match_players = match.active_match.player_profiles.players()
         
         # Create a mapping from player profile -> dict of leaderboard id -> (updated elo, elo diff)
         player_profile_to_leaderboard_elo_update_and_diff_map: Dict[
             PlayerProfile, Dict[str, tuple[int, int]]
         ] = {}
 
-        for player_profile in match.active_match.player_profiles:
+        for player_profile in match_players:
             leaderboards_to_elo_update_and_diff_map: Dict[
                 str, tuple[int, int]
             ] = {}

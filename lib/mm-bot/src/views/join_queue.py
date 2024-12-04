@@ -192,9 +192,10 @@ class MatchQueueView(ui.View):
             )
             return
         
-        embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-        embed.title(
-            name=f"🏎️ Match #{active_match.bot_match_id} in progress...",
+        embed = discord.Embed(
+            title=f"🏎️ Match #{active_match.bot_match_id} in progress...",
+            color=COLOR_EMBED, 
+            timestamp=datetime.utcnow()
         )
 
         team_a = active_match.player_profiles.team_a
@@ -220,9 +221,9 @@ class MatchQueueView(ui.View):
         new_active_matches = self.mm_manager.process_new_active_matches_for_queue(self.queue_id)
 
         for new_match in new_active_matches:
-            if isinstance(new_match, List):
+            if isinstance(new_match.player_profiles, List):
                 await self.process_new_active_solo_match(new_match)
-            elif isinstance(new_match, Teams2v2):
+            elif isinstance(new_match.player_profiles, Teams2v2):
                 await self.process_new_active_teams_match(new_match)
             else:
                 logging.error(f"Unknown match type {type(new_match)}")
@@ -234,8 +235,12 @@ class MatchQueueView(ui.View):
         completed_matches = self.mm_manager.process_completed_matches_for_queue(self.queue_id)
 
         for completed_match in completed_matches:
-            message = self.active_match_messages.pop(completed_match.active_match.bot_match_id)
+            try:
+                message = self.active_match_messages.pop(completed_match.active_match.bot_match_id)
 
-            await message.delete()
+                await message.delete()
 
-            logging.info(f"Completed match with bot match ID {completed_match.active_match.bot_match_id} removed from queue view {self.queue_id}")
+                logging.info(f"Completed match with bot match ID {completed_match.active_match.bot_match_id} removed from queue view {self.queue_id}")
+            except Exception as e:
+                logging.error(f"Failed to delete message for completed match with bot match ID {completed_match.active_match.bot_match_id} in queue view {self.queue_id}: {e}")
+                continue

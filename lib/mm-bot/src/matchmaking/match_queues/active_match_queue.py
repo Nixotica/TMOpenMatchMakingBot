@@ -54,11 +54,11 @@ class ActiveMatchQueue:
             )
             return False
 
-    def remove_player(self, player: QueuedPlayer | PlayerProfile | int | str) -> None:
+    def remove_player(self, player: QueuedPlayer | PlayerProfile) -> None:
         """Remove a player from the queue.
 
         Args:
-            player (QueuedPlayer | PlayerProfile | int | str): The player to remove from the queue. Can be a PlayerProfile object, a string representing the TM account ID, or an integer representing the Discord account ID.
+            player (QueuedPlayer | PlayerProfile): The player to remove from the queue. Can be a PlayerProfile object, a string representing the TM account ID, or an integer representing the Discord account ID.
         """
         # TODO - horrible implementation, needs fixing
         if isinstance(player, QueuedPlayer):
@@ -66,16 +66,6 @@ class ActiveMatchQueue:
             logging.info(
                 f"Removed player {player.profile.tm_account_id} from queue {self.queue.queue_id}."
             )
-        elif isinstance(player, int):
-            self.players = [
-                p for p in self.players if p.profile.discord_account_id != player
-            ]
-            logging.info(f"Removed player {player} from queue {self.queue.queue_id}.")
-        elif isinstance(player, str):
-            self.players = [
-                p for p in self.players if p.profile.tm_account_id != player
-            ]
-            logging.info(f"Removed player {player} from queue {self.queue.queue_id}.")
         else:
             self.players = [p for p in self.players if p.profile != player]
             logging.info(
@@ -126,8 +116,8 @@ class ActiveMatchQueue:
         elif self.queue.type == QueueType.Queue2v2:
             # TODO - once we support a mix of solo and teams in queue, consider that when making the teams
             teams = Teams2v2(
-                Team2v2(self.players[0].profile, self.players[1].profile),
-                Team2v2(self.players[2].profile, self.players[3].profile),
+                Team2v2("Blue", self.players[0].profile, self.players[1].profile),
+                Team2v2("Red", self.players[2].profile, self.players[3].profile),
             )
             return ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
         elif self.queue.type == QueueType.QueueSoloTest:

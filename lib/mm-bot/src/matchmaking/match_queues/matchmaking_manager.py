@@ -167,31 +167,32 @@ class MatchmakingManager:
         )
         return None
 
-    def add_team_to_queue(
-        self, team: Team2v2, queue_id: str
-    ) -> Optional[ActiveMatchQueue]:
-        """Adds a team to the given queue by ID.
+    # TODO - re-add support for this with queued parties
+    # def add_team_to_queue(
+    #     self, team: Team2v2, queue_id: str
+    # ) -> Optional[ActiveMatchQueue]:
+    #     """Adds a team to the given queue by ID.
 
-        Args:
-            team (Team2v2): Team to add to the queue.
-            queue_id (str): The queue to add to.
+    #     Args:
+    #         team (Team2v2): Team to add to the queue.
+    #         queue_id (str): The queue to add to.
 
-        Returns:
-            Optional[ActiveMatchQueue]: Returns the queue the team was added to, None if not.
-        """
-        for queue in self.active_queues:
-            if queue.queue.queue_id == queue_id:
-                if queue.queue.type == QueueType.Queue1v1v1v1:
-                    logging.error(
-                        f"Attempt to add team {team} to single player queue {queue_id}."
-                    )
-                    return None
-                queue.add_team(team)
-                return queue
-        logging.warn(
-            f"Attempted to add team to a queue which doesn't exist: {queue_id}"
-        )
-        return None
+    #     Returns:
+    #         Optional[ActiveMatchQueue]: Returns the queue the team was added to, None if not.
+    #     """
+    #     for queue in self.active_queues:
+    #         if queue.queue.queue_id == queue_id:
+    #             if queue.queue.type == QueueType.Queue1v1v1v1:
+    #                 logging.error(
+    #                     f"Attempt to add team {team} to single player queue {queue_id}."
+    #                 )
+    #                 return None
+    #             queue.add_team(team)
+    #             return queue
+    #     logging.warn(
+    #         f"Attempted to add team to a queue which doesn't exist: {queue_id}"
+    #     )
+    #     return None
 
     def remove_player_from_queue(self, player: PlayerProfile, queue_id: str) -> None:
         """Removes a player from the given queue by ID.
@@ -202,12 +203,6 @@ class MatchmakingManager:
         """
         for queue in self.active_queues:
             if queue.queue.queue_id == queue_id:
-                if queue.queue.type == QueueType.Queue2v2:
-                    logging.error(
-                        f"Attempted to remove player from a 2v2 queue: {queue_id}"
-                    )
-                    # TODO - this should not be an error, we should allow free agents
-                    return None
                 queue.remove_player(player)
 
     def remove_team_from_queue(self, team: Team2v2):
@@ -391,7 +386,7 @@ class MatchmakingManager:
             for active_queue in self.active_queues:
                 players_to_remove = active_queue.players.copy()
                 for player in players_to_remove:
-                    if active_match.has_player(player):
+                    if active_match.has_player(player.profile):
                         active_queue.remove_player(player)
             self.add_new_active_match(active_match)
 
