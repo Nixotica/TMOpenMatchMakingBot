@@ -71,7 +71,11 @@ class LeaderboardViewBuilder(commands.Cog):
         leaderboards = self.ddb_manager.get_leaderboards()
 
         for leaderboard in leaderboards:
-            await self.add_leaderboard_view(leaderboard)
+            try:
+                await self.add_leaderboard_view(leaderboard)
+            except Exception as e:
+                logging.error(f"Error setting up leaderboard {leaderboard.leaderboard_id}: {e}")
+                continue
 
     @commands.hybrid_command(
         name="create_leaderboard",
