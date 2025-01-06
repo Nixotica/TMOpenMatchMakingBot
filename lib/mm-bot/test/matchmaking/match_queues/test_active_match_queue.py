@@ -30,6 +30,7 @@ class TestActiveMatchQueues(unittest.TestCase):
                 leaderboard_ids=["l1"],
                 primary_leaderboard_id=None,
                 ping_role_id=None,
+                display_name=None,
             )
         )
 

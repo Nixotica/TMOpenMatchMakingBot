@@ -55,6 +55,10 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
 
 11. To stop running the bot, you should run `docker-compose stop` from the same directory (in a separate terminal instance if your logs are being output to the first instance), which will run through the necessary tear-down steps to remove queues from the discord server channels, etc. 
 
+## Testing
+
+For unit/integ tests, you'll want to use pytest. Simply install python3.11 locally, navigate to `/lib/mm-bot` and run `python3.11 -m pip install -r requirements.txt` then `python3.11 -m pytest`. 
+
 ## Commands
 
 ### Create Queue
