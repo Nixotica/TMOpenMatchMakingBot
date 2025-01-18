@@ -2,6 +2,7 @@ import asyncio
 import logging
 import threading
 from typing import Dict, List, Optional
+from matchmaking.party.active_party import ActiveParty
 from models.match_queue import MatchQueue
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
@@ -145,21 +146,7 @@ class MatchmakingManager:
                     )
                     return None
                 
-                # If this was the first person to join queue, trigger a ping to the discord
-                time_of_last_ping = self._last_first_player_ping_time.get(queue_id)
-                now = time.time()
-
-                if len(queue.players) == 1 and (
-                    time_of_last_ping is None or
-                    now - time_of_last_ping > QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC
-                ):
-                    logging.info(
-                        f"First player {player.tm_account_id} joined queue {queue_id}."
-                    )
-                    self.new_first_players_joined_queue.append(
-                        (player, queue)
-                    )
-                    self._last_first_player_ping_time[queue_id] = now
+                self.maybe_trigger_first_joined(player, queue)
 
                 return queue
         logging.warning(
@@ -167,32 +154,58 @@ class MatchmakingManager:
         )
         return None
 
-    # TODO - re-add support for this with queued parties
-    # def add_team_to_queue(
-    #     self, team: Team2v2, queue_id: str
-    # ) -> Optional[ActiveMatchQueue]:
-    #     """Adds a team to the given queue by ID.
+    def add_party_to_queue(
+        self, party: ActiveParty, queue_id: str
+    ) -> Optional[ActiveMatchQueue]:
+        """Adds a party to the given queue by ID.
 
-    #     Args:
-    #         team (Team2v2): Team to add to the queue.
-    #         queue_id (str): The queue to add to.
+        Args:
+            party (ActiveParty): Party to add to the queue.
+            queue_id (str): The queue to add to.
 
-    #     Returns:
-    #         Optional[ActiveMatchQueue]: Returns the queue the team was added to, None if not.
-    #     """
-    #     for queue in self.active_queues:
-    #         if queue.queue.queue_id == queue_id:
-    #             if queue.queue.type == QueueType.Queue1v1v1v1:
-    #                 logging.error(
-    #                     f"Attempt to add team {team} to single player queue {queue_id}."
-    #                 )
-    #                 return None
-    #             queue.add_team(team)
-    #             return queue
-    #     logging.warn(
-    #         f"Attempted to add team to a queue which doesn't exist: {queue_id}"
-    #     )
-    #     return None
+        Returns:
+            Optional[ActiveMatchQueue]: Returns the queue the party was added to, None if not.
+        """
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                if self.is_player_in_match(party.requester) or self.is_player_in_match(party.accepter):
+                    logging.info(
+                        f"Player {party.requester.tm_account_id} or {party.accepter.tm_account_id} already in an active match."
+                    )
+                    return None
+                
+                if queue.queue.type != QueueType.Queue2v2:
+                    logging.info(
+                        f"Attempted to add a party to a non-2v2 queue {queue_id}"
+                    )
+                    return None
+                
+                party_added = queue.add_party(party)
+                if not party_added:
+                    logging.info(
+                        f"Player {party.requester} or {party.accepter} already in queue {queue_id}."
+                    )
+                    return None
+                
+                self.maybe_trigger_first_joined(party.requester, queue)
+
+                return queue
+                
+    def maybe_trigger_first_joined(self, added_player: PlayerProfile, queue: ActiveMatchQueue) -> None:
+        time_of_last_ping = self._last_first_player_ping_time.get(queue.queue.queue_id)
+        now = time.time()
+
+        if len(queue.player_parties) == 1 and (
+            time_of_last_ping is None or
+            now - time_of_last_ping > QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC
+        ):
+            logging.info(
+                f"First player {queue.player_parties[0].players()} joined queue {queue.queue.queue_id}."
+            )
+            self.new_first_players_joined_queue.append(
+                (added_player, queue)
+            )
+            self._last_first_player_ping_time[queue.queue.queue_id] = now
 
     def remove_player_from_queue(self, player: PlayerProfile, queue_id: str) -> None:
         """Removes a player from the given queue by ID.
@@ -205,8 +218,16 @@ class MatchmakingManager:
             if queue.queue.queue_id == queue_id:
                 queue.remove_player(player)
 
-    def remove_team_from_queue(self, team: Team2v2):
-        pass  # TODO
+    def remove_party_from_queue(self, party: ActiveParty, queue_id: str) -> None:
+        """Removes a party from the given queue by ID.
+
+        Args:
+            party (ActiveParty): Party to remove from the queue.
+            queue_id (str): The queue to remove from.
+        """
+        for queue in self.active_queues:
+            if queue.queue.queue_id == queue_id:
+                queue.remove_party(party)
 
     def cancel_match(self, bot_match_id: int) -> Optional[ActiveMatch]:
         """Cancels an active match, if one exists with the givne bot match ID.
@@ -384,10 +405,11 @@ class MatchmakingManager:
         for active_match in new_active_matches:
             # Remove players in new active match from all queues
             for active_queue in self.active_queues:
-                players_to_remove = active_queue.players.copy()
-                for player in players_to_remove:
-                    if active_match.has_player(player.profile):
-                        active_queue.remove_player(player)
+                parties_to_remove = active_queue.player_parties.copy()
+                for party in parties_to_remove:
+                    for player in party.players():
+                        if active_match.has_player(player):
+                            active_queue.remove_player(player)
             self.add_new_active_match(active_match)
 
     async def _check_active_matches(self):
@@ -420,13 +442,14 @@ class MatchmakingManager:
         self._last_check_kick_players_time
         logging.debug("Checking players to kick from spending too long in queue...")
         for match_queue in self.active_queues:
-            for queued_player in match_queue.players:
+            for queued_party in match_queue.player_parties:
                 if (
-                    now - queued_player.queue_join_time_since_epoch
+                    now - queued_party.queue_join_time()
                     > QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC
                 ):
-                    match_queue.remove_player(queued_player)
+                    for player in queued_party.players():
+                        match_queue.remove_player(player)
                     logging.info(
-                        f"Kicked player {queued_player.profile.tm_account_id} from {match_queue.queue.queue_id} queue for exceeding {QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC} seconds in queue."
+                        f"Kicked players {queued_party.players()} from {match_queue.queue.queue_id} queue for exceeding {QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC} seconds in queue."
                     )
             # TODO - add support for kicking teams

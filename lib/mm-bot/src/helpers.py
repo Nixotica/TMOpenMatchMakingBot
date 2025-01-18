@@ -131,3 +131,34 @@ async def get_ping_channel(
         return
     
     return ping_channel
+
+
+async def get_party_channel(
+    bot: commands.Bot,
+    s3_manager: S3ClientManager,
+) -> Optional[discord.TextChannel]:
+    """Gets the party channel for party messages.
+
+    Args:
+        bot (commands.Bot): The discord bot
+        s3_manager (S3ClientManager): The s3 client manager for retrieving configs
+
+    Returns:
+        Optional[discord.TextChannel]: _description_
+    """
+    configs = s3_manager.get_configs()
+    party_channel_id = configs.party_channel_id
+
+    if party_channel_id is None:
+        logging.error("No party channel set.")
+        return
+
+    party_channel = bot.get_channel(party_channel_id)
+    if party_channel is None:
+        logging.error(f"Party channel not found with ID {party_channel_id}.")
+        return
+    if not isinstance(party_channel, discord.TextChannel):
+        logging.error(f"Channel {party_channel_id} is not a text channel.")
+        return
+
+    return party_channel

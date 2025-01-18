@@ -17,3 +17,10 @@ class ActiveParty:
     def __contains__(self, player: PlayerProfile) -> bool:
         return player in self.__iter__()
     
+    def teammate(self, player: PlayerProfile) -> PlayerProfile:
+        if player == self.requester:
+            return self.accepter
+        elif player == self.accepter:
+            return self.requester
+        else:
+            raise ValueError(f"Player {player.tm_account_id} is not in this party.")

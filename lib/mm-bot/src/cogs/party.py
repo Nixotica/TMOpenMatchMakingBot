@@ -5,6 +5,7 @@ from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import ROLE_MOD
+from helpers import get_party_channel
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.party.party_manager import PartyManager
 
@@ -55,30 +56,6 @@ class Party(commands.Cog, name="party"):
             f"Processing command to invite player {member.name} to party from user {ctx.message.author.name}."
         )
 
-        configs = self.s3_manager.get_configs()
-        if not configs.party_channel_id:
-            if not configs.bot_messages_channel_id:
-                await ctx.send(
-                    "Party channel not set. Please contact a moderator."
-                )
-            else:
-                party_channel_id = configs.bot_messages_channel_id
-        else:
-            party_channel_id = configs.party_channel_id
-        party_channel = self.bot.get_channel(party_channel_id)
-        if party_channel is None:
-            logging.error(f"Party channel not found with ID {party_channel_id}.")
-            await ctx.send(
-                "Party channel not found. Please contact a moderator."
-            )
-            return
-        if not isinstance(party_channel, discord.TextChannel):
-            logging.error(f"Party channel is not a text channel.")
-            await ctx.send(
-                "Party channel not found. Please contact a moderator."
-            )
-            return
-
         requester_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
             ctx.message.author.id
         )
@@ -94,16 +71,37 @@ class Party(commands.Cog, name="party"):
         if not accepter_profile:
             await ctx.send(f"{member.name} must register their account first!")
             return
+        
+        await self.party_manager.add_outstanding_party_request(requester_profile, accepter_profile)
 
-        accept_button = discord.ui.Button(label="✅ Accept", style=discord.ButtonStyle.green)
-        decline_button = discord.ui.Button(label="❌ Decline", style=discord.ButtonStyle.red)
-        view = discord.ui.View()
-        view.add_item(accept_button)
-        view.add_item(decline_button)
+        await ctx.send(f"Party request sent to {member.name}.", ephemeral=True)
 
-        message = await party_channel.send(
-            content=f"❗ <@{accepter_profile.discord_account_id}>! <@{requester_profile.discord_account_id}> has requested you to join their party.",
-            view=view,
+    @commands.hybrid_command(
+        name="unparty",
+        description="Disband your party."
+    )
+    async def unparty(
+        self, ctx: commands.Context,
+    ) -> None:
+        logging.info(
+            f"Processing command to disband party from user {ctx.message.author.name}."
         )
 
-        
+        requester_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
+            ctx.message.author.id
+        )
+
+        if not requester_profile:
+            await ctx.send(f"You must register your account first!")
+            return
+
+        party = self.party_manager.remove_party(requester_profile)
+        if not party:
+            await ctx.send(f"You are not in a party.", ephemeral=True)
+            return
+
+        await ctx.send(f"Unpartied from <@{party.teammate(requester_profile).discord_account_id}>.", ephemeral=True)
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(Party(bot))

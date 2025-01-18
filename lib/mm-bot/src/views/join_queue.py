@@ -1,15 +1,17 @@
 from datetime import datetime
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 import discord
 from discord import TextChannel, ui
 from discord.ext import tasks, commands
 from cogs.constants import COLOR_EMBED
 from helpers import get_rank_for_player
+from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
+from matchmaking.party.party_manager import PartyManager
 from models.leaderboard_rank import LeaderboardRank
 from models.player_profile import PlayerProfile
 
@@ -22,6 +24,7 @@ class MatchQueueView(ui.View):
     def __init__(self, queue_id: str, channel: TextChannel):
         super().__init__(timeout=None)
         self.mm_manager = MatchmakingManager()
+        self.party_manager = PartyManager()
         self.ddb_manager = DynamoDbManager()
         self.queue_id = queue_id
         self.channel = channel
@@ -60,8 +63,38 @@ class MatchQueueView(ui.View):
                 f"You are already in a match.", ephemeral=True
             )
             return
+        
+        with_teammate: Optional[PlayerProfile] = None
+        
+        # Handle partied players joining queue.
+        player_party = self.party_manager.get_player_party(player_profile)
+        if player_party is not None:
+            queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
+            if not queue:
+                logging.warning(f"Unexpectedly could not find queue with ID {self.queue_id} in mm manager.")
+                return
+            
+            # If this is a solo queue, do not allow player to join
+            if queue.queue.type != QueueType.Queue2v2:
+                await interaction.response.send_message(
+                    f"This queue does not allowed partied players. Use /unparty first!", ephemeral=True
+                )
+                return
 
-        added_queue = self.mm_manager.add_player_to_queue(player_profile, self.queue_id)
+            # If their teammate is in a match, warn them and do not allow them to join
+            teammate = player_party.teammate(player_profile)
+            if self.mm_manager.is_player_in_match(teammate):
+                await interaction.response.send_message(
+                    f"Your teammate {teammate} is still in a match.", ephemeral=True
+                )
+                return
+            
+            added_queue = self.mm_manager.add_party_to_queue(player_party, self.queue_id)
+            with_teammate = teammate
+
+        # Otherwise solo queueing
+        else:
+            added_queue = self.mm_manager.add_player_to_queue(player_profile, self.queue_id)
 
         if not added_queue:
             await interaction.response.send_message(
@@ -69,8 +102,9 @@ class MatchQueueView(ui.View):
             )
             return
 
+        with_teammate_msg = f" with <@{with_teammate.discord_account_id}>" if with_teammate else ""
         await interaction.response.send_message(
-            f"Joined queue {self.queue_id}.", ephemeral=True
+            f"Joined queue {self.queue_id}{with_teammate_msg}.", ephemeral=True
         )
 
         await self.update_queue_embed()
@@ -87,6 +121,10 @@ class MatchQueueView(ui.View):
             user.id
         )
 
+        if not player_profile:
+            # Don't tell the user anything, they probably aren't registered
+            return
+
         requested_queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
 
         if not requested_queue:
@@ -95,14 +133,22 @@ class MatchQueueView(ui.View):
             )
             return
 
-        player_profiles = [p.profile for p in requested_queue.players]
+        player_profiles = []
+        for party in requested_queue.player_parties:
+            for player in party.players():
+                player_profiles.append(player)
+
         if player_profile not in player_profiles:
             await interaction.response.send_message(
                 f"You are not in queue {self.queue_id}.", ephemeral=True
             )
             return
 
-        self.mm_manager.remove_player_from_queue(player_profile, self.queue_id)
+        player_party = self.party_manager.get_player_party(player_profile)
+        if player_party is not None:
+            self.mm_manager.remove_party_from_queue(player_party, self.queue_id)
+        else:
+            self.mm_manager.remove_player_from_queue(player_profile, self.queue_id)
 
         await interaction.response.send_message(
             f"Left queue {self.queue_id}.", ephemeral=True
@@ -131,7 +177,9 @@ class MatchQueueView(ui.View):
         embed.set_footer(text="Last updated")
 
         leaderboard_id = queue.queue.primary_leaderboard_id
-        num_players = len(queue.players)
+        num_players = 0
+        for party in queue.player_parties:
+            num_players += len(party.players())
         if leaderboard_id is None or num_players == 0:
             embed.add_field(name="Players:", value=num_players)
         else:
@@ -139,19 +187,20 @@ class MatchQueueView(ui.View):
                 leaderboard_id
             )
             ranks_to_count: Dict[LeaderboardRank, int] = {}
-            for player in queue.players:
-                player_elo = self.ddb_manager.get_or_create_player_elo(
-                    player.profile.tm_account_id,
-                    leaderboard_id,
-                )
-                rank = get_rank_for_player(player_elo.elo, leaderboard_id, leaderboard_ranks)
-                if rank is None:
-                    logging.error(f"Failed to get rank for player {player_elo.tm_account_id} with elo {player_elo.elo} on leaderboard {leaderboard_id}.")
-                    continue
-                if ranks_to_count.get(rank) is None:
-                    ranks_to_count[rank] = 1
-                else:
-                    ranks_to_count[rank] += 1
+            for party in queue.player_parties:
+                for player in party.players():
+                    player_elo = self.ddb_manager.get_or_create_player_elo(
+                        player.tm_account_id,
+                        leaderboard_id,
+                    )
+                    rank = get_rank_for_player(player_elo.elo, leaderboard_id, leaderboard_ranks)
+                    if rank is None:
+                        logging.error(f"Failed to get rank for player {player_elo.tm_account_id} with elo {player_elo.elo} on leaderboard {leaderboard_id}.")
+                        continue
+                    if ranks_to_count.get(rank) is None:
+                        ranks_to_count[rank] = 1
+                    else:
+                        ranks_to_count[rank] += 1
 
             value = ""
             for rank in leaderboard_ranks:
