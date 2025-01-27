@@ -6,6 +6,7 @@ import discord
 from aws.dynamodb import DynamoDbManager
 from helpers import get_discord_user, get_next_rank_for_player, get_rank_for_player
 from cogs.constants import COLOR_EMBED
+from models.leaderboard_rank import LeaderboardRank
 
 
 class LeaderboardView(ui.View):
@@ -150,11 +151,18 @@ class LeaderboardView(ui.View):
         )
         logging.info(f"Initial player rank: {prev_player_rank} for player {top_25_player_elos[0]}")
 
+        is_ranked = True
         if prev_player_rank is None:
             logging.error(
-                f"No rank found for player with elo {top_25_player_elos[0].elo} while updating leaderboard..."
+                f"No rank found for player with elo {top_25_player_elos[0].elo} while updating leaderboard, creating a 'Rankless' view."
             )
-            return
+            is_ranked = False
+            prev_player_rank = LeaderboardRank(
+                'default',
+                self.leaderboard_id,
+                "Unranked",
+                0
+            )
 
         player_pos = 1
         rank_group_msg = ""
@@ -163,10 +171,14 @@ class LeaderboardView(ui.View):
                 player_elo.elo, self.leaderboard_id, leaderboard_ranks_descending
             )
             if player_rank is None:
-                logging.error(
-                    f"No rank found for player with elo {player_elo.elo} while updating leaderboard, skipping..."
-                )
-                continue
+                # If this is an unranked leaderboard, override player's rank to unranked
+                if not is_ranked:
+                    player_rank = prev_player_rank
+                else:
+                    logging.error(
+                        f"No rank found for player with elo {player_elo.elo} while updating leaderboard, skipping..."
+                    )
+                    continue
             
             # If this is a new section of players of same rank, complete the previous section using the rank above
             if player_rank != prev_player_rank:
