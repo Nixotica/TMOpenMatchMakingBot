@@ -25,7 +25,8 @@ def expected_score(elo_i: int, elo_j: int):
 def calculate_elo_2v2_ratings(
     match_positions: MatchPositions2v2,
     player_elos: List[PlayerElo], 
-    K=32
+    K_team=20,
+    K_individual=10,
 ) -> UpdatedElos:
     """
     Calculate updated Elo ratings for all players based on their match positions and their team's placement.
@@ -34,8 +35,8 @@ def calculate_elo_2v2_ratings(
     Args:
         match_positions (MatchPositions2v2): The match positions object containing individual and team placements.
         player_elos (List[PlayerElo]): A list of players' current elos before this match.
-        K (int, optional): Sensitivity for Elo adjustment (default is 20).
-
+        K_team (int, optional): Sensitivity for Elo adjustment in the team vs team calculation (default is 20).
+        K_individual (int, optional): Sensitivity for Elo adjustment using individual player placement (default is 10).
     Returns:
         UpdatedElos: An object capturing the updated elos for every player.
     """
@@ -61,9 +62,6 @@ def calculate_elo_2v2_ratings(
     team_a_rating = get_team_rating(player_elos, match_positions.teams.team_a)
     team_b_rating = get_team_rating(player_elos, match_positions.teams.team_b)
 
-    # print('team a rating:', team_a_rating)
-    # print('team b rating:', team_b_rating)
-
     # Expected score for each team based on the average team rating
     expected_score_a = expected_score(team_a_rating, team_b_rating)
     expected_score_b = expected_score(team_b_rating, team_a_rating)
@@ -76,11 +74,11 @@ def calculate_elo_2v2_ratings(
     actual_score_team_a = 1 if team_a_position == 1 else 0
     actual_score_team_b = 1 - actual_score_team_a
 
-    team_a_adjustment = K * (actual_score_team_a - expected_score_a)
-    team_b_adjustment = K * (actual_score_team_b - expected_score_b)
+    team_a_adjustment = K_team * (actual_score_team_a - expected_score_a)
+    team_b_adjustment = K_team * (actual_score_team_b - expected_score_b)
 
-    # print('team a adjustment:', team_a_adjustment)
-    # print('team b adjustment:', team_b_adjustment)
+    print('team a adjustment:', team_a_adjustment)
+    print('team b adjustment:', team_b_adjustment)
 
     individual_results = match_positions.individual_results()
 
@@ -99,28 +97,33 @@ def calculate_elo_2v2_ratings(
         
         # Determine the player's team's expected and actual scores, and total adjustment
         player_in_team_a = match_positions.teams.team_a.__contains__(player.tm_account_id)
-        E_i =  expected_score_a if player_in_team_a else expected_score_b
-        S_i = actual_score_team_a if player_in_team_a else actual_score_team_b
-        team_average = team_a_rating if player_in_team_a else team_b_rating
-        total_adjustment = team_a_adjustment if player_in_team_a else team_b_adjustment
+        team_adjustment = team_a_adjustment if player_in_team_a else team_b_adjustment
 
-        # Contribution factor based on player's placement in the match as an individual
-        individual_placement = get_player_placement(player, individual_results)
-        placement_factor = 1 / (1 + individual_placement)
+        # Calculate individual adjustment based on head-to-head performance
+        individual_adjustment = 0
+        for opponent in player_elos:
+            if opponent.tm_account_id == player.tm_account_id:
+                continue  # Skip self
 
-        # Calculate player's share of the team adjustment based on their proximity to the team average
-        proximity_factor = R_i / team_average
+            # Calculate expected score against this opponent
+            E_ij = expected_score(R_i, opponent.elo)
 
-        # Adjust proporitionally to avoid boosting
-        individual_adjustment = total_adjustment * (placement_factor * proximity_factor / (placement_factor + proximity_factor))
+            # Determine actual score against this opponent (1 if player placed higher, 0 otherwise)
+            player_placement = get_player_placement(player, individual_results)
+            opponent_placement = get_player_placement(opponent, individual_results)
+            S_ij = 1 if player_placement < opponent_placement else 0
 
-        # print(f'individual adjustment for player {player.tm_account_id}: {individual_adjustment}')
+            # Add to individual adjustment
+            individual_adjustment += K_individual * (S_ij - E_ij)
+
+        # Combine team and individual adjustments
+        total_adjustment = team_adjustment + individual_adjustment
 
         # Calculate the updated elo and diff
-        R_i_prime = R_i + individual_adjustment
+        R_i_prime = R_i + total_adjustment
         diff = R_i_prime - R_i
 
-        # print(f'player {player.tm_account_id} R_i_prime {R_i_prime} and diff {diff}')
+        print(f'player {player.tm_account_id} R_i_prime {R_i_prime} and diff {diff}')
 
         updated_elo_ratings[player] = round(R_i_prime)
         elo_differences[player] = round(diff)

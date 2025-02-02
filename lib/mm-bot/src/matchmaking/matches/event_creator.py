@@ -102,6 +102,7 @@ def create_1v1v1v1_match(
                         cup_points_limit=POINTS_LIMIT_1v1v1v1,
                         rounds_per_map=99,
                         ko_checkpoint_number=0,
+                        hide_scores_header=True,
                     ),
                     plugin_settings=ClassicPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,

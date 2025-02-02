@@ -18,7 +18,7 @@ class TestEloSystem(unittest.TestCase):
         p1_acc = "tm_acc_1"
         self.player1 = PlayerProfile(
             tm_account_id=p1_acc,
-            discord_account_id="dc_acc_1",
+            discord_account_id=1,
             matches_played=0,
         )
         self.player1_elo = PlayerElo(
@@ -30,7 +30,7 @@ class TestEloSystem(unittest.TestCase):
         p2_acc = "tm_acc_2"
         self.player2 = PlayerProfile(
             tm_account_id=p2_acc,
-            discord_account_id="dc_acc_2",
+            discord_account_id=2,
             matches_played=0,
         )
         self.player2_elo = PlayerElo(
@@ -42,7 +42,7 @@ class TestEloSystem(unittest.TestCase):
         p3_acc = "tm_acc_3"
         self.player3 = PlayerProfile(
             tm_account_id=p3_acc,
-            discord_account_id="dc_acc_3",
+            discord_account_id=3,
             matches_played=0,
         )
         self.player3_elo = PlayerElo(
@@ -54,7 +54,7 @@ class TestEloSystem(unittest.TestCase):
         p4_acc = "tm_acc_4"
         self.player4 = PlayerProfile(
             tm_account_id=p4_acc,
-            discord_account_id="dc_acc_4",
+            discord_account_id=4,
             matches_played=0,
         )
         self.player4_elo = PlayerElo(
@@ -98,28 +98,28 @@ class TestEloSystem(unittest.TestCase):
                     RankedParticipant(
                         participant=p1_acc,
                         rank=1,
-                        score=1,
+                        score=0,
                         zone=None,
                         team="team_a"
                     ),
                     RankedParticipant(
                         participant=p2_acc,
                         rank=4,
-                        score=1,
+                        score=0,
                         zone=None,
                         team="team_a"
                     ),
                     RankedParticipant(
                         participant=p3_acc,
                         rank=3,
-                        score=0,
+                        score=1,
                         zone=None,
                         team="team_b"
                     ),
                     RankedParticipant(
                         participant=p4_acc,
                         rank=2,
-                        score=0,
+                        score=1,
                         zone=None,
                         team="team_b"
                     )
@@ -129,13 +129,13 @@ class TestEloSystem(unittest.TestCase):
                         position=2,
                         team="team_a",
                         rank=2,
-                        score=1,
+                        score=0,
                     ),
                     RankedTeam(
                         position=1,
                         team="team_b",
                         rank=1,
-                        score=0,
+                        score=1,
                     )
                 ]
             )
@@ -166,7 +166,7 @@ class TestEloSystem(unittest.TestCase):
         self.assertLess(elo_differences[self.player2_elo], 0)
 
         # Ensure that since P1 came in last, they have lower elo diff than P2
-        self.assertLess(elo_differences[self.player1_elo], elo_differences[self.player2_elo])
+        self.assertLess(elo_differences[self.player2_elo], elo_differences[self.player1_elo])
 
         # Ensure that since P3 came in third, they have lower elo diff than P4
         self.assertLess(elo_differences[self.player3_elo], elo_differences[self.player4_elo])
