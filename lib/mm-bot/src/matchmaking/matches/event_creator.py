@@ -29,6 +29,7 @@ from nadeo_event_api.api.pastebin.pastebin_api import post_tmwt_2v2
 from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import Tmwt2v2Pastebin, Tmwt2v2PastebinTeam
 from nadeo_event_api.api.structure.round.match_spot import TeamMatchSpot
 from aws.s3 import S3ClientManager
+from matchmaking.matches.map_selection_manager import MapSelectionManager
 from models.match_queue import MatchQueue
 from matchmaking.matches.team_2v2 import Teams2v2
 from models.player_profile import PlayerProfile
@@ -36,30 +37,6 @@ from nadeo.ubi_token_vendor import UbiTokenRefresher
 from matchmaking.matches.created_match_info import CreatedMatchInfo
 from matchmaking.constants import POINTS_LIMIT_1v1v1v1
 import datetime as dt
-
-
-def get_random_map(match_queue: MatchQueue) -> Map:
-    """Get a random map for the given match queue.
-
-    Args:
-        match_queue (MatchQueue): The match queue containing the campaign from which a map should be chosen.
-
-    Returns:
-        Map: A random map from the campaign.
-    """
-    UbiTokenRefresher().refresh_tokens()
-
-    campaign_playlist = Campaign(
-        match_queue.campaign_club_id, match_queue.campaign_id
-    )._playlist
-    if not campaign_playlist:
-        error = f"No campaign playlist found with club id {match_queue.campaign_club_id} campaign id {match_queue.campaign_id}"
-        logging.error(error)
-        raise Exception(error)
-    map_pool = [Map(playlist_map._uuid) for playlist_map in campaign_playlist]
-    map_to_use = map_pool[random.randint(0, len(map_pool) - 1)]
-
-    return map_to_use
 
 
 def create_1v1v1v1_match(
@@ -74,7 +51,7 @@ def create_1v1v1v1_match(
     event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
-    map_to_use = get_random_map(match_queue)
+    map_to_use = MapSelectionManager().get_random_map(match_queue)
 
     event = Event(
         name=event_name,
@@ -147,7 +124,7 @@ def create_lsc_match(
     event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
-    map_to_use = get_random_map(match_queue)
+    map_to_use = MapSelectionManager().get_random_map(match_queue)
 
     event = Event(
         name=event_name,
@@ -216,7 +193,7 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
     event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
-    map_to_use = get_random_map(match_queue)
+    map_to_use = MapSelectionManager().get_random_map(match_queue)
 
     pastebin_api_dev_key = S3ClientManager().get_secrets().pastebin_api_dev_key
 
@@ -314,7 +291,7 @@ def create_solo_match(
     event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
-    map_to_use = get_random_map(match_queue)
+    map_to_use = MapSelectionManager().get_random_map(match_queue)
 
     event = Event(
         name=event_name,
