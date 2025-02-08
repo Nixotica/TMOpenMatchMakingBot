@@ -402,6 +402,11 @@ class MatchmakingManager:
             )
             new_active_matches.append(active_match)
 
+            # To patch a bug where players get added to two queued matches at the same time,
+            # I'm just going to have a single match generate per invocation of this method. 
+            # TODO - Handle this better if matchmaking manager and monitor get refactored. 
+            break
+
         for active_match in new_active_matches:
             # Remove players in new active match from all queues
             for active_queue in self.active_queues:
