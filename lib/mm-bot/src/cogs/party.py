@@ -5,8 +5,8 @@ from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import ROLE_MOD
-from helpers import get_party_manager
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
+from cogs.party_manager import get_party_manager
 
 
 class Party(commands.Cog, name="party"):

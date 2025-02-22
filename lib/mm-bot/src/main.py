@@ -12,7 +12,7 @@ from aws.dynamodb import DynamoDbManager
 from discord import Intents
 from discord.ext.commands import Bot
 from health_check import start_health_check_in_thread
-from matchmaking.party.party_manager import PartyManager
+from cogs.party_manager import PartyManager
 from models.bot_secrets import Secrets
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 

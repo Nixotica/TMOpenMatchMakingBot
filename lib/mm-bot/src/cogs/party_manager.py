@@ -1,10 +1,11 @@
-import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
 from typing import Dict, List, Optional
 
+import discord
 from discord.ext import commands, tasks
 from aws.s3 import S3ClientManager
+from cogs.constants import COG_PARTY_MANAGER, COLOR_EMBED
 from helpers import get_party_channel, get_ping_channel, safe_delete_message
 from matchmaking.party.active_party import ActiveParty
 from matchmaking.party.constants import PARTY_MANAGER_CHECK_STALE_PARTY_REQUESTS_SEC
@@ -28,6 +29,16 @@ class PartyManager(commands.Cog):
         # Represented as an "active" party for which this message will party the two players.
         self.outstanding_party_request_messages: Dict[ActiveParty, PartyRequest] = {} 
 
+    def cog_load(self):
+        logging.info("Party Manager loading...")
+        self.check_party_requests_status.start()
+        self.check_for_stale_party_requests.start()
+
+    def cog_unload(self):
+        logging.info("Party manager unloading...")
+        self.check_party_requests_status.cancel()
+        self.check_for_stale_party_requests.cancel()
+
     async def add_outstanding_party_request(self, requester: PlayerProfile, accepter: PlayerProfile) -> None:
         active_party = ActiveParty(requester, accepter)
 
@@ -42,8 +53,14 @@ class PartyManager(commands.Cog):
             logging.error("Party channel not found. Skipping sending party request.")
             return
         
+        embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+        embed.add_field(
+            name="❗ Party System",
+            value=f"<@{accepter.discord_account_id}>, <@{requester.discord_account_id}> has invited you to a party!"
+        )
         message = await party_channel.send(
-            content=f"❗ <@{accepter.discord_account_id}>, <@{requester.discord_account_id}> has invited you to a party!",
+            content=f"<@{accepter.discord_account_id}>",
+            embed=embed,
             view=view,
         )
         
@@ -103,11 +120,12 @@ class PartyManager(commands.Cog):
     async def check_for_stale_party_requests(self):
         now = datetime.now(timezone.utc)
         
-        for active_party, party_request in self.outstanding_party_request_messages.items():
+        outstanding_party_request_messages_copy = self.outstanding_party_request_messages.copy()
+        for active_party, party_request in outstanding_party_request_messages_copy.items():
             if now - timedelta(seconds=PARTY_MANAGER_CHECK_STALE_PARTY_REQUESTS_SEC) > party_request.message.created_at:
                 logging.info(f"Party request for {active_party} is stale. Removing...")
 
-                safe_delete_message(party_request.message)
+                await safe_delete_message(party_request.message)
 
                 self.outstanding_party_request_messages.pop(active_party)
 
@@ -115,11 +133,18 @@ class PartyManager(commands.Cog):
                     logging.error("Bot is not initialized in party manager. Skipping pinging stale party request.")
                     continue
 
-                ping_channel = await get_ping_channel(self.bot, self.s3_manager)
+                party_channel = await get_party_channel(self.bot, self.s3_manager)
 
-                if ping_channel:
-                    await ping_channel.send(
-                        f"❗ <@{active_party.requester.discord_account_id}, <@{active_party.accepter.discord_account_id} did not respond to your invite in time."
+                if party_channel:
+                    embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+                    embed.add_field(
+                        name="❗ Party System",
+                        value=f"<@{active_party.accepter.discord_account_id}> did not respond to your invite in time."
+                    )
+
+                    await party_channel.send(
+                        content=f"<@{active_party.requester.discord_account_id}>",
+                        embed=embed,
                     )
 
     @check_for_stale_party_requests.before_loop
@@ -130,3 +155,11 @@ class PartyManager(commands.Cog):
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(PartyManager(bot))
+
+def get_party_manager(bot: commands.Bot) -> Optional[PartyManager]:
+    """Gets party manager singleton if initialized, else returns None."""
+    party_manager = bot.get_cog(COG_PARTY_MANAGER)
+    if not party_manager:
+        logging.warning("Error retrieving party manager.")
+        return None
+    return party_manager

@@ -5,12 +5,13 @@ import discord
 from discord import TextChannel, ui
 from discord.ext import tasks, commands
 from cogs.constants import COLOR_EMBED
-from helpers import get_party_manager, get_rank_for_player
+from helpers import get_rank_for_player
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
+from cogs.party_manager import get_party_manager
 from models.leaderboard_rank import LeaderboardRank
 from models.player_profile import PlayerProfile
 
