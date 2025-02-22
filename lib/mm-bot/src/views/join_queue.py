@@ -85,7 +85,7 @@ class MatchQueueView(ui.View):
             teammate = player_party.teammate(player_profile)
             if self.mm_manager.is_player_in_match(teammate):
                 await interaction.response.send_message(
-                    f"Your teammate {teammate} is still in a match.", ephemeral=True
+                    f"Your teammate <@{teammate.discord_account_id}> is still in a match.", ephemeral=True
                 )
                 return
             

@@ -153,7 +153,7 @@ class LeaderboardView(ui.View):
 
         is_ranked = True
         if prev_player_rank is None:
-            logging.error(
+            logging.info(
                 f"No rank found for player with elo {top_25_player_elos[0].elo} while updating leaderboard, creating a 'Rankless' view."
             )
             is_ranked = False
@@ -175,7 +175,7 @@ class LeaderboardView(ui.View):
                 if not is_ranked:
                     player_rank = prev_player_rank
                 else:
-                    logging.error(
+                    logging.warning(
                         f"No rank found for player with elo {player_elo.elo} while updating leaderboard, skipping..."
                     )
                     continue
