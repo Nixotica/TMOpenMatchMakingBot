@@ -6,7 +6,7 @@ from matchmaking.party.request_status import PartyRequestStatus
 
 class PartyRequestView(discord.ui.View):
     def __init__(self, active_party: ActiveParty):
-        super().__init__()  # TODO - timeout and cancel after a few minutes
+        super().__init__()
         self.active_party = active_party
         self.status: PartyRequestStatus = PartyRequestStatus.PENDING
 

@@ -4,6 +4,8 @@ from typing import List, Optional
 
 import discord
 from aws.s3 import S3ClientManager
+from cogs.constants import COG_PARTY_MANAGER
+from matchmaking.party.party_manager import PartyManager
 from models.leaderboard_rank import LeaderboardRank
 from discord.ext import commands
 from discord.user import User
@@ -162,3 +164,22 @@ async def get_party_channel(
         return
 
     return party_channel
+
+async def safe_delete_message(message: discord.Message) -> None:
+    """Delete message safely, catching errors"""
+    try:
+        await message.delete()
+    except discord.NotFound:
+        logging.info("Message already deleted.")
+    except discord.Forbidden:
+        logging.warning("Bot lacks permission to delete messages.")
+    except Exception as e:
+        logging.error(f"Unexpected error deleting message: {e}")
+        
+def get_party_manager(bot: commands.Bot) -> Optional[PartyManager]:
+    """Gets party manager singleton if initialized, else returns None."""
+    party_manager = bot.get_cog(COG_PARTY_MANAGER)
+    if not party_manager:
+        logging.warning("Error retrieving party manager.")
+        return None
+    return party_manager

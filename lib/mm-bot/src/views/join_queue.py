@@ -5,13 +5,12 @@ import discord
 from discord import TextChannel, ui
 from discord.ext import tasks, commands
 from cogs.constants import COLOR_EMBED
-from helpers import get_rank_for_player
+from helpers import get_party_manager, get_rank_for_player
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from aws.dynamodb import DynamoDbManager
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
-from matchmaking.party.party_manager import PartyManager
 from models.leaderboard_rank import LeaderboardRank
 from models.player_profile import PlayerProfile
 
@@ -21,10 +20,10 @@ class MatchQueueView(ui.View):
     A view for joining and leaving a matchmaking queue, plus the players in the queue and active queues. 
     """
 
-    def __init__(self, queue_id: str, channel: TextChannel):
+    def __init__(self, bot: commands.Bot, queue_id: str, channel: TextChannel):
         super().__init__(timeout=None)
+        self.bot = bot
         self.mm_manager = MatchmakingManager()
-        self.party_manager = PartyManager()
         self.ddb_manager = DynamoDbManager()
         self.queue_id = queue_id
         self.channel = channel
@@ -67,7 +66,9 @@ class MatchQueueView(ui.View):
         with_teammate: Optional[PlayerProfile] = None
         
         # Handle partied players joining queue.
-        player_party = self.party_manager.get_player_party(player_profile)
+        party_manager = get_party_manager(self.bot)
+        if party_manager:
+            player_party = party_manager.get_player_party(player_profile)
         if player_party is not None:
             queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
             if not queue:
@@ -144,7 +145,9 @@ class MatchQueueView(ui.View):
             )
             return
 
-        player_party = self.party_manager.get_player_party(player_profile)
+        party_manager = get_party_manager(self.bot)
+        if party_manager:
+            player_party = party_manager.get_player_party(player_profile)
         if player_party is not None:
             self.mm_manager.remove_party_from_queue(player_party, self.queue_id)
         else:

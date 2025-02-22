@@ -5,9 +5,8 @@ from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import ROLE_MOD
-from helpers import get_party_channel
+from helpers import get_party_manager
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
-from matchmaking.party.party_manager import PartyManager
 
 
 class Party(commands.Cog, name="party"):
@@ -20,7 +19,6 @@ class Party(commands.Cog, name="party"):
         self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
         self.s3_manager = S3ClientManager()
-        self.party_manager = PartyManager()
 
     @commands.hybrid_command(
         name="set_party_channel",
@@ -72,7 +70,12 @@ class Party(commands.Cog, name="party"):
             await ctx.send(f"{member.name} must register their account first!")
             return
         
-        await self.party_manager.add_outstanding_party_request(requester_profile, accepter_profile)
+        party_manager = get_party_manager(self.bot)
+        if not party_manager:
+            await ctx.send("Error sending party request.")
+            return
+        
+        await party_manager.add_outstanding_party_request(requester_profile, accepter_profile)
 
         await ctx.send(f"Party request sent to {member.name}.", ephemeral=True)
 
@@ -95,7 +98,12 @@ class Party(commands.Cog, name="party"):
             await ctx.send(f"You must register your account first!")
             return
 
-        party = self.party_manager.remove_party(requester_profile)
+        party_manager = get_party_manager(self.bot)
+        if not party_manager:
+            await ctx.send("Error attemping to unparty.")
+            return
+        
+        party = party_manager.remove_party(requester_profile)
         if not party:
             await ctx.send(f"You are not in a party.", ephemeral=True)
             return

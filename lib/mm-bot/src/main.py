@@ -90,9 +90,6 @@ async def main():
     # Set up and run bot
     bot = DiscordBot()
 
-    # Set up the party manager and run
-    PartyManager(bot).start_run_forever_in_thread()
-
     try:
         await bot.start_bot(secrets.discord_bot_token)
     except KeyboardInterrupt:

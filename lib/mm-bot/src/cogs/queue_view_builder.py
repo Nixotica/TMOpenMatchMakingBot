@@ -56,7 +56,7 @@ class QueueViewBuilder(commands.Cog):
         )
 
         # TODO - based on type, different queue views (2v2 should look different...)
-        view = MatchQueueView(queue.queue.queue_id, channel)
+        view = MatchQueueView(self.bot, queue.queue.queue_id, channel)
 
         self.views.append(view)
 
