@@ -275,7 +275,7 @@ class MonitorMatchmakingManager(commands.Cog):
                     ):
                         elo_diff = elo_diff_rating.elo
 
-                if not updated_elo or not elo_diff:
+                if updated_elo is None or elo_diff is None:
                     logging.error(
                         f"Could not find updated elo or elo diff for player {player_profile.tm_account_id} on leaderboard {leaderboard_id}"
                     )
