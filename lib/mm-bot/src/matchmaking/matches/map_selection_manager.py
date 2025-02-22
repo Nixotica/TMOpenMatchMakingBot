@@ -39,11 +39,8 @@ class MapSelectionManager:
         Returns:
             Map: A random map from the campaign.
         """
-        UbiTokenRefresher().refresh_tokens()
-
-        campaign_playlist = Campaign(
-            match_queue.campaign_club_id, match_queue.campaign_id
-        )._playlist
+        campaign = self._get_campaign(match_queue)
+        campaign_playlist = campaign._playlist
         if not campaign_playlist:
             raise Exception(
                 f"No campaign playlist found with club id {match_queue.campaign_club_id} and campaign id {match_queue.campaign_id}."
@@ -59,10 +56,18 @@ class MapSelectionManager:
             return map_to_use
 
         prev_used_map_uuid = self.last_played_maps_by_queue.get(match_queue.queue_id)
+        print('prev_used_map_uuid', prev_used_map_uuid)
 
-        while map_to_use == prev_used_map_uuid:
+        while map_to_use._uuid == prev_used_map_uuid:
+            print('map_to_use', map_to_use._uuid)
             map_to_use = map_pool[random.randint(0, len(map_pool) - 1)]
 
         self.last_played_maps_by_queue[match_queue.queue_id] = map_to_use._uuid
+        print('updated_prev_used_map_uuid', self.last_played_maps_by_queue.get(match_queue.queue_id)) # type: ignore
 
         return map_to_use
+    
+    def _get_campaign(self, match_queue: MatchQueue) -> Campaign:
+        UbiTokenRefresher().refresh_tokens()
+
+        return Campaign(match_queue.campaign_club_id, match_queue.campaign_id)
