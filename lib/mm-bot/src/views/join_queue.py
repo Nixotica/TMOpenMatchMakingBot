@@ -29,6 +29,7 @@ class MatchQueueView(ui.View):
         self.queue_id = queue_id
         self.channel = channel
         self.active_match_messages: Dict[int, discord.message.Message] = {}
+        self.prev_num_queued_players: int = 0
 
     async def start_task(self, message: discord.message.Message):
         self.active_queue_message = message
@@ -172,6 +173,16 @@ class MatchQueueView(ui.View):
             )
             raise ValueError(f"Queue {self.queue_id} not found.")
 
+        num_players = 0
+        for party in queue.player_parties:
+            num_players += len(party.players())
+
+        # If the number of players hasn't changed, don't bother updating the queue. 
+        if num_players == self.prev_num_queued_players:
+            logging.debug(f"Number of players in queue {self.queue_id} has not changed, skipping update.")
+            return
+        self.prev_num_queued_players = num_players
+
         queue_name = queue.queue.display_name if queue.queue.display_name else queue.queue.queue_id
         embed = discord.Embed(
             title=f"Better Matchmaking Queue - {queue_name}",
@@ -181,9 +192,6 @@ class MatchQueueView(ui.View):
         embed.set_footer(text="Last updated")
 
         leaderboard_id = queue.queue.primary_leaderboard_id
-        num_players = 0
-        for party in queue.player_parties:
-            num_players += len(party.players())
         if leaderboard_id is None or num_players == 0:
             embed.add_field(name="Players:", value=num_players)
         else:
@@ -213,8 +221,10 @@ class MatchQueueView(ui.View):
                 value += f"{rank.display_name}: {ranks_to_count[rank]}\n"
 
             embed.add_field(name="Players:", value=value)
-
-        await self.active_queue_message.edit(embed=embed)
+        try:
+            await self.active_queue_message.edit(embed=embed)
+        except Exception as e:
+            logging.warning(f"Failed to update queue {queue_name} embed: {e}")
 
     async def process_new_active_solo_match(self, active_match: ActiveMatch) -> None:
         if not isinstance(active_match.player_profiles, List):
