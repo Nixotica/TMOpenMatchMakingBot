@@ -42,4 +42,6 @@ KEY_CURRENT_VALUE = "current_value"
 KEY_PRIMARY_LEADERBOARD_ID = "primary_leaderboard_id"
 KEY_PING_ROLE_ID = "ping_role_id"
 
+KEY_EVENT_ID = "event_id"
+
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

@@ -24,6 +24,7 @@ export class StorageStack extends Stack {
     public readonly ranksTable: Table;
     public readonly leaderboardRanksTable: Table;
     public readonly nextBotMatchIdTable: Table;
+    public readonly activeMatchesTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageStackProps) {
         super(scope, id, props);
@@ -172,6 +173,21 @@ export class StorageStack extends Stack {
         this.nextBotMatchIdTable = new Table(this, "NextBotMatchIdTable", {
             partitionKey: { name: "bot_match_id", type: AttributeType.STRING },
             tableName: `tm-mm-bot-next-bot-match-id-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+
+        /**
+         * ActiveMatches Table
+         * 
+         * A table for storing the actively tracked matches by BMM.
+         * The main purpose is to persist matches between service restarts so results can be reported properly.
+         * Consists of:
+         * - `bot_match_id`: Match ID created by the bot (Primary Key)
+         * - `event_id`: The event ID assigned by Nadeo
+         */
+        this.activeMatchesTable = new Table(this, "ActiveMatchesTable", {
+            partitionKey: { name: "bot_match_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-active-matches-${props.stage}-${props.account}`,
             billingMode: BillingMode.PAY_PER_REQUEST,
         });
 
