@@ -29,7 +29,7 @@ class MatchQueueView(ui.View):
         self.queue_id = queue_id
         self.channel = channel
         self.active_match_messages: Dict[int, discord.message.Message] = {}
-        self.prev_num_queued_players: int = 0
+        self.prev_num_queued_players: int = -1
 
     async def start_task(self, message: discord.message.Message):
         self.active_queue_message = message
