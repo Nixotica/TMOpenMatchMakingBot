@@ -41,8 +41,8 @@ export interface BotServiceStackProps extends StackProps {
     /** A table containing the next bot match ID to be used when generating a match. */
     nextBotMatchIdTable: Table,
 
-    /** A table containing the active matches to be tracked by the bot. */
-    activeMatchesTable: Table,
+    /** A table containing the persisted matches to be tracked by the bot. */
+    persistedMatchesTable: Table,
 }
 
 /**
@@ -122,7 +122,7 @@ export class BotServiceStack extends Stack {
         props.ranksTable.grantFullAccess(taskRole);
         props.leaderboardRanksTable.grantFullAccess(taskRole);
         props.nextBotMatchIdTable.grantFullAccess(taskRole);
-        props.activeMatchesTable.grantFullAccess(taskRole);
+        props.persistedMatchesTable.grantFullAccess(taskRole);
 
         // Define the EC2 task with container details
         const ec2TaskDefinition = new Ec2TaskDefinition(this, 'MM-Bot-Task', {
@@ -145,7 +145,7 @@ export class BotServiceStack extends Stack {
                 RANKS_TABLE: props.ranksTable.tableName,
                 LEADERBOARD_RANKS_TABLE: props.leaderboardRanksTable.tableName,
                 NEXT_BOT_MATCH_ID_TABLE: props.nextBotMatchIdTable.tableName,
-                ACTIVE_MATCHES_TABLE: props.activeMatchesTable.tableName,
+                PERSISTED_MATCHES_TABLE: props.persistedMatchesTable.tableName,
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },

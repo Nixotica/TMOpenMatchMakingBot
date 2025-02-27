@@ -2,6 +2,7 @@ import asyncio
 import logging
 import threading
 from typing import Dict, List, Optional
+from matchmaking.match_queues.match_persistence import get_persisted_matches, persist_match
 from matchmaking.party.active_party import ActiveParty
 from models.match_queue import MatchQueue
 from matchmaking.matches.active_match import ActiveMatch
@@ -16,9 +17,7 @@ from matchmaking.match_queues.constants import (
     QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC,
 )
 from models.player_profile import PlayerProfile
-from models.leaderboard import Leaderboard
 from models.match_queue import QueueType
-from matchmaking.matches.team_2v2 import Team2v2
 from nadeo_event_api.api.structure.event import Event
 import time
 
@@ -46,7 +45,11 @@ class MatchmakingManager:
                 self.active_queues.append(
                     ActiveMatchQueue(queue)
                 )  # TODO - it should also check DDB table if this updated on some cadence
-            self.active_matches: List[ActiveMatch] = []
+
+            # Retrieve persisted matches from previous instance of bot if exists
+            persisted_matches = get_persisted_matches()
+            logging.info(f"Retrieved {len(persisted_matches)} persisted matches.")
+            self.active_matches: List[ActiveMatch] = persisted_matches
 
             self.new_active_matches_monitor: List[
                 ActiveMatch
@@ -230,7 +233,7 @@ class MatchmakingManager:
                 queue.remove_party(party)
 
     def cancel_match(self, bot_match_id: int) -> Optional[ActiveMatch]:
-        """Cancels an active match, if one exists with the givne bot match ID.
+        """Cancels an active match, if one exists with the given bot match ID.
 
         Args:
             bot_match_id (int): The bot match ID of the match to cancel.
@@ -243,12 +246,13 @@ class MatchmakingManager:
                 self.active_matches.remove(match)
 
                 # Also add to the "completed" matches for a queue so it knows to delete the active match message
-                self.completed_matches_queue_view.append(CompletedMatch(match, canceled=True))
+                canceled_match = CompletedMatch(match, canceled=True)
+                self.completed_matches_queue_view.append(canceled_match)
+                canceled_match.cleanup()
 
-            Event.delete_from_id(match.event_id)
-            logging.info(f"Canceled match with bot match ID {bot_match_id} and event ID {match.event_id}.")
+                logging.info(f"Canceled match with bot match ID {bot_match_id} and event ID {match.event_id}.")
 
-            return match
+                return match
         return None
 
     def process_completed_matches_monitor(self) -> List[CompletedMatch]:
@@ -401,6 +405,9 @@ class MatchmakingManager:
                 f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}."
             )
             new_active_matches.append(active_match)
+
+            # Persist the match in the case of bot going down
+            persist_match(active_match)
 
             # To patch a bug where players get added to two queued matches at the same time,
             # I'm just going to have a single match generate per invocation of this method. 

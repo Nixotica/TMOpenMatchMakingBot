@@ -30,7 +30,7 @@ from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 from models.match_queue import MatchQueue
 from models.rank_role import RankRole
 from models.leaderboard_rank import LeaderboardRank
-from models.stored_active_match import StoredActiveMatch
+from models.persisted_match import PersistedMatch
 
 
 class DynamoDbManager:
@@ -90,10 +90,10 @@ class DynamoDbManager:
             raise ValueError("NEXT_BOT_MATCH_ID_TABLE environment variable is not set")
         self._next_bot_match_id_table = self._resource.Table(next_bot_match_id_table)
 
-        active_matches_table = os.environ.get("ACTIVE_MATCHES_TABLE")
-        if active_matches_table is None:
-            raise ValueError("ACTIVE_MATCHES_TABLE environment variable is not set")
-        self._active_matches_table = self._resource.Table(active_matches_table)
+        persisted_matches_table = os.environ.get("PERSISTED_MATCHES_TABLE")
+        if persisted_matches_table is None:
+            raise ValueError("PERSISTED_MATCHES_TABLE environment variable is not set")
+        self._persisted_matches_table = self._resource.Table(persisted_matches_table)
 
     def _create_client(self) -> DynamoDBClient:
         try:
@@ -763,53 +763,53 @@ class DynamoDbManager:
             else:
                 raise
     
-    def get_active_matches(self) -> List[StoredActiveMatch]:
-        """Get a list of active matches from the ActiveMatches table.
+    def get_persisted_matches(self) -> List[PersistedMatch]:
+        """Get a list of persisted matches from the PersistedMatches table.
 
         Returns:
-            List[StoredActiveMatch]: List of active matches in DDB.
+            List[PersistedMatch]: List of persisted matches in DDB.
         """
         try:
-            response = self._active_matches_table.scan()
+            response = self._persisted_matches_table.scan()
             items = response.get("Items", [])
             if not items:
                 return []
-            matches = [StoredActiveMatch.from_dict(items[i]) for i in range(len(items))]
+            matches = [PersistedMatch.from_dict(items[i]) for i in range(len(items))]
             return matches
         except Exception as e:
-            logging.error(f"Error getting active matches from DynamoDB: {e}")
+            logging.error(f"Error getting persisted matches from DynamoDB: {e}")
             raise
 
-    def create_active_match(self, active_match: StoredActiveMatch) -> bool:
-        """Create a new active match.
+    def create_persisted_match(self, persisted_match: PersistedMatch) -> bool:
+        """Create a new persisted match.
 
         Args:
-            active_match (StoredActiveMatch): The active match to add to the database.
+            persisted_match (PersistedMatch): The match to persist in the database.
 
         Returns:
-            bool: True if the active match was successfully created, False otherwise.
+            bool: True if the match was successfully created, False otherwise.
         """
         try:
-            self._active_matches_table.put_item(
-                Item=active_match.to_dict(),
+            self._persisted_matches_table.put_item(
+                Item=persisted_match.to_dict(),
                 ConditionExpression=Attr(KEY_BOT_MATCH_ID).not_exists(),
             )
             return True
         except Exception as e:
-            logging.error(f"Error creating active match in DynamoDB: {e}")
+            logging.error(f"Error creating persisted match in DynamoDB: {e}")
             return False
         
-    def delete_active_match(self, bot_match_id: int) -> bool:
-        """Delete an active match.
+    def delete_persisted_match(self, bot_match_id: int) -> bool:
+        """Delete a persisted match.
 
         Args:
-            bot_match_id (int): The bot match ID of the active match to delete.
+            bot_match_id (int): The bot match ID of the match to delete.
 
         Returns:
-            bool: True if the active match was successfully deleted, False otherwise.
+            bool: True if the match was successfully deleted, False otherwise.
         """
         try:
-            self._active_matches_table.delete_item(
+            self._persisted_matches_table.delete_item(
                 Key={KEY_BOT_MATCH_ID: bot_match_id},
             )
             return True

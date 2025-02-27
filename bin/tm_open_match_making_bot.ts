@@ -49,7 +49,7 @@ if (process.env.STAGE == 'dev') {
     ranksTable: storage.ranksTable,
     leaderboardRanksTable: storage.leaderboardRanksTable,
     nextBotMatchIdTable: storage.nextBotMatchIdTable,
-    activeMatchesTable: storage.activeMatchesTable,
+    persistedMatchesTable: storage.persistedMatchesTable,
     terminationProtection: true,
   })
 }

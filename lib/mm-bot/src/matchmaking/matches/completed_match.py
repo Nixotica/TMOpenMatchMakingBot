@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 from typing import Dict, List
+from matchmaking.match_queues.match_persistence import delete_persisted_match
 from models.player_profile import PlayerProfile
 from models.player_elo import PlayerElo
 from aws.dynamodb import DynamoDbManager
@@ -186,3 +187,4 @@ class CompletedMatch:
             f"Cleaning up match {self.active_match.match_id} by deleting from Nadeo servers..."
         )
         Event.delete_from_id(self.active_match.event_id)
+        delete_persisted_match(self.active_match.bot_match_id)
