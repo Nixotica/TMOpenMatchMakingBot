@@ -60,6 +60,10 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
 
 For unit/integ tests, you'll want to use pytest. Simply install python3.11 locally, navigate to `/lib/mm-bot` and run `python3.11 -m pip install -r requirements.txt` then `python3.11 -m pytest`. 
 
+## Gotchas
+
+There currently isn't any CI/CD so deploying to prod is done from command line by running `export STAGE=prod` and then deploying. However, this *sometimes* makes the nadeo event api out of date, and it will cause deployment to fail. In that case, run `git ls-remote https://github.com/Nixotica/NadeoEventAPIWrapper.git release`, copy the hash, and paste it in `requirements.txt` instead of "release" in the final line. 
+
 ## Commands
 
 ### Create Queue
