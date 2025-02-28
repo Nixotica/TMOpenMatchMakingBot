@@ -26,7 +26,7 @@ def calculate_elo_2v2_ratings(
     match_positions: MatchPositions2v2,
     player_elos: List[PlayerElo], 
     K_team=20,
-    K_individual=3,
+    K_individual=5,
 ) -> UpdatedElos:
     """
     Calculate updated Elo ratings for all players based on their match positions and their team's placement.
