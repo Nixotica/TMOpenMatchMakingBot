@@ -208,11 +208,11 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
         teams.team_b.player_b.tm_account_id,
     )
 
-    paste = Tmwt2v2Pastebin(
-        team_a,
-        team_b,
-    )
-    teams_url = post_tmwt_2v2(paste, pastebin_api_dev_key)
+    # paste = Tmwt2v2Pastebin(
+    #     team_a,
+    #     team_b,
+    # )
+    # teams_url = post_tmwt_2v2(paste, pastebin_api_dev_key)
 
     event = Event(
         name=event_name,
@@ -236,7 +236,7 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
                             warmup_number=1,
                         ),
                         match_points_limit=1,
-                        teams_url=teams_url,
+                        # teams_url=teams_url, # TODO - add this back if/when pastebin API limit is resolved
                         match_info=f"BMM - #{bot_match_id}",
                     ),
                     plugin_settings=TMWTPluginSettings(
