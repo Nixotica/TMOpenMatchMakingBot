@@ -1,0 +1,54 @@
+name: Deploy AWS Stack
+
+on:
+  push:
+    branches:
+      - master  # Run only when `master` updates
+
+jobs:
+  test:
+    name: Run Unit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'  # Use your Python version
+
+      - name: Install Dependencies
+        run: |
+          cd /lib/mm-bot/  # Navigate to correct directory
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt  # Ensure dependencies are installed
+          pip install pytest  # If not already in requirements.txt
+
+      - name: Run Tests
+        run: pytest --maxfail=1 --disable-warnings  # Fail early if a test fails
+
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-latest
+    needs: test  # ✅ Only runs if `test` job succeeds
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v3
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-2  # Change to your region
+
+      - name: Install AWS CDK (if using CDK)
+        run: npm install -g aws-cdk
+
+      - name: Deploy Stack (CDK Example)
+        run: |
+          cdk synth  # Check if the stack compiles
+          cdk deploy --require-approval never  # Deploy without approval prompt
