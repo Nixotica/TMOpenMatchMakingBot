@@ -21,7 +21,7 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          cd /lib/mm-bot/  # Navigate to correct directory
+          cd lib/mm-bot/  # Navigate to correct directory
           python -m pip install --upgrade pip
           pip install -r requirements.txt  # Ensure dependencies are installed
           pip install pytest  # If not already in requirements.txt
