@@ -43,10 +43,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-2
 
-      - name: Install AWS CDK (if using CDK)
-        run: npm install -g aws-cdk
-
-      - name: Deploy Stack (CDK Example)
+      - name: Deploy Stack
         run: |
-          cdk synth
+          npm install -g aws-cdk
+          npm install -g ts-node
+          npm install  
+          npm install --save-dev @types/node
+          cdk synth  
           cdk deploy --all --require-approval never
