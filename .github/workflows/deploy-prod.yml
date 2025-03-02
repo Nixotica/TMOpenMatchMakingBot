@@ -31,6 +31,8 @@ jobs:
     name: Deploy to AWS
     runs-on: ubuntu-latest
     needs: test
+    env:
+      STAGE: prod
 
     steps:
       - name: Checkout Code

@@ -30,7 +30,7 @@ if (process.env.STAGE == 'dev') {
   //   ranksTable: storage.ranksTable,
   //   leaderboardRanksTable: storage.leaderboardRanksTable,
   // })
-} else {
+} else if (process.env.STAGE == 'prod') {
   const storage = new StorageStack(app, 'TmOpenMatchMakingBotStack-Storage-prod', {
     env: env,
     stage: 'prod',
@@ -52,4 +52,6 @@ if (process.env.STAGE == 'dev') {
     persistedMatchesTable: storage.persistedMatchesTable,
     terminationProtection: true,
   })
+} else {
+  throw new Error(`Unsupported stage, must be one of "dev" or "prod", received ${process.env.STAGE}`)
 }
