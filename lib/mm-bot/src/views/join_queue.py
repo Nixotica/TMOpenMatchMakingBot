@@ -68,7 +68,7 @@ class MatchQueueView(ui.View):
         with_teammate: Optional[PlayerProfile] = None
         
         # Handle partied players joining queue.
-        party_manager = get_party_manager(self.bot)
+        party_manager = get_party_manager()
         if party_manager:
             player_party = party_manager.get_player_party(player_profile)
         if player_party is not None:
@@ -147,7 +147,7 @@ class MatchQueueView(ui.View):
             )
             return
 
-        party_manager = get_party_manager(self.bot)
+        party_manager = get_party_manager()
         if party_manager:
             player_party = party_manager.get_player_party(player_profile)
         if player_party is not None:
