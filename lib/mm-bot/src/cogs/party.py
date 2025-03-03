@@ -70,7 +70,7 @@ class Party(commands.Cog, name="party"):
             await ctx.send(f"{member.name} must register their account first!")
             return
         
-        party_manager = get_party_manager(self.bot)
+        party_manager = get_party_manager()
         if not party_manager:
             await ctx.send("Error sending party request.")
             return
@@ -98,7 +98,7 @@ class Party(commands.Cog, name="party"):
             await ctx.send(f"You must register your account first!")
             return
 
-        party_manager = get_party_manager(self.bot)
+        party_manager = get_party_manager()
         if not party_manager:
             await ctx.send("Error attemping to unparty.")
             return

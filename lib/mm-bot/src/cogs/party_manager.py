@@ -5,6 +5,7 @@ from typing import Dict, List, Optional
 import discord
 from discord.ext import commands, tasks
 from aws.s3 import S3ClientManager
+from cogs import registry
 from cogs.constants import COG_PARTY_MANAGER, COLOR_EMBED
 from helpers import get_party_channel, get_ping_channel, safe_delete_message
 from matchmaking.party.active_party import ActiveParty
@@ -28,6 +29,8 @@ class PartyManager(commands.Cog):
 
         # Represented as an "active" party for which this message will party the two players.
         self.outstanding_party_request_messages: Dict[ActiveParty, PartyRequest] = {} 
+
+        registry.register_cog(COG_PARTY_MANAGER, self)
 
     def cog_load(self):
         logging.info("Party Manager loading...")
@@ -156,10 +159,6 @@ class PartyManager(commands.Cog):
 async def setup(bot: commands.Bot):
     await bot.add_cog(PartyManager(bot))
 
-def get_party_manager(bot: commands.Bot) -> Optional[PartyManager]:
+def get_party_manager() -> Optional[PartyManager]:
     """Gets party manager singleton if initialized, else returns None."""
-    party_manager = bot.get_cog(COG_PARTY_MANAGER)
-    if not party_manager:
-        logging.warning("Error retrieving party manager.")
-        return None
-    return party_manager
+    return registry.get(COG_PARTY_MANAGER)
