@@ -1,16 +1,16 @@
 from dataclasses import dataclass
 from typing import Dict, List
-from models.player_profile import PlayerProfile
-import numpy as np
+
 from matchmaking.match_complete.match_positions_2v2 import MatchPositions2v2
 from matchmaking.matches.team_2v2 import Team2v2
 from models.player_elo import PlayerElo
+from models.player_profile import PlayerProfile
 
 
 @dataclass
 class UpdatedElos:
-    """A class representing updated elo ratings and the differences with previous elo for a given match.
-    """
+    """A class representing updated elo ratings and the differences with previous elo for a given match."""
+
     updated_elo_ratings: Dict[PlayerElo, int]
     elo_differences: Dict[PlayerElo, int]
 
@@ -20,11 +20,11 @@ def expected_score(elo_i: int, elo_j: int):
     Calculate the expected score for player i against player j.
     """
     return 1 / (1 + 10 ** ((elo_j - elo_i) / 400))
-    
+
 
 def calculate_elo_2v2_ratings(
     match_positions: MatchPositions2v2,
-    player_elos: List[PlayerElo], 
+    player_elos: List[PlayerElo],
     K_team=20,
     K_individual=5,
 ) -> UpdatedElos:
@@ -50,12 +50,12 @@ def calculate_elo_2v2_ratings(
                 player_a_rating = player_elo.elo
             elif player_elo.tm_account_id == team.player_b.tm_account_id:
                 player_b_rating = player_elo.elo
-        
+
         if player_a_rating is None or player_b_rating is None:
             raise ValueError(
                 f"Could not find player elos for team {team} in {player_elos}"
             )
-        
+
         return (player_a_rating + player_b_rating) // 2
 
     # Calculate the team elo as the average of each team's player ratings
@@ -68,7 +68,7 @@ def calculate_elo_2v2_ratings(
 
     # Calculate total rating adjustment for each team
     teams_results = match_positions.team_results()
-    
+
     # Get the actual score (1 = win, 0 = lose) for each team
     team_a_position = teams_results[match_positions.teams.team_a]
     actual_score_team_a = 1 if team_a_position == 1 else 0
@@ -77,26 +77,30 @@ def calculate_elo_2v2_ratings(
     team_a_adjustment = K_team * (actual_score_team_a - expected_score_a)
     team_b_adjustment = K_team * (actual_score_team_b - expected_score_b)
 
-    print('team a adjustment:', team_a_adjustment)
-    print('team b adjustment:', team_b_adjustment)
+    print("team a adjustment:", team_a_adjustment)
+    print("team b adjustment:", team_b_adjustment)
 
     individual_results = match_positions.individual_results()
 
-    def get_player_placement(player: PlayerElo, individual_results: Dict[PlayerProfile, int]) -> int:
+    def get_player_placement(
+        player: PlayerElo, individual_results: Dict[PlayerProfile, int]
+    ) -> int:
         for player_profile, placement in individual_results.items():
             if player_profile.tm_account_id == player.tm_account_id:
                 return placement
 
         raise ValueError(f"Could not find player {player} in {individual_results}")
-    
+
     # Calculate new elo for each player with adjusted distribution to avoid boosting
     updated_elo_ratings = {}
     elo_differences = {}
     for player in player_elos:
         R_i = player.elo
-        
+
         # Determine the player's team's expected and actual scores, and total adjustment
-        player_in_team_a = match_positions.teams.team_a.__contains__(player.tm_account_id)
+        player_in_team_a = match_positions.teams.team_a.__contains__(
+            player.tm_account_id
+        )
         team_adjustment = team_a_adjustment if player_in_team_a else team_b_adjustment
 
         # Calculate individual adjustment based on head-to-head performance
@@ -123,7 +127,7 @@ def calculate_elo_2v2_ratings(
         R_i_prime = R_i + total_adjustment
         diff = R_i_prime - R_i
 
-        print(f'player {player.tm_account_id} R_i_prime {R_i_prime} and diff {diff}')
+        print(f"player {player.tm_account_id} R_i_prime {R_i_prime} and diff {diff}")
 
         updated_elo_ratings[player] = round(R_i_prime)
         elo_differences[player] = round(diff)
@@ -134,15 +138,14 @@ def calculate_elo_2v2_ratings(
     )
 
 
-def calculate_elo_ratings(
-    match_positions: Dict[PlayerElo, int], K=20
-) -> UpdatedElos:
+def calculate_elo_ratings(match_positions: Dict[PlayerElo, int], K=20) -> UpdatedElos:
     """
     Calculate updated Elo ratings for all players based on their match positions.
     NOTE: Only pass in PlayerElo's pertaining to a single leaderboard at a time!
 
     Args:
-        match_positions (Dict[PlayerElo, int]): A dictionary with player elos as keys and their match positions as values.
+        match_positions (Dict[PlayerElo, int]): A dictionary with player elos as
+            keys and their match positions as values.
         K (int, optional): Sensitivity for Elo adjustment (default is 20).
 
     Returns:
@@ -154,7 +157,7 @@ def calculate_elo_ratings(
         player_elo_obj = next(iter(match_positions))
         return UpdatedElos(
             updated_elo_ratings={player_elo_obj: player_elo_obj.elo + 1},
-            elo_differences={player_elo_obj: 1}
+            elo_differences={player_elo_obj: 1},
         )
 
     def update_elo(R_i, S_i, E_i, K=7):

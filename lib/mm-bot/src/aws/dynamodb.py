@@ -1,36 +1,36 @@
-from datetime import datetime
 import logging
 import os
+from datetime import datetime
 from typing import List, Optional
 
 import boto3
 from aws.constants import (
+    INDEX_DISCORD_ACCOUNT_ID,
+    KEY_ACTIVE,
+    KEY_BOT_MATCH_ID,
     KEY_CURRENT_VALUE,
-    KEY_LEADERBOARD_ID,
-    KEY_LEADERBOARD_IDS,
-    KEY_TM_ACCOUNT_ID,
     KEY_DISCORD_ACCOUNT_ID,
     KEY_ELO,
+    KEY_LEADERBOARD_ID,
+    KEY_LEADERBOARD_IDS,
     KEY_MATCHES_PLAYED,
-    KEY_ACTIVE,
-    INDEX_DISCORD_ACCOUNT_ID,
     KEY_QUEUE_ID,
-    KEY_RANK_ROLE_ID,
     KEY_RANK_ID,
-    KEY_BOT_MATCH_ID,
+    KEY_RANK_ROLE_ID,
+    KEY_TM_ACCOUNT_ID,
 )
-from matchmaking.constants import DEFAULT_ELO
-from boto3.dynamodb.conditions import Key, Attr
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
-from models.player_profile import PlayerProfile
-from models.match_results import DdbMatchResults
+from matchmaking.constants import DEFAULT_ELO
 from models.leaderboard import Leaderboard
-from models.player_elo import PlayerElo
-from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
-from models.match_queue import MatchQueue
-from models.rank_role import RankRole
 from models.leaderboard_rank import LeaderboardRank
+from models.match_queue import MatchQueue
+from models.match_results import DdbMatchResults
 from models.persisted_match import PersistedMatch
+from models.player_elo import PlayerElo
+from models.player_profile import PlayerProfile
+from models.rank_role import RankRole
+from mypy_boto3_dynamodb import DynamoDBClient, DynamoDBServiceResource
 
 
 class DynamoDbManager:
@@ -192,7 +192,8 @@ class DynamoDbManager:
         except ClientError as e:
             if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
                 logging.warning(
-                    f"Player profile already exists for TM account ID {tm_account_id} and Discord account ID {discord_account_id}"
+                    f"Player profile already exists for TM account ID {tm_account_id} "
+                    f"and Discord account ID {discord_account_id}"
                 )
                 return False
             else:
@@ -366,7 +367,8 @@ class DynamoDbManager:
         try:
             self._match_queues_table.update_item(
                 Key={KEY_QUEUE_ID: queue_id},
-                UpdateExpression="SET #leaderboard_ids = list_append(if_not_exists(#leaderboard_ids, :empty_list), :leaderboard)",
+                UpdateExpression="SET #leaderboard_ids = list_append"
+                "(if_not_exists(#leaderboard_ids, :empty_list), :leaderboard)",
                 ExpressionAttributeNames={
                     "#leaderboard_ids": KEY_LEADERBOARD_IDS,
                 },
@@ -519,7 +521,9 @@ class DynamoDbManager:
     def get_or_create_player_elo(
         self, tm_account_id: str, leaderboard_id: str
     ) -> PlayerElo:
-        """Get the elo for a given leaderboard ID for a specific player. If it doesn't exist, will create a record with the default elo.
+        """
+        Get the elo for a given leaderboard ID for a specific player.
+        If it doesn't exist, will create a record with the default elo.
 
         Args:
             tm_account_id (str): The TM account ID for which to return the given player's elo.
@@ -538,7 +542,8 @@ class DynamoDbManager:
             item = get_response.get("Item", {})
             if not item:
                 logging.info(
-                    f"No elo found for account ID {tm_account_id} and leaderbord ID {leaderboard_id}. Creating default one."
+                    f"No elo found for account ID {tm_account_id} and "
+                    f"leaderbord ID {leaderboard_id}. Creating default one."
                 )
                 try:
                     item = PlayerElo(
@@ -583,7 +588,7 @@ class DynamoDbManager:
 
     def get_top_25_players_by_elo(self, leaderboard_id: str) -> List[PlayerElo]:
         """Get a sorted list of the top 25 players by their elo in descending order for a given leaderboard.
-        
+
         Args:
             leaderboard_id (str): The leaderboard ID to get player elos for.
 
@@ -605,7 +610,9 @@ class DynamoDbManager:
             logging.error(f"Error getting top 25 player elos from DynamoDB: {e}")
             raise
 
-    def get_nearby_players_by_elo(self, leaderboard_id: str, tm_account_id: str) -> tuple[int, List[PlayerElo]]:
+    def get_nearby_players_by_elo(
+        self, leaderboard_id: str, tm_account_id: str
+    ) -> tuple[int, List[PlayerElo]]:
         """Get the players 3 places above and below a specific player by elo in descending order.
 
         Args:
@@ -613,7 +620,8 @@ class DynamoDbManager:
             player_id (str): The player ID to find nearby players for.
 
         Returns:
-            tuple[int, List[PlayerElo]]: The first player's position in list and a list of 3 players above and 3 players below player. 
+            tuple[int, List[PlayerElo]]: The first player's position in list and
+                a list of 3 players above and 3 players below player.
         """
         try:
             # Query all players in the leaderboard sorted by elo
@@ -625,19 +633,30 @@ class DynamoDbManager:
             items = response.get("Items", [])
             if not items:
                 return (0, [])
-            
+
             # Convert items to PlayerElo objects
             player_elos = [PlayerElo.from_dict(item) for item in items]
 
             # Find the target player index
-            target_index = next((i for i, player in enumerate(player_elos) if player.tm_account_id == tm_account_id), None)
+            target_index = next(
+                (
+                    i
+                    for i, player in enumerate(player_elos)
+                    if player.tm_account_id == tm_account_id
+                ),
+                None,
+            )
             if target_index is None:
-                logging.warning(f"Player {tm_account_id} not found in leaderboard {leaderboard_id}.")
+                logging.warning(
+                    f"Player {tm_account_id} not found in leaderboard {leaderboard_id}."
+                )
                 return (0, [])
 
             # Get players 3 places above and below
             start_index = max(0, target_index - 3)
-            end_index = min(len(player_elos), target_index + 4)  # target + 3 (inclusive)
+            end_index = min(
+                len(player_elos), target_index + 4
+            )  # target + 3 (inclusive)
             return (start_index + 1, player_elos[start_index:end_index])
         except Exception as e:
             logging.error(f"Error getting nearby players from DynamoDB: {e}")
@@ -700,7 +719,9 @@ class DynamoDbManager:
             logging.error(f"Error creating leaderboard rank in DynamoDB: {e}")
             raise
 
-    def get_ranks_for_leaderboard_by_min_elo_descending(self, leaderboard_id: str) -> List[LeaderboardRank]:
+    def get_ranks_for_leaderboard_by_min_elo_descending(
+        self, leaderboard_id: str
+    ) -> List[LeaderboardRank]:
         """Get a list of ranks from the LeaderboardRanks table in descending order of minimum elo.
 
         Args:
@@ -734,35 +755,35 @@ class DynamoDbManager:
             # Attempt to increment the current value
             response = self._next_bot_match_id_table.update_item(
                 Key={KEY_BOT_MATCH_ID: KEY_BOT_MATCH_ID},
-                UpdateExpression='SET #current_value = #current_value + :inc',
-                ExpressionAttributeNames={'#current_value': KEY_CURRENT_VALUE},
-                ExpressionAttributeValues={':inc': 1},
-                ReturnValues='UPDATED_OLD'  # Return the value before it was updated
+                UpdateExpression="SET #current_value = #current_value + :inc",
+                ExpressionAttributeNames={"#current_value": KEY_CURRENT_VALUE},
+                ExpressionAttributeValues={":inc": 1},
+                ReturnValues="UPDATED_OLD",  # Return the value before it was updated
             )
-            return int(response['Attributes'][KEY_CURRENT_VALUE]) + 1 # type: ignore
+            return int(response["Attributes"][KEY_CURRENT_VALUE]) + 1  # type: ignore
 
         except ClientError as e:
-            if e.response['Error']['Code'] == 'ValidationException':
+            if e.response["Error"]["Code"] == "ValidationException":
                 # This error can indicate that the item doesn't exist, so initialize it
                 logging.info("Match ID not initialized yet. Initializing to 1.")
                 try:
                     self._next_bot_match_id_table.put_item(
-                        Item={
-                            KEY_BOT_MATCH_ID: KEY_BOT_MATCH_ID,
-                            KEY_CURRENT_VALUE: 1
-                        },
-                        ConditionExpression=f'attribute_not_exists({KEY_BOT_MATCH_ID})'  # Avoid overwriting if race condition
+                        Item={KEY_BOT_MATCH_ID: KEY_BOT_MATCH_ID, KEY_CURRENT_VALUE: 1},
+                        ConditionExpression=f"attribute_not_exists({KEY_BOT_MATCH_ID})",
                     )
                     return 1  # Return 1 since we are initializing it to 1
                 except ClientError as init_e:
-                    if init_e.response['Error']['Code'] == 'ConditionalCheckFailedException':
+                    if (
+                        init_e.response["Error"]["Code"]
+                        == "ConditionalCheckFailedException"
+                    ):
                         # In the event of a race condition, just retry incrementing
                         return self.get_next_bot_match_id_and_increment()
                     else:
                         raise
             else:
                 raise
-    
+
     def get_persisted_matches(self) -> List[PersistedMatch]:
         """Get a list of persisted matches from the PersistedMatches table.
 
@@ -798,7 +819,7 @@ class DynamoDbManager:
         except Exception as e:
             logging.error(f"Error creating persisted match in DynamoDB: {e}")
             return False
-        
+
     def delete_persisted_match(self, bot_match_id: int) -> bool:
         """Delete a persisted match.
 

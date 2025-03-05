@@ -1,7 +1,8 @@
+import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import time
 from typing import List
+
 from models.player_profile import PlayerProfile
 
 
@@ -15,7 +16,6 @@ class QueuedParty(ABC):
         Returns:
             List[PlayerProfile]: List of players in the party.
         """
-        pass
 
     @abstractmethod
     def queue_join_time(self) -> float:
@@ -24,7 +24,6 @@ class QueuedParty(ABC):
         Returns:
             float: Time since epoch when the party joined the queue.
         """
-        pass
 
 
 @dataclass(unsafe_hash=True)
@@ -35,10 +34,10 @@ class QueuedPlayer(QueuedParty):
 
     def players(self) -> List[PlayerProfile]:
         return [self.profile]
-    
+
     def queue_join_time(self) -> float:
         return self.queue_join_time_since_epoch
-    
+
     @classmethod
     def new_joined_player(cls, profile: PlayerProfile, queue_id: str):
         now = time.time()
@@ -59,6 +58,8 @@ class QueuedTeam(QueuedParty):
         return self.queue_join_time_since_epoch
 
     @classmethod
-    def new_joined_team(cls, requester: PlayerProfile, accepter: PlayerProfile, queue_id: str):
+    def new_joined_team(
+        cls, requester: PlayerProfile, accepter: PlayerProfile, queue_id: str
+    ):
         now = time.time()
         return cls(requester, accepter, now, queue_id)

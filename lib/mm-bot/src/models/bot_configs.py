@@ -1,13 +1,18 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from aws.constants import *
+from aws.constants import (
+    CONFIGS_BOT_MESSAGES_CHANNEL_ID,
+    CONFIGS_GLOBAL_LEADERBOARD_ID,
+    CONFIGS_PARTY_CHANNEL_ID,
+    CONFIGS_PINGS_ROLE_ID,
+)
 
 
 @dataclass
 class BotConfigs:
     global_leaderboard_id: Optional[str]
-    bot_messages_channel_id: Optional[int] 
+    bot_messages_channel_id: Optional[int]
     pings_role_id: Optional[int]
     party_channel_id: Optional[int]
 
@@ -17,8 +22,13 @@ class BotConfigs:
         bot_messages_channel_id = data.get(CONFIGS_BOT_MESSAGES_CHANNEL_ID)
         pings_role_id = data.get(CONFIGS_PINGS_ROLE_ID)
         party_channel_id = data.get(CONFIGS_PARTY_CHANNEL_ID)
-        
-        return cls(global_leaderboard_id, bot_messages_channel_id, pings_role_id, party_channel_id)
+
+        return cls(
+            global_leaderboard_id,
+            bot_messages_channel_id,
+            pings_role_id,
+            party_channel_id,
+        )
 
     def to_dict(self):
         return {

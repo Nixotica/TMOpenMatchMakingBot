@@ -1,13 +1,14 @@
 import logging
 from typing import List
-from matchmaking.party.active_party import ActiveParty
-from models.player_profile import PlayerProfile
-from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
-from models.match_queue import MatchQueue
+
+from matchmaking.constants import NUM_LSC_PLAYERS, NUM_1v1v1v1_PLAYERS
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.queued_party import QueuedParty, QueuedPlayer, QueuedTeam
 from matchmaking.matches.active_match import ActiveMatch
-from matchmaking.constants import NUM_1v1v1v1_PLAYERS, NUM_LSC_PLAYERS
+from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
+from matchmaking.party.active_party import ActiveParty
+from models.match_queue import MatchQueue
+from models.player_profile import PlayerProfile
 
 
 class ActiveMatchQueue:
@@ -61,7 +62,9 @@ class ActiveMatchQueue:
         Args:
             player (PlayerProfile): The player to remove from the queue.
         """
-        self.player_parties = [p for p in self.player_parties if player not in p.players()]
+        self.player_parties = [
+            p for p in self.player_parties if player not in p.players()
+        ]
         logging.info(
             f"Removed player {player.tm_account_id} from queue {self.queue.queue_id}."
         )
@@ -78,7 +81,9 @@ class ActiveMatchQueue:
         team = QueuedTeam.new_joined_team(
             party.requester, party.accepter, self.queue.queue_id
         )
-        if not self.is_player_queued(party.requester) and not self.is_player_queued(party.accepter):
+        if not self.is_player_queued(party.requester) and not self.is_player_queued(
+            party.accepter
+        ):
             self.player_parties.append(team)
             logging.info(
                 f"Added players {team.players()} to queue {self.queue.queue_id}."
@@ -89,7 +94,7 @@ class ActiveMatchQueue:
                 f"Players {team.players()} attempted to join queue {self.queue.queue_id} they were already in."
             )
             return False
-        
+
     def remove_party(self, party: ActiveParty) -> None:
         """Remove a party from the queue.
 
@@ -131,11 +136,11 @@ class ActiveMatchQueue:
             )
             if len(self.player_parties) >= NUM_LSC_PLAYERS:
                 return True
-        
+
         return False
 
     def generate_match(self, bot_match_id: int) -> ActiveMatch:
-        """Generates a match with the given bot match ID. 
+        """Generates a match with the given bot match ID.
 
         Args:
             bot_match_id (int): The ID to give to the current match (used in its event name)
@@ -146,8 +151,10 @@ class ActiveMatchQueue:
         if self.queue.type == QueueType.Queue1v1v1v1:
             players_in_match = self.player_parties[:NUM_1v1v1v1_PLAYERS]
             players_in_match = [p.players()[0] for p in players_in_match]
-            return ActiveMatch.create_1v1v1v1(self.queue, bot_match_id, players_in_match)
-        
+            return ActiveMatch.create_1v1v1v1(
+                self.queue, bot_match_id, players_in_match
+            )
+
         elif self.queue.type == QueueType.Queue2v2:
             solo_players: List[PlayerProfile] = []
             teams_in_match: List[Team2v2] = []
@@ -156,7 +163,9 @@ class ActiveMatchQueue:
                 # If this is a team, add it to teams in match
                 if len(party.players()) == 2:
                     team_name = "Blue" if len(teams_in_match) == 0 else "Red"
-                    teams_in_match.append(Team2v2(team_name, party.players()[0], party.players()[1]))
+                    teams_in_match.append(
+                        Team2v2(team_name, party.players()[0], party.players()[1])
+                    )
 
                 # Otherwise add it to solo players
                 if len(party.players()) == 1:
@@ -165,7 +174,9 @@ class ActiveMatchQueue:
                 # If 2 solo players, make them a team
                 if len(solo_players) == 2:
                     team_name = "Blue" if len(teams_in_match) == 0 else "Red"
-                    teams_in_match.append(Team2v2(team_name, solo_players[0], solo_players[1]))
+                    teams_in_match.append(
+                        Team2v2(team_name, solo_players[0], solo_players[1])
+                    )
                     solo_players = []
 
                 # if two teams in match, break
@@ -174,15 +185,15 @@ class ActiveMatchQueue:
 
             teams = Teams2v2(teams_in_match[0], teams_in_match[1])
             return ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
-        
+
         elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.player_parties[0].players()[0]
             return ActiveMatch.create_solo(self.queue, bot_match_id, player_in_match)
-        
+
         elif self.queue.type == QueueType.QueueLSC:
             players_in_match = self.player_parties[:NUM_LSC_PLAYERS]
             players_in_match = [p.players()[0] for p in players_in_match]
             return ActiveMatch.create_lsc(self.queue, bot_match_id, players_in_match)
-        
+
         else:
             raise Exception("Invalid queue type")

@@ -1,6 +1,8 @@
 import logging
 import threading
+
 from flask import Flask, jsonify
+from waitress import serve  # type: ignore
 
 
 def listen_for_health_checks() -> None:
@@ -17,7 +19,7 @@ def listen_for_health_checks() -> None:
         logging.info(f"Registered route: {rule}")
 
     logging.info("Starting Flask app...")
-    from waitress import serve
+
     serve(app, host="0.0.0.0", port=8080)
 
 

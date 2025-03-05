@@ -1,15 +1,19 @@
 import unittest
-from typing import Dict
+
 from matchmaking.match_complete.match_positions_2v2 import MatchPositions2v2
 from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
 from models.player_profile import PlayerProfile
-from src.models.player_elo import PlayerElo
-from nadeo_event_api.objects.inbound.match_results import MatchResults, RankedParticipant, RankedTeam
-from src.matchmaking.match_complete.calculate_elo import (
+from nadeo_event_api.objects.inbound.match_results import (
+    MatchResults,
+    RankedParticipant,
+    RankedTeam,
+)
+from src.matchmaking.match_complete.calculate_elo import (  # Assuming this code is in a module called elo_system
     UpdatedElos,
     calculate_elo_2v2_ratings,
     calculate_elo_ratings,
-)  # Assuming this code is in a module called elo_system
+)
+from src.models.player_elo import PlayerElo
 
 
 class TestEloSystem(unittest.TestCase):
@@ -88,7 +92,7 @@ class TestEloSystem(unittest.TestCase):
                     name="team_b",
                     player_a=self.player3,
                     player_b=self.player4,
-                )
+                ),
             ),
             # Team A (P1, P2) loses, player order P1, P4, P3, P2
             results=MatchResults(
@@ -96,33 +100,17 @@ class TestEloSystem(unittest.TestCase):
                 round_position=0,
                 results=[
                     RankedParticipant(
-                        participant=p1_acc,
-                        rank=1,
-                        score=0,
-                        zone=None,
-                        team="team_a"
+                        participant=p1_acc, rank=1, score=0, zone=None, team="team_a"
                     ),
                     RankedParticipant(
-                        participant=p2_acc,
-                        rank=4,
-                        score=0,
-                        zone=None,
-                        team="team_a"
+                        participant=p2_acc, rank=4, score=0, zone=None, team="team_a"
                     ),
                     RankedParticipant(
-                        participant=p3_acc,
-                        rank=3,
-                        score=1,
-                        zone=None,
-                        team="team_b"
+                        participant=p3_acc, rank=3, score=1, zone=None, team="team_b"
                     ),
                     RankedParticipant(
-                        participant=p4_acc,
-                        rank=2,
-                        score=1,
-                        zone=None,
-                        team="team_b"
-                    )
+                        participant=p4_acc, rank=2, score=1, zone=None, team="team_b"
+                    ),
                 ],
                 teams=[
                     RankedTeam(
@@ -136,14 +124,16 @@ class TestEloSystem(unittest.TestCase):
                         team="team_b",
                         rank=1,
                         score=1,
-                    )
-                ]
-            )
+                    ),
+                ],
+            ),
         )
-    
+
     def test_calculate_elo_2v2_ratings(self):
         # Test calculating Elo ratings for 2v2 matches also accounting for match positions
-        updated_elos: UpdatedElos = calculate_elo_2v2_ratings(self.match_positions_2v2, self.player_elos)
+        updated_elos: UpdatedElos = calculate_elo_2v2_ratings(
+            self.match_positions_2v2, self.player_elos
+        )
         updated_ratings = updated_elos.updated_elo_ratings
         elo_differences = updated_elos.elo_differences
 
@@ -166,11 +156,14 @@ class TestEloSystem(unittest.TestCase):
         self.assertLess(elo_differences[self.player2_elo], 0)
 
         # Ensure that since P1 came in last, they have lower elo diff than P2
-        self.assertLess(elo_differences[self.player2_elo], elo_differences[self.player1_elo])
+        self.assertLess(
+            elo_differences[self.player2_elo], elo_differences[self.player1_elo]
+        )
 
         # Ensure that since P3 came in third, they have lower elo diff than P4
-        self.assertLess(elo_differences[self.player3_elo], elo_differences[self.player4_elo])
-
+        self.assertLess(
+            elo_differences[self.player3_elo], elo_differences[self.player4_elo]
+        )
 
     def test_calculate_elo_ratings(self):
         # Test calculating Elo ratings for multiple players based on match positions

@@ -1,25 +1,27 @@
 import asyncio
 import logging
 import threading
+import time
 from typing import Dict, List, Optional
-from matchmaking.match_queues.match_persistence import get_persisted_matches, persist_match
-from matchmaking.party.active_party import ActiveParty
-from models.match_queue import MatchQueue
-from matchmaking.matches.active_match import ActiveMatch
-from matchmaking.matches.completed_match import CompletedMatch
-from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
+
 from aws.dynamodb import DynamoDbManager
+from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from matchmaking.match_queues.constants import (
+    QUEUE_MANAGER_CHECK_KICK_QUEUED_PLAYERS_INTERVAL_SEC,
     QUEUE_MANAGER_CHECK_MATCH_RESULTS_INTERVAL_SEC,
     QUEUE_MANAGER_CHECK_QUEUES_INTERVAL_SEC,
-    QUEUE_MANAGER_CHECK_KICK_QUEUED_PLAYERS_INTERVAL_SEC,
     QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC,
     QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC,
 )
+from matchmaking.match_queues.match_persistence import (
+    get_persisted_matches,
+    persist_match,
+)
+from matchmaking.matches.active_match import ActiveMatch
+from matchmaking.matches.completed_match import CompletedMatch
+from matchmaking.party.active_party import ActiveParty
+from models.match_queue import MatchQueue, QueueType
 from models.player_profile import PlayerProfile
-from models.match_queue import QueueType
-from nadeo_event_api.api.structure.event import Event
-import time
 
 
 class MatchmakingManager:
@@ -51,28 +53,26 @@ class MatchmakingManager:
             logging.info(f"Retrieved {len(persisted_matches)} persisted matches.")
             self.active_matches: List[ActiveMatch] = persisted_matches
 
-            self.new_active_matches_monitor: List[
-                ActiveMatch
-            ] = []  # Only new and not processed by matchmaking monitor for bot
-            self.completed_matches_monitor: List[
-                CompletedMatch
-            ] = []  # Only completed and not processed by matchmaking monitor for bot
+            self.new_active_matches_monitor: List[ActiveMatch] = (
+                []
+            )  # Only new and not processed by matchmaking monitor for bot
+            self.completed_matches_monitor: List[CompletedMatch] = (
+                []
+            )  # Only completed and not processed by matchmaking monitor for bot
 
-            self.new_active_matches_queue_view: List[
-                ActiveMatch
-            ] = []  # Only new and not processed by match queue view
-            self.completed_matches_queue_view: List[
-                CompletedMatch
-            ] = []
+            self.new_active_matches_queue_view: List[ActiveMatch] = (
+                []
+            )  # Only new and not processed by match queue view
+            self.completed_matches_queue_view: List[CompletedMatch] = []
 
             self.new_first_players_joined_queue: List[
                 tuple[PlayerProfile, ActiveMatchQueue]
             ] = []  # Only detected internally and not processed by bot
 
-            self._last_check_queues_time = 0
-            self._last_check_matches_time = 0
-            self._last_check_kick_players_time = 0
-            self._last_first_player_ping_time: Dict[str, float] = {} # queue_id : time
+            self._last_check_queues_time = 0.0
+            self._last_check_matches_time = 0.0
+            self._last_check_kick_players_time = 0.0
+            self._last_first_player_ping_time: Dict[str, float] = {}  # queue_id : time
 
             self._thread = None
 
@@ -88,9 +88,9 @@ class MatchmakingManager:
         active_queue = ActiveMatchQueue(queue)
         self.active_queues.append(active_queue)
         return active_queue
-    
+
     def remove_queue(self, queue_id: str) -> bool:
-        """Removes an active queue from the Matchmaking manager. 
+        """Removes an active queue from the Matchmaking manager.
         If the bot reloads and the queue is "active" in DDB, it will re-activate.
 
         Args:
@@ -103,9 +103,9 @@ class MatchmakingManager:
             if queue.queue.queue_id == queue_id:
                 self.active_queues.remove(queue)
                 return True
-            
+
         return False
-    
+
     def is_player_in_match(self, player: PlayerProfile) -> bool:
         """Checks if a player is in an active match.
 
@@ -113,13 +113,13 @@ class MatchmakingManager:
             player (PlayerProfile): The player to check.
 
         Returns:
-            bool: True if player is in an active match, False otherwise. 
+            bool: True if player is in an active match, False otherwise.
         """
         for match in self.active_matches:
             for match_player in match.player_profiles:
                 if player == match_player:
                     return True
-            
+
         return False
 
     def add_player_to_queue(
@@ -148,7 +148,7 @@ class MatchmakingManager:
                         f"Player {player.tm_account_id} already in queue {queue_id}."
                     )
                     return None
-                
+
                 self.maybe_trigger_first_joined(player, queue)
 
                 return queue
@@ -171,43 +171,48 @@ class MatchmakingManager:
         """
         for queue in self.active_queues:
             if queue.queue.queue_id == queue_id:
-                if self.is_player_in_match(party.requester) or self.is_player_in_match(party.accepter):
+                if self.is_player_in_match(party.requester) or self.is_player_in_match(
+                    party.accepter
+                ):
                     logging.info(
-                        f"Player {party.requester.tm_account_id} or {party.accepter.tm_account_id} already in an active match."
+                        f"Player {party.requester.tm_account_id} or {party.accepter.tm_account_id} "
+                        f"already in an active match."
                     )
                     return None
-                
+
                 if queue.queue.type != QueueType.Queue2v2:
                     logging.info(
                         f"Attempted to add a party to a non-2v2 queue {queue_id}"
                     )
                     return None
-                
+
                 party_added = queue.add_party(party)
                 if not party_added:
                     logging.info(
                         f"Player {party.requester} or {party.accepter} already in queue {queue_id}."
                     )
                     return None
-                
+
                 self.maybe_trigger_first_joined(party.requester, queue)
 
                 return queue
-                
-    def maybe_trigger_first_joined(self, added_player: PlayerProfile, queue: ActiveMatchQueue) -> None:
+        return None
+
+    def maybe_trigger_first_joined(
+        self, added_player: PlayerProfile, queue: ActiveMatchQueue
+    ) -> None:
         time_of_last_ping = self._last_first_player_ping_time.get(queue.queue.queue_id)
         now = time.time()
 
         if len(queue.player_parties) == 1 and (
-            time_of_last_ping is None or
-            now - time_of_last_ping > QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC
+            time_of_last_ping is None
+            or now - time_of_last_ping
+            > QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC
         ):
             logging.info(
                 f"First player {queue.player_parties[0].players()} joined queue {queue.queue.queue_id}."
             )
-            self.new_first_players_joined_queue.append(
-                (added_player, queue)
-            )
+            self.new_first_players_joined_queue.append((added_player, queue))
             self._last_first_player_ping_time[queue.queue.queue_id] = now
 
     def remove_player_from_queue(self, player: PlayerProfile, queue_id: str) -> None:
@@ -250,7 +255,9 @@ class MatchmakingManager:
                 self.completed_matches_queue_view.append(canceled_match)
                 canceled_match.cleanup()
 
-                logging.info(f"Canceled match with bot match ID {bot_match_id} and event ID {match.event_id}.")
+                logging.info(
+                    f"Canceled match with bot match ID {bot_match_id} and event ID {match.event_id}."
+                )
 
                 return match
         return None
@@ -266,18 +273,20 @@ class MatchmakingManager:
         new_active_matches = self.new_active_matches_monitor
         self.new_active_matches_monitor = []
         return new_active_matches
-    
-    def process_completed_matches_for_queue(self, queue_id: str) -> List[CompletedMatch]:
+
+    def process_completed_matches_for_queue(
+        self, queue_id: str
+    ) -> List[CompletedMatch]:
         """Returns a list of completed matches for a given queue ID and removes from the list."""
         matches_to_return = []
-        
+
         for match in self.completed_matches_queue_view:
             if match.active_match.match_queue.queue_id == queue_id:
                 matches_to_return.append(match)
                 self.completed_matches_queue_view.remove(match)
 
         return matches_to_return
-    
+
     def process_new_active_matches_for_queue(self, queue_id: str) -> List[ActiveMatch]:
         """Returns a list of new active matches for a given queue ID and removes from the list."""
         matches_to_return = []
@@ -288,7 +297,7 @@ class MatchmakingManager:
                 self.new_active_matches_queue_view.remove(match)
 
         return matches_to_return
-    
+
     def add_new_active_match(self, active_match: ActiveMatch) -> None:
         """Adds a new active match to the list of new active matches, for all separate tasks requesting them."""
         self.active_matches.append(active_match)
@@ -301,13 +310,15 @@ class MatchmakingManager:
         for all separate tasks requesting them. Also removes from the list of active matches
         """
         self.active_matches.remove(active_match)
-        
+
         completed_match = CompletedMatch(active_match)
 
         self.completed_matches_monitor.append(completed_match)
         self.completed_matches_queue_view.append(completed_match)
-    
-    def process_first_player_joined_queue(self) -> List[tuple[PlayerProfile, ActiveMatchQueue]]:
+
+    def process_first_player_joined_queue(
+        self,
+    ) -> List[tuple[PlayerProfile, ActiveMatchQueue]]:
         """Returns a list of players who took the initiative to join a match queue with zero players in it."""
         new_first_players_joined_queue = self.new_first_players_joined_queue
         self.new_first_players_joined_queue = []
@@ -319,11 +330,11 @@ class MatchmakingManager:
             if queue.queue.queue_id == queue_id:
                 return queue
         return None
-    
+
     def get_active_matches_by_queue_id(self, queue_id: str) -> List[ActiveMatch]:
         """Returns a list of active matches for the given match queue ID."""
         active_matches = []
-        
+
         for active_match in self.active_matches:
             if active_match.match_queue.queue_id == queue_id:
                 active_matches.append(active_match)
@@ -349,7 +360,7 @@ class MatchmakingManager:
     async def _run_forever(self):
         """Run the matchmaking manager forever."""
         while True:
-            logging.debug(f"Running Matchmaking Manager loop...")
+            logging.debug("Running Matchmaking Manager loop...")
             await self._check_if_should_queue_matches()
             await self._check_active_matches()
             await self._check_if_should_kick_idle_players_from_queue()
@@ -410,8 +421,8 @@ class MatchmakingManager:
             persist_match(active_match)
 
             # To patch a bug where players get added to two queued matches at the same time,
-            # I'm just going to have a single match generate per invocation of this method. 
-            # TODO - Handle this better if matchmaking manager and monitor get refactored. 
+            # I'm just going to have a single match generate per invocation of this method.
+            # TODO - Handle this better if matchmaking manager and monitor get refactored.
             break
 
         for active_match in new_active_matches:
@@ -462,6 +473,6 @@ class MatchmakingManager:
                     for player in queued_party.players():
                         match_queue.remove_player(player)
                     logging.info(
-                        f"Kicked players {queued_party.players()} from {match_queue.queue.queue_id} queue for exceeding {QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC} seconds in queue."
+                        f"Kicked players {queued_party.players()} from {match_queue.queue.queue_id} queue "
+                        f"for exceeding {QUEUE_MANAGER_MAX_TIME_IN_QUEUE_SEC} seconds in queue."
                     )
-            # TODO - add support for kicking teams

@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Iterator, List
+
 from models.player_profile import PlayerProfile
-from nadeo_event_api.objects.inbound.match_results import RankedTeam
 
 
 @dataclass(unsafe_hash=True)
@@ -16,7 +16,10 @@ class Team2v2:
 
     def __contains__(self, player: PlayerProfile | str) -> bool:
         if isinstance(player, str):
-            return self.player_a.tm_account_id == player or self.player_b.tm_account_id == player
+            return (
+                self.player_a.tm_account_id == player
+                or self.player_b.tm_account_id == player
+            )
         else:
             return player in self.__iter__()
 
@@ -36,4 +39,9 @@ class Teams2v2:
         return party in self.__iter__()
 
     def players(self) -> List[PlayerProfile]:
-        return [self.team_a.player_a, self.team_a.player_b, self.team_b.player_a, self.team_b.player_b]
+        return [
+            self.team_a.player_a,
+            self.team_a.player_b,
+            self.team_b.player_a,
+            self.team_b.player_b,
+        ]

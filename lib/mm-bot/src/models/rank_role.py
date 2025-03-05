@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from aws.constants import KEY_MIN_ELO, KEY_RANK_ROLE_ID, KEY_DISPLAY_NAME
+from aws.constants import KEY_DISPLAY_NAME, KEY_MIN_ELO, KEY_RANK_ROLE_ID
 
 
 @dataclass

@@ -1,15 +1,15 @@
 import logging
-import discord
-from discord.ext import commands
 
+import discord
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import ROLE_MOD
-from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from cogs.party_manager import get_party_manager
+from discord.ext import commands
+from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
 
-class Party(commands.Cog, name="party"):
+class Party(commands.Cog):
     """
     Party bot commands for setting up party message channel and allowing players to join/leave parties.
     """
@@ -22,11 +22,13 @@ class Party(commands.Cog, name="party"):
 
     @commands.hybrid_command(
         name="set_party_channel",
-        description="Set the channel for party requests players can accept or decline."
+        description="Set the channel for party requests players can accept or decline.",
     )
     @commands.has_role(ROLE_MOD)
     async def set_party_channel(
-        self, ctx: commands.Context, channel_id: str # Cannot be int - too long for discord bot
+        self,
+        ctx: commands.Context,
+        channel_id: str,  # Cannot be int - too long for discord bot
     ) -> None:
         logging.info(
             f"Processing command to set party channel from user {ctx.message.author.name}."
@@ -43,23 +45,24 @@ class Party(commands.Cog, name="party"):
 
         await ctx.send(f"Party channel set to {channel_id}.", ephemeral=True)
 
-    @commands.hybrid_command(
-        name="party",
-        description="Invite a player to your party."
-    )
+    @commands.hybrid_command(name="party", description="Invite a player to your party.")
     async def party(
-        self, ctx: commands.Context, member: discord.Member,
+        self,
+        ctx: commands.Context,
+        member: discord.Member,
     ) -> None:
         logging.info(
             f"Processing command to invite player {member.name} to party from user {ctx.message.author.name}."
         )
 
-        requester_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
-            ctx.message.author.id
+        requester_profile = (
+            self.ddb_manager.query_player_profile_for_discord_account_id(
+                ctx.message.author.id
+            )
         )
 
         if not requester_profile:
-            await ctx.send(f"You must register your account first!")
+            await ctx.send("You must register your account first!")
             return
 
         accepter_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
@@ -69,46 +72,51 @@ class Party(commands.Cog, name="party"):
         if not accepter_profile:
             await ctx.send(f"{member.name} must register their account first!")
             return
-        
+
         party_manager = get_party_manager()
         if not party_manager:
             await ctx.send("Error sending party request.")
             return
-        
-        await party_manager.add_outstanding_party_request(requester_profile, accepter_profile)
+
+        await party_manager.add_outstanding_party_request(
+            requester_profile, accepter_profile
+        )
 
         await ctx.send(f"Party request sent to {member.name}.", ephemeral=True)
 
-    @commands.hybrid_command(
-        name="unparty",
-        description="Disband your party."
-    )
+    @commands.hybrid_command(name="unparty", description="Disband your party.")
     async def unparty(
-        self, ctx: commands.Context,
+        self,
+        ctx: commands.Context,
     ) -> None:
         logging.info(
             f"Processing command to disband party from user {ctx.message.author.name}."
         )
 
-        requester_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
-            ctx.message.author.id
+        requester_profile = (
+            self.ddb_manager.query_player_profile_for_discord_account_id(
+                ctx.message.author.id
+            )
         )
 
         if not requester_profile:
-            await ctx.send(f"You must register your account first!")
+            await ctx.send("You must register your account first!")
             return
 
         party_manager = get_party_manager()
         if not party_manager:
             await ctx.send("Error attemping to unparty.")
             return
-        
+
         party = party_manager.remove_party(requester_profile)
         if not party:
-            await ctx.send(f"You are not in a party.", ephemeral=True)
+            await ctx.send("You are not in a party.", ephemeral=True)
             return
 
-        await ctx.send(f"Unpartied from <@{party.teammate(requester_profile).discord_account_id}>.", ephemeral=True)
+        await ctx.send(
+            f"Unpartied from <@{party.teammate(requester_profile).discord_account_id}>.",
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

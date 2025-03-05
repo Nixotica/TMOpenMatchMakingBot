@@ -1,42 +1,38 @@
-import logging
-import random
+import datetime as dt
 import time
 from typing import List
-from nadeo_event_api.api.structure.event import Event
-from nadeo_event_api.api.structure.round.round import Round, RoundConfig
-from nadeo_event_api.api.structure.enums import ScriptType, ParticipantType
-from nadeo_event_api.api.structure.settings.script_settings import (
-    CupSpecialScriptSettings,
-    RoundsScriptSettings,
-    BaseScriptSettings,
-    TMWTScriptSettings,
+
+from matchmaking.constants import POINTS_LIMIT_1v1v1v1
+from matchmaking.matches.created_match_info import CreatedMatchInfo
+from matchmaking.matches.map_selection_manager import MapSelectionManager
+from matchmaking.matches.team_2v2 import Teams2v2
+from models.match_queue import MatchQueue
+from models.player_profile import PlayerProfile
+from nadeo_event_api.api.event_api import (
+    get_matches_for_round,
+    get_rounds_for_event,
+    post_event,
 )
+from nadeo_event_api.api.structure.enums import (
+    AutoStartMode,
+    ParticipantType,
+    ScriptType,
+)
+from nadeo_event_api.api.structure.event import Event
+from nadeo_event_api.api.structure.round.match import Match
+from nadeo_event_api.api.structure.round.match_spot import SeedMatchSpot, TeamMatchSpot
+from nadeo_event_api.api.structure.round.round import Round, RoundConfig
 from nadeo_event_api.api.structure.settings.plugin_settings import (
     ClassicPluginSettings,
     TMWTPluginSettings,
 )
-from nadeo_event_api.api.structure.round.match import Match
-from nadeo_event_api.api.structure.enums import AutoStartMode
-from nadeo_event_api.api.structure.round.match_spot import SeedMatchSpot
-from nadeo_event_api.api.club.campaign import Campaign
-from nadeo_event_api.api.structure.maps import Map
-from nadeo_event_api.api.event_api import (
-    post_event,
-    get_rounds_for_event,
-    get_matches_for_round,
+from nadeo_event_api.api.structure.settings.script_settings import (
+    BaseScriptSettings,
+    CupSpecialScriptSettings,
+    RoundsScriptSettings,
+    TMWTScriptSettings,
 )
-from nadeo_event_api.api.pastebin.pastebin_api import post_tmwt_2v2
-from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import Tmwt2v2Pastebin, Tmwt2v2PastebinTeam
-from nadeo_event_api.api.structure.round.match_spot import TeamMatchSpot
-from aws.s3 import S3ClientManager
-from matchmaking.matches.map_selection_manager import MapSelectionManager
-from models.match_queue import MatchQueue
-from matchmaking.matches.team_2v2 import Teams2v2
-from models.player_profile import PlayerProfile
-from nadeo.ubi_token_vendor import UbiTokenRefresher
-from matchmaking.matches.created_match_info import CreatedMatchInfo
-from matchmaking.constants import POINTS_LIMIT_1v1v1v1
-import datetime as dt
+from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import Tmwt2v2PastebinTeam
 
 
 def create_1v1v1v1_match(
@@ -157,7 +153,7 @@ def create_lsc_match(
                     ),
                 ),
             )
-        ]
+        ],
     )
 
     # TODO - error handling
@@ -178,7 +174,9 @@ def create_lsc_match(
     return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
 
 
-def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2) -> CreatedMatchInfo:
+def create_2v2_match(
+    match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
+) -> CreatedMatchInfo:
     """Create a 2v2 match using Trackmania competition tool.
 
     Args:
@@ -195,7 +193,7 @@ def create_2v2_match(match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
 
     map_to_use = MapSelectionManager().get_random_map(match_queue)
 
-    pastebin_api_dev_key = S3ClientManager().get_secrets().pastebin_api_dev_key
+    # pastebin_api_dev_key = S3ClientManager().get_secrets().pastebin_api_dev_key
 
     team_a = Tmwt2v2PastebinTeam(
         teams.team_a.name,
