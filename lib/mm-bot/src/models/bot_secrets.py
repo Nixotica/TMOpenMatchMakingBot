@@ -1,7 +1,11 @@
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
-from aws.constants import *
+from aws.constants import (
+    SECRET_DISCORD_BOT_TOKEN,
+    SECRET_PASTEBIN_API_DEV_KEY,
+    SECRET_UBI_AUTHS,
+)
 
 
 @dataclass

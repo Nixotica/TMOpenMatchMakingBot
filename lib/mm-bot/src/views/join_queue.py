@@ -1,24 +1,25 @@
-from datetime import datetime
 import logging
+from datetime import datetime
 from typing import Dict, List, Optional
+
 import discord
-from discord import TextChannel, ui
-from discord.ext import tasks, commands
+from aws.dynamodb import DynamoDbManager
 from cogs.constants import COLOR_EMBED
+from cogs.party_manager import get_party_manager
+from discord import TextChannel, ui
+from discord.ext import commands, tasks
 from helpers import get_rank_for_player
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
-from aws.dynamodb import DynamoDbManager
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
-from cogs.party_manager import get_party_manager
 from models.leaderboard_rank import LeaderboardRank
 from models.player_profile import PlayerProfile
 
 
 class MatchQueueView(ui.View):
     """
-    A view for joining and leaving a matchmaking queue, plus the players in the queue and active queues. 
+    A view for joining and leaving a matchmaking queue, plus the players in the queue and active queues.
     """
 
     def __init__(self, bot: commands.Bot, queue_id: str, channel: TextChannel):
@@ -34,13 +35,15 @@ class MatchQueueView(ui.View):
     async def start_task(self, message: discord.message.Message):
         self.active_queue_message = message
         self.update_embed_task = self.update_queue_embed.start()
-        self.update_active_matches_embeds_task = self.update_active_matches_embeds.start()
+        self.update_active_matches_embeds_task = (
+            self.update_active_matches_embeds.start()
+        )
 
     async def stop_task(self):
         await self.active_queue_message.delete()
-        for (_, message) in self.active_match_messages.items():
+        for _, message in self.active_match_messages.items():
             await message.delete()
-            
+
     @ui.button(label="Join Queue", style=discord.ButtonStyle.green)
     async def join_queue(self, interaction: discord.Interaction, button: ui.Button):
         user = interaction.user
@@ -55,18 +58,18 @@ class MatchQueueView(ui.View):
 
         if not player_profile:
             await interaction.response.send_message(
-                f"You have not registered your account yet.", ephemeral=True
+                "You have not registered your account yet.", ephemeral=True
             )
             return
-        
+
         if self.mm_manager.is_player_in_match(player_profile):
             await interaction.response.send_message(
-                f"You are already in a match.", ephemeral=True
+                "You are already in a match.", ephemeral=True
             )
             return
-        
+
         with_teammate: Optional[PlayerProfile] = None
-        
+
         # Handle partied players joining queue.
         party_manager = get_party_manager()
         if party_manager:
@@ -74,13 +77,16 @@ class MatchQueueView(ui.View):
         if player_party is not None:
             queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
             if not queue:
-                logging.warning(f"Unexpectedly could not find queue with ID {self.queue_id} in mm manager.")
+                logging.warning(
+                    f"Unexpectedly could not find queue with ID {self.queue_id} in mm manager."
+                )
                 return
-            
+
             # If this is a solo queue, do not allow player to join
             if queue.queue.type != QueueType.Queue2v2:
                 await interaction.response.send_message(
-                    f"This queue does not allowed partied players. Use /unparty first!", ephemeral=True
+                    "This queue does not allowed partied players. Use /unparty first!",
+                    ephemeral=True,
                 )
                 return
 
@@ -88,16 +94,21 @@ class MatchQueueView(ui.View):
             teammate = player_party.teammate(player_profile)
             if self.mm_manager.is_player_in_match(teammate):
                 await interaction.response.send_message(
-                    f"Your teammate <@{teammate.discord_account_id}> is still in a match.", ephemeral=True
+                    f"Your teammate <@{teammate.discord_account_id}> is still in a match.",
+                    ephemeral=True,
                 )
                 return
-            
-            added_queue = self.mm_manager.add_party_to_queue(player_party, self.queue_id)
+
+            added_queue = self.mm_manager.add_party_to_queue(
+                player_party, self.queue_id
+            )
             with_teammate = teammate
 
         # Otherwise solo queueing
         else:
-            added_queue = self.mm_manager.add_player_to_queue(player_profile, self.queue_id)
+            added_queue = self.mm_manager.add_player_to_queue(
+                player_profile, self.queue_id
+            )
 
         if not added_queue:
             await interaction.response.send_message(
@@ -105,7 +116,9 @@ class MatchQueueView(ui.View):
             )
             return
 
-        with_teammate_msg = f" with <@{with_teammate.discord_account_id}>" if with_teammate else ""
+        with_teammate_msg = (
+            f" with <@{with_teammate.discord_account_id}>" if with_teammate else ""
+        )
         await interaction.response.send_message(
             f"Joined queue {self.queue_id}{with_teammate_msg}.", ephemeral=True
         )
@@ -177,13 +190,19 @@ class MatchQueueView(ui.View):
         for party in queue.player_parties:
             num_players += len(party.players())
 
-        # If the number of players hasn't changed, don't bother updating the queue. 
+        # If the number of players hasn't changed, don't bother updating the queue.
         if num_players == self.prev_num_queued_players:
-            logging.debug(f"Number of players in queue {self.queue_id} has not changed, skipping update.")
+            logging.debug(
+                f"Number of players in queue {self.queue_id} has not changed, skipping update."
+            )
             return
         self.prev_num_queued_players = num_players
 
-        queue_name = queue.queue.display_name if queue.queue.display_name else queue.queue.queue_id
+        queue_name = (
+            queue.queue.display_name
+            if queue.queue.display_name
+            else queue.queue.queue_id
+        )
         embed = discord.Embed(
             title=f"Better Matchmaking Queue - {queue_name}",
             color=COLOR_EMBED,
@@ -195,8 +214,10 @@ class MatchQueueView(ui.View):
         if leaderboard_id is None or num_players == 0:
             embed.add_field(name="Players:", value=num_players)
         else:
-            leaderboard_ranks = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(
-                leaderboard_id
+            leaderboard_ranks = (
+                self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(
+                    leaderboard_id
+                )
             )
             ranks_to_count: Dict[LeaderboardRank, int] = {}
             for party in queue.player_parties:
@@ -205,9 +226,14 @@ class MatchQueueView(ui.View):
                         player.tm_account_id,
                         leaderboard_id,
                     )
-                    rank = get_rank_for_player(player_elo.elo, leaderboard_id, leaderboard_ranks)
+                    rank = get_rank_for_player(
+                        player_elo.elo, leaderboard_id, leaderboard_ranks
+                    )
                     if rank is None:
-                        logging.error(f"Failed to get rank for player {player_elo.tm_account_id} with elo {player_elo.elo} on leaderboard {leaderboard_id}.")
+                        logging.error(
+                            f"Failed to get rank for player {player_elo.tm_account_id} "
+                            f"with elo {player_elo.elo} on leaderboard {leaderboard_id}."
+                        )
                         continue
                     if ranks_to_count.get(rank) is None:
                         ranks_to_count[rank] = 1
@@ -241,8 +267,7 @@ class MatchQueueView(ui.View):
 
         embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
         embed.add_field(
-            name=f"🏎️ Match #{active_match.bot_match_id} in progress...",
-            value=value
+            name=f"🏎️ Match #{active_match.bot_match_id} in progress...", value=value
         )
 
         message = await self.channel.send(embed=embed)
@@ -254,23 +279,23 @@ class MatchQueueView(ui.View):
                 f"Expected player profiles to be a Teams2v2, got {type(active_match.player_profiles)} instead."
             )
             return
-        
+
         embed = discord.Embed(
             title=f"🏎️ Match #{active_match.bot_match_id} in progress...",
-            color=COLOR_EMBED, 
-            timestamp=datetime.utcnow()
+            color=COLOR_EMBED,
+            timestamp=datetime.utcnow(),
         )
 
         team_a = active_match.player_profiles.team_a
         embed.add_field(
             name="Blue Team",
-            value=f"<@{team_a.player_a.discord_account_id}> & <@{team_a.player_b.discord_account_id}>"
+            value=f"<@{team_a.player_a.discord_account_id}> & <@{team_a.player_b.discord_account_id}>",
         )
 
         team_b = active_match.player_profiles.team_b
         embed.add_field(
             name="Red Team",
-            value=f"<@{team_b.player_a.discord_account_id}> & <@{team_b.player_b.discord_account_id}>"
+            value=f"<@{team_b.player_a.discord_account_id}> & <@{team_b.player_b.discord_account_id}>",
         )
 
         message = await self.channel.send(embed=embed)
@@ -281,7 +306,9 @@ class MatchQueueView(ui.View):
         logging.debug(f"Updating embeds for active matches in queue {self.queue_id}.")
 
         # Get new active matches and send the messages for them.
-        new_active_matches = self.mm_manager.process_new_active_matches_for_queue(self.queue_id)
+        new_active_matches = self.mm_manager.process_new_active_matches_for_queue(
+            self.queue_id
+        )
 
         for new_match in new_active_matches:
             if isinstance(new_match.player_profiles, List):
@@ -292,18 +319,30 @@ class MatchQueueView(ui.View):
                 logging.error(f"Unknown match type {type(new_match)}")
                 continue
 
-            logging.info(f"New match with bot match ID {new_match.bot_match_id} added to queue view {self.queue_id}")
+            logging.info(
+                f"New match with bot match ID {new_match.bot_match_id} added to queue view {self.queue_id}"
+            )
 
         # Get completed matches and delete the messages for them.
-        completed_matches = self.mm_manager.process_completed_matches_for_queue(self.queue_id)
+        completed_matches = self.mm_manager.process_completed_matches_for_queue(
+            self.queue_id
+        )
 
         for completed_match in completed_matches:
             try:
-                message = self.active_match_messages.pop(completed_match.active_match.bot_match_id)
+                message = self.active_match_messages.pop(
+                    completed_match.active_match.bot_match_id
+                )
 
                 await message.delete()
 
-                logging.info(f"Completed match with bot match ID {completed_match.active_match.bot_match_id} removed from queue view {self.queue_id}")
+                logging.info(
+                    f"Completed match with bot match ID {completed_match.active_match.bot_match_id} "
+                    f"removed from queue view {self.queue_id}"
+                )
             except Exception as e:
-                logging.error(f"Failed to delete message for completed match with bot match ID {completed_match.active_match.bot_match_id} in queue view {self.queue_id}: {e}")
+                logging.error(
+                    f"Failed to delete message for completed match with bot match ID "
+                    f"{completed_match.active_match.bot_match_id} in queue view {self.queue_id}: {e}"
+                )
                 continue

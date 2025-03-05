@@ -1,14 +1,14 @@
 from dataclasses import dataclass
 from typing import Any, Dict
+
 from aws.constants import (
     KEY_BOT_MATCH_ID,
     KEY_QUEUE_ID,
+    KEY_RESULTS,
+    KEY_TIME_PLAYED,
     KEY_TM_MATCH_ID,
     KEY_TM_MATCH_LIVE_ID,
-    KEY_TIME_PLAYED,
-    KEY_RESULTS,
 )
-import datetime as dt
 
 
 @dataclass

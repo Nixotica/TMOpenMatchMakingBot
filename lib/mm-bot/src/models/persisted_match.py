@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from aws.constants import KEY_BOT_MATCH_ID, KEY_EVENT_ID, KEY_QUEUE_ID, KEY_QUEUE_TYPE
-from matchmaking.match_queues.enum import QueueType
+from aws.constants import KEY_BOT_MATCH_ID, KEY_EVENT_ID, KEY_QUEUE_ID
 
 
 @dataclass(unsafe_hash=True)
@@ -21,9 +20,9 @@ class PersistedMatch:
             raise ValueError(
                 f"StoredActiveMatch must have a {KEY_BOT_MATCH_ID}, {KEY_EVENT_ID}, and {KEY_QUEUE_ID}"
             )
-        
+
         return cls(bot_match_id, event_id, queue_id)
-    
+
     def to_dict(self):
         return {
             KEY_BOT_MATCH_ID: self.bot_match_id,

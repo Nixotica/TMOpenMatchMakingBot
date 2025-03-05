@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict, Optional
 
-from aws.constants import KEY_DISPLAY_NAME, KEY_LEADERBOARD_ID, KEY_CHANNEL_ID
+from aws.constants import KEY_CHANNEL_ID, KEY_DISPLAY_NAME, KEY_LEADERBOARD_ID
 
 
 @dataclass

@@ -2,17 +2,17 @@ from dataclasses import dataclass
 from typing import Any, Dict, List, Optional
 
 from aws.constants import (
+    KEY_ACTIVE,
+    KEY_CAMPAIGN_CLUB_ID,
+    KEY_CAMPAIGN_ID,
+    KEY_CHANNEL_ID,
     KEY_DISPLAY_NAME,
     KEY_LEADERBOARD_IDS,
+    KEY_MATCH_CLUB_ID,
     KEY_PING_ROLE_ID,
     KEY_PRIMARY_LEADERBOARD_ID,
     KEY_QUEUE_ID,
-    KEY_ACTIVE,
-    KEY_CAMPAIGN_ID,
-    KEY_CAMPAIGN_CLUB_ID,
-    KEY_MATCH_CLUB_ID,
     KEY_QUEUE_TYPE,
-    KEY_CHANNEL_ID,
 )
 from matchmaking.match_queues.enum import QueueType
 

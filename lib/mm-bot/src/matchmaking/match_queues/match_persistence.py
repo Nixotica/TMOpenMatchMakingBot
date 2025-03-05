@@ -1,21 +1,19 @@
 import logging
 from typing import List
+
 from aws.dynamodb import DynamoDbManager
 from matchmaking.constants import NUM_1v1v1v1_PLAYERS
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
-from models.player_profile import PlayerProfile
 from models.persisted_match import PersistedMatch
-
+from nadeo.ubi_token_vendor import UbiTokenRefresher
 from nadeo_event_api.api.event_api import (
-    get_rounds_for_event,
-    get_matches_for_round,
     get_event_participants,
     get_event_teams,
+    get_matches_for_round,
+    get_rounds_for_event,
 )
-
-from nadeo.ubi_token_vendor import UbiTokenRefresher
 
 
 def active_match_from_persisted_match(persisted_match: PersistedMatch) -> ActiveMatch:
@@ -44,12 +42,12 @@ def active_match_from_persisted_match(persisted_match: PersistedMatch) -> Active
     player_profiles = None
     if queue.type == QueueType.Queue2v2:
         event_teams = get_event_teams(event_id)
-        
+
         team_a_p1_tmacc = event_teams[0].players[0].account_id
         team_a_p1 = ddb.query_player_profile_for_tm_account_id(team_a_p1_tmacc)
         if team_a_p1 is None:
             raise LookupError(f"Could not find discord for {team_a_p1_tmacc}")
-        
+
         team_a_p2_tmacc = event_teams[0].players[1].account_id
         team_a_p2 = ddb.query_player_profile_for_tm_account_id(team_a_p2_tmacc)
         if team_a_p2 is None:
@@ -126,9 +124,9 @@ def get_persisted_matches() -> List[ActiveMatch]:
     for persisted_match in persisted_matches:
         try:
             active_matches.append(active_match_from_persisted_match(persisted_match))
-        except:
+        except Exception as e:
             logging.warning(
-                f"Failed to get persisted match {persisted_match.bot_match_id} from DDB. Deleting it."
+                f"Failed to get persisted match {persisted_match.bot_match_id} from DDB: {e}. Deleting it."
             )
             DynamoDbManager().delete_persisted_match(persisted_match.bot_match_id)
     return active_matches
@@ -142,6 +140,7 @@ def persist_match(match: ActiveMatch) -> None:
     """
     persisted_match = persisted_match_from_active_match(match)
     DynamoDbManager().create_persisted_match(persisted_match)
+
 
 def delete_persisted_match(bot_match_id: int) -> None:
     """Delete a match from DDB persistence.

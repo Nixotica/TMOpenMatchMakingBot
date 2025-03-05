@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
-from aws.constants import KEY_TM_ACCOUNT_ID, KEY_ELO, KEY_LEADERBOARD_ID
+
+from aws.constants import KEY_ELO, KEY_LEADERBOARD_ID, KEY_TM_ACCOUNT_ID
 
 
 @dataclass(unsafe_hash=True)

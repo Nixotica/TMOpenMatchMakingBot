@@ -1,20 +1,16 @@
 import asyncio
-from importlib.util import spec_from_file_location, module_from_spec
 import logging
 import os
 import platform
 import signal
-from typing import Any, Dict
 
 import discord
 from aws.s3 import S3ClientManager
-from aws.dynamodb import DynamoDbManager
 from discord import Intents
 from discord.ext.commands import Bot
 from health_check import start_health_check_in_thread
-from cogs.party_manager import PartyManager
-from models.bot_secrets import Secrets
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
+from models.bot_secrets import Secrets
 
 
 # Define bot

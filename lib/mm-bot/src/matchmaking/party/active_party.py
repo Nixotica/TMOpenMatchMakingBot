@@ -16,7 +16,7 @@ class ActiveParty:
 
     def __contains__(self, player: PlayerProfile) -> bool:
         return player in self.__iter__()
-    
+
     def teammate(self, player: PlayerProfile) -> PlayerProfile:
         if player == self.requester:
             return self.accepter

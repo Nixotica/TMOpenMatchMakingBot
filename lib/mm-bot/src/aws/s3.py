@@ -4,10 +4,10 @@ import os
 from typing import Any, Dict
 
 import boto3
+from aws.constants import CONFIGS_JSON, SECRETS_JSON
 from botocore.exceptions import ClientError
-from aws.constants import *
-from models.bot_secrets import Secrets
 from models.bot_configs import BotConfigs
+from models.bot_secrets import Secrets
 from mypy_boto3_s3 import S3Client
 
 
