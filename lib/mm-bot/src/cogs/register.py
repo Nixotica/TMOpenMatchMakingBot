@@ -1,10 +1,10 @@
 import logging
 
-from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
+from discord.ext import commands
 
 
-class Register(commands.Cog, name="register"):
+class Register(commands.Cog):
     """
     Command for a player to register their Ubisoft account to their
     Discord account.
@@ -23,7 +23,8 @@ class Register(commands.Cog, name="register"):
     )
     async def register(self, ctx: commands.Context, tm_account_id: str) -> None:
         logging.info(
-            f"Processing command to register TM account {tm_account_id} to user {ctx.message.author.name} with id {ctx.message.author.id}."
+            f"Processing command to register TM account {tm_account_id} to user "
+            f"{ctx.message.author.name} with id {ctx.message.author.id}."
         )
         # TODO check that the requested account ID actually exists via TM API
 
@@ -38,12 +39,14 @@ class Register(commands.Cog, name="register"):
 
         if existing_tm_account_link is not None:
             await ctx.send(
-                f"Account {tm_account_id} is already registered to a Discord account: {existing_tm_account_link.discord_account_id}."
+                f"Account {tm_account_id} is already registered to a Discord account: "
+                f"{existing_tm_account_link.discord_account_id}."
             )
             return
         if existing_discord_account_link is not None:
             await ctx.send(
-                f"Your Discord account is already registered to a Trackmania account: {existing_discord_account_link.tm_account_id}."
+                f"Your Discord account is already registered to a Trackmania account: "
+                f"{existing_discord_account_link.tm_account_id}."
             )
             return
 

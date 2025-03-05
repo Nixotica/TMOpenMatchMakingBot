@@ -1,11 +1,7 @@
 from dataclasses import dataclass
 from typing import Any, Dict
 
-from aws.constants import (
-    KEY_DISCORD_ACCOUNT_ID,
-    KEY_MATCHES_PLAYED,
-    KEY_TM_ACCOUNT_ID,
-)
+from aws.constants import KEY_DISCORD_ACCOUNT_ID, KEY_MATCHES_PLAYED, KEY_TM_ACCOUNT_ID
 
 
 @dataclass(unsafe_hash=True)
@@ -28,5 +24,7 @@ class PlayerProfile:
     def __eq__(self, other) -> bool:
         if not isinstance(other, PlayerProfile):
             return False
-        return self.tm_account_id == other.tm_account_id and \
-            self.discord_account_id == other.discord_account_id
+        return (
+            self.tm_account_id == other.tm_account_id
+            and self.discord_account_id == other.discord_account_id
+        )

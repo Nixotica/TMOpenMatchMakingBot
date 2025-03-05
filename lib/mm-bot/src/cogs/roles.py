@@ -1,14 +1,14 @@
 import logging
-import discord
-from discord.ext import commands, tasks
 
+import discord
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
-from models.rank_role import RankRole
 from cogs.constants import ROLE_ADMIN
+from discord.ext import commands
+from models.rank_role import RankRole
 
 
-class Roles(commands.Cog, name="roles"):
+class Roles(commands.Cog):
     """
     Commands and management for creating and managing user roles.
     Includes the process of updating elo-based ranks.
@@ -32,9 +32,9 @@ class Roles(commands.Cog, name="roles"):
         )
 
         if min_elo < 0:
-            await ctx.send(f"Invalid minimum elo, must be greater than zero.")
+            await ctx.send("Invalid minimum elo, must be greater than zero.")
             return
-        
+
         rank_role = RankRole(role.id, role.name, min_elo)
         success = self.ddb_manager.create_rank_role(rank_role)
 
@@ -51,17 +51,22 @@ class Roles(commands.Cog, name="roles"):
     )
     @commands.has_role(ROLE_ADMIN)
     async def refresh_player_ranks(
-        self, ctx: commands.Context, user: discord.Member,
+        self,
+        ctx: commands.Context,
+        user: discord.Member,
     ) -> None:
         logging.info(
             f"Processing command to refresh player rank from user {ctx.message.author.name}"
         )
 
         try:
-            member = ctx.guild.get_member(user.id) # type: ignore
-            member_roles = member.roles # type: ignore
+            member = ctx.guild.get_member(user.id)
+            if member is None:
+                await ctx.send(f"Failed to find user {user.name}.")
+                return
+            member_roles = member.roles
         except Exception as e:
-            await ctx.send(f"Failed to get roles for user {user.name}.")
+            await ctx.send(f"Failed to get roles for user {user.name}: {e}.")
             return
 
         player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
@@ -79,7 +84,9 @@ class Roles(commands.Cog, name="roles"):
             logging.info("No global leaderboard found, not updating player rank role.")
             return
 
-        player_elo = self.ddb_manager.get_or_create_player_elo(player_profile.tm_account_id, global_leaderboard)
+        player_elo = self.ddb_manager.get_or_create_player_elo(
+            player_profile.tm_account_id, global_leaderboard
+        )
         rank_roles = self.ddb_manager.get_rank_roles()
 
         # Find the rank role the user should have now
@@ -94,15 +101,25 @@ class Roles(commands.Cog, name="roles"):
             await ctx.send(f"Couldn't assign a rank to user with elo {player_elo}")
             return
 
+        # Add the new role to the user
+        role_to_add = ctx.guild.get_role(new_rank_role.rank_role_id)
+        if role_to_add is None:
+            logging.error(
+                f"Couldn't find role '{new_rank_role.rank_role_id}' "
+                f"to add to user {player_profile.discord_account_id}"
+            )
+            return
+
         # Remove user's discord roles which correspond to a rank role
         rank_role_ids = [role.rank_role_id for role in rank_roles]
         for role in member_roles:
-            if role.id in rank_role_ids: # type: ignore
-                await member.remove_roles(role) # type: ignore
+            if role.id in rank_role_ids:
+                await member.remove_roles(role)
 
-        # Add the new role to the user
-        await member.add_roles(ctx.guild.get_role(new_rank_role.rank_role_id)) # type: ignore
-        logging.info(f"Updated rank role for user {player_profile.discord_account_id} to {new_rank_role.display_name}") # type: ignore
+        await member.add_roles(role_to_add)
+        logging.info(
+            f"Updated rank role for user {player_profile.discord_account_id} to {new_rank_role.display_name}"
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

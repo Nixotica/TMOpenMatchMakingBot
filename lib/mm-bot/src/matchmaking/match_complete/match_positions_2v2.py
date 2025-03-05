@@ -1,9 +1,9 @@
 import logging
 from typing import Dict
-from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
-from nadeo_event_api.objects.inbound.match_results import MatchResults
 
+from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
 from models.player_profile import PlayerProfile
+from nadeo_event_api.objects.inbound.match_results import MatchResults
 
 
 class MatchPositions2v2:
@@ -14,9 +14,9 @@ class MatchPositions2v2:
     ):
         self.teams = teams
         self.results = results
-        
+
     def individual_results(self) -> Dict[PlayerProfile, int]:
-        """Get the individual positions of players independent of their team's results. 
+        """Get the individual positions of players independent of their team's results.
         This is calculated by the game under the hood, so the rank of players in the "results" field is
         actually correlated with how many points they contributed to the game overall (4, 3, 2, 1 repartition).
 
@@ -30,29 +30,24 @@ class MatchPositions2v2:
                 if player.tm_account_id == result.participant:
                     if result.rank is None:
                         logging.warning(
-                            f"Player {player.tm_account_id} has no rank in match results. They probably didn't show up. Giving them last."
+                            f"Player {player.tm_account_id} has no rank in match results. "
+                            "They probably didn't show up. Giving them last."
                         )
                         match_positions[player] = 4
                     else:
                         match_positions[player] = result.rank
-                    
+
         return match_positions
-    
+
     def team_results(self) -> Dict[Team2v2, int]:
         match_positions = {}
         for team in self.results.teams:
             # Get the Team2v2 from the RankedTeam
-            team_2v2 = next(
-                (
-                    t
-                    for t in self.teams
-                    if t.name == team.team
-                )
-            )
+            team_2v2 = next((t for t in self.teams if t.name == team.team))
 
-            if team.rank is None:
+            if not team.rank:
                 logging.warning(
-                    f"Team {team.team_id} has no rank in match results. They probably didn't show up. Giving them last."
+                    f"Team {team.team} has no rank in match results. They probably didn't show up. Giving them last."
                 )
                 match_positions[team_2v2] = 2
             else:
