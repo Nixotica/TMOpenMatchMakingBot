@@ -1,4 +1,5 @@
 import logging
+import re
 
 from discord.ext import commands
 from aws.dynamodb import DynamoDbManager
@@ -25,7 +26,12 @@ class Register(commands.Cog, name="register"):
         logging.info(
             f"Processing command to register TM account {tm_account_id} to user {ctx.message.author.name} with id {ctx.message.author.id}."
         )
-        # TODO check that the requested account ID actually exists via TM API
+        UUID_REGEX = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.I)
+        if not bool(UUID_REGEX.match(tm_account_id)):
+            await ctx.send(
+                f"Invalid Trackmania account ID: {tm_account_id}. Must be a UUID."
+            )
+            return
 
         existing_tm_account_link = (
             self.ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
@@ -38,7 +44,7 @@ class Register(commands.Cog, name="register"):
 
         if existing_tm_account_link is not None:
             await ctx.send(
-                f"Account {tm_account_id} is already registered to a Discord account: {existing_tm_account_link.discord_account_id}."
+                f"Account {tm_account_id} is already registered to a Discord account: <@{existing_tm_account_link.discord_account_id}>."
             )
             return
         if existing_discord_account_link is not None:
