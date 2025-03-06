@@ -27,7 +27,9 @@ class Register(commands.Cog):
             f"Processing command to register TM account {tm_account_id} to user "
             f"{ctx.message.author.name} with id {ctx.message.author.id}."
         )
-        UUID_REGEX = re.compile(r'^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$', re.I)
+        UUID_REGEX = re.compile(
+            r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.I
+        )
         if not bool(UUID_REGEX.match(tm_account_id)):
             await ctx.send(
                 f"Invalid Trackmania account ID: {tm_account_id}. Must be a UUID."
