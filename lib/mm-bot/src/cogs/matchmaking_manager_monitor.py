@@ -432,6 +432,11 @@ class MonitorMatchmakingManager(commands.Cog):
         """Wait until the bot is ready before starting the loop."""
         await self.bot.wait_until_ready()
 
+    @check_for_completed_matches.before_loop
+    async def before_check_for_completed_matches(self):
+        """Wait until the bot is ready before starting the loop."""
+        await self.bot.wait_until_ready()
+
 
 async def setup(bot: commands.Bot):
     await bot.add_cog(MonitorMatchmakingManager(bot))
