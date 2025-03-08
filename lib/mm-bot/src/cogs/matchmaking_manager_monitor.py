@@ -5,7 +5,7 @@ from typing import Dict, List
 import discord
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
-from cogs.constants import COLOR_EMBED
+from cogs.constants import COLOR_EMBED, JOIN_MATCH_2V2_TIMEOUT_SEC
 from discord.ext import commands, tasks
 from helpers import get_ping_channel
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
@@ -86,7 +86,7 @@ class MonitorMatchmakingManager(commands.Cog):
                 button = discord.ui.Button(
                     label="I joined the Server", style=discord.ButtonStyle.green
                 )
-                view = discord.ui.View(timeout=120)  # 120 seconds to respond
+                view = discord.ui.View(timeout=JOIN_MATCH_2V2_TIMEOUT_SEC)
                 view.add_item(button)
 
                 # Corouting to await button interaction
@@ -104,7 +104,7 @@ class MonitorMatchmakingManager(commands.Cog):
                 try:
                     # Wait for player ack
                     interaction = await self.bot.wait_for(
-                        "interaction", check=check, timeout=120
+                        "interaction", check=check, timeout=JOIN_MATCH_2V2_TIMEOUT_SEC
                     )
                     await interaction.response.send_message(
                         f"<@{player.discord_account_id}> joined match, pinging next player.",
