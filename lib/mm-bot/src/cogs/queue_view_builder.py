@@ -154,14 +154,14 @@ class QueueViewBuilder(commands.Cog):
         )
 
         # TODO - this is making pointless scans on dynamo
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards()
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
         ]:
             await ctx.send(f"Leaderboard {leaderboard_id} not found.", ephemeral=True)
             return
 
-        queues = self.ddb_manager.get_active_match_queues()
+        queues = self.ddb_manager.get_match_queues()
         if queue_id not in [queue.queue_id for queue in queues]:
             await ctx.send(f"Queue {queue_id} not found.", ephemeral=True)
             return
@@ -179,16 +179,15 @@ class QueueViewBuilder(commands.Cog):
 
     @commands.hybrid_command(
         name="list_queues",
-        description="List all active matchmaking queues",
+        description="List matchmaking queues, and optionally hide disabled queues from list.",
     )
     @commands.has_role(ROLE_MOD)
-    async def list_queues(self, ctx: commands.Context) -> None:
+    async def list_queues(self, ctx: commands.Context, hide_disabled: bool) -> None:
         logging.info(
             f"Processing command to list queues from user {ctx.message.author.name}."
         )
 
-        # Assume MM manager is up to date
-        queues = self.mm_manager.active_queues
+        queues = self.ddb_manager.get_match_queues(hide_disabled)
 
         if not queues:
             await ctx.send("No active queues found.")
@@ -197,19 +196,19 @@ class QueueViewBuilder(commands.Cog):
         embed = discord.Embed(title="Active Queues")
 
         for queue in queues:
-            display_name = (
-                queue.queue.display_name
-                if queue.queue.display_name
-                else queue.queue.queue_id
+            display_name = queue.display_name if queue.display_name else queue.queue_id
+            campaign_link = (
+                "https://trackmania.io/#/campaigns/"
+                f"{queue.campaign_club_id}/{queue.campaign_id}"
             )
-            campaign_link = "https://trackmania.io/#/campaigns/"
-            f"{queue.queue.campaign_club_id}/{queue.queue.campaign_id}"
-            value = f"Channel ID: {queue.queue.channel_id}\n"
+            active = "True" if queue.active else "False"
+            value = f"Channel ID: {queue.channel_id}\n"
             value += f"Display Name: {display_name}\n"
             value += f"Campaign Link: {campaign_link}\n"
+            value += f"Active: {active}\n"
 
             embed.add_field(
-                name=queue.queue.queue_id,
+                name=queue.queue_id,
                 value=value,
                 inline=False,
             )
@@ -271,7 +270,7 @@ class QueueViewBuilder(commands.Cog):
             return
 
         # TODO - this is making pointless scans on dynamo
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards()
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
         ]:

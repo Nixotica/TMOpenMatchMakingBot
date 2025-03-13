@@ -69,7 +69,7 @@ class LeaderboardViewBuilder(commands.Cog):
         # await view.update_embed()
 
     async def setup_leaderboards(self) -> None:
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards()
 
         for leaderboard in leaderboards:
             try:
@@ -121,18 +121,19 @@ class LeaderboardViewBuilder(commands.Cog):
 
     @commands.hybrid_command(
         name="list_leaderboards",
-        description="List all leaderboards",
+        description="List leaderboards, and optionally hide disabled leaderboards from list.",
     )
     @commands.has_role(ROLE_MOD)
     async def list_leaderboards(
         self,
         ctx: commands.Context,
+        hide_disabled: bool,
     ) -> None:
         logging.info(
             f"Processing command to list leaderboards from user {ctx.message.author.name}."
         )
 
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards(hide_disabled)
 
         if not leaderboards:
             await ctx.send("No leaderboards found.", ephemeral=True)
@@ -146,8 +147,10 @@ class LeaderboardViewBuilder(commands.Cog):
                 if leaderboard.display_name
                 else leaderboard.leaderboard_id
             )
+            active = "True" if leaderboard.active else "False"
             value = f"Channel ID: {leaderboard.channel_id}\n"
             value += f"Display Name: {display_name}\n"
+            value += f"Active: {active}\n"
 
             ranks = self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(
                 leaderboard.leaderboard_id
@@ -222,7 +225,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to set main leaderboard to {leaderboard_id} from user {ctx.message.author.name}"
         )
 
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards()
         leaderboard_ids = [leaderboard.leaderboard_id for leaderboard in leaderboards]
 
         if leaderboard_id not in leaderboard_ids:
@@ -254,7 +257,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to create rank {rank_id} from user {ctx.message.author.name}."
         )
 
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards()
         leaderboard_ids = [leaderboard.leaderboard_id for leaderboard in leaderboards]
 
         if leaderboard_id not in leaderboard_ids:
@@ -292,7 +295,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to list ranks for leaderboard {leaderboard_id} from user {ctx.message.author.name}."
         )
 
-        leaderboards = self.ddb_manager.get_active_leaderboards()
+        leaderboards = self.ddb_manager.get_leaderboards()
         leaderboard_ids = [leaderboard.leaderboard_id for leaderboard in leaderboards]
 
         if leaderboard_id not in leaderboard_ids:
