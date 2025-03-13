@@ -105,6 +105,7 @@ class LeaderboardViewBuilder(commands.Cog):
             leaderboard_id=leaderboard_id,
             channel_id=channel_id,
             display_name=display_name,
+            active=True,
         )
 
         success = self.ddb_manager.create_leaderboard(leaderboard)
