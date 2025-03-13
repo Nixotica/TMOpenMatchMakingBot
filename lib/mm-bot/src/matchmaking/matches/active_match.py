@@ -128,6 +128,11 @@ class ActiveMatch:
     def has_player(self, player: PlayerProfile) -> bool:
         return player in self.player_profiles
 
+    def participants(self) -> List[PlayerProfile]:
+        if isinstance(self.player_profiles, Teams2v2):
+            return self.player_profiles.players()
+        return self.player_profiles
+
     def is_match_complete(self) -> bool:
         self._match_info = get_match_info(self.match_live_id)
         if self._match_info.status == "COMPLETED":  # type: ignore

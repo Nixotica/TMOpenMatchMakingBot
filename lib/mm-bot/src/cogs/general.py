@@ -101,11 +101,10 @@ class General(commands.Cog):
             )
             return
 
-        players = canceled_match.player_profiles
+        players = canceled_match.participants()
         player_discord_ids_str = ""
-        if isinstance(players, list):
-            for player in players:
-                player_discord_ids_str += f"<@{player.discord_account_id}> "
+        for player in players:
+            player_discord_ids_str += f"<@{player.discord_account_id}> "
 
         await ctx.send(
             f"Match {bot_match_id} cancelled. Affected players: {player_discord_ids_str}."
