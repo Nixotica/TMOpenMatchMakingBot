@@ -465,14 +465,16 @@ class DynamoDbManager:
             logging.error(f"Error creating leaderboard in DynamoDB: {e}")
             raise
 
-    def get_leaderboards(self) -> List[Leaderboard]:
+    def get_active_leaderboards(self) -> List[Leaderboard]:
         """Get a list of leaderboards from the Leaderboards table.
 
         Returns:
             List[Leaderboard]: List of leaderboards in DDB.
         """
         try:
-            response = self._leaderboards_table.scan()
+            response = self._leaderboards_table.scan(
+                FilterExpression=Attr(KEY_ACTIVE).eq(True)
+            )
             items = response.get("Items", [])
             if not items:
                 return []
@@ -482,7 +484,7 @@ class DynamoDbManager:
             logging.error(f"Error getting leaderboards from DynamoDB: {e}")
             raise
 
-    def query_leaderboard_by_id(self, leaderboard_id: str) -> Optional[Leaderboard]:
+    def get_leaderboard(self, leaderboard_id: str) -> Optional[Leaderboard]:
         """Get a leaderboard from the Leaderboards table.
 
         Args:

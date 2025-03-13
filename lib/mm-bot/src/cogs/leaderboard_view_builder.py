@@ -69,7 +69,7 @@ class LeaderboardViewBuilder(commands.Cog):
         # await view.update_embed()
 
     async def setup_leaderboards(self) -> None:
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
 
         for leaderboard in leaderboards:
             try:
@@ -105,6 +105,7 @@ class LeaderboardViewBuilder(commands.Cog):
             leaderboard_id=leaderboard_id,
             channel_id=channel_id,
             display_name=display_name,
+            active=True,
         )
 
         success = self.ddb_manager.create_leaderboard(leaderboard)
@@ -131,7 +132,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to list leaderboards from user {ctx.message.author.name}."
         )
 
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
 
         if not leaderboards:
             await ctx.send("No leaderboards found.", ephemeral=True)
@@ -172,7 +173,7 @@ class LeaderboardViewBuilder(commands.Cog):
         )
 
         # Check if the leaderboard exists
-        leaderboard = self.ddb_manager.query_leaderboard_by_id(leaderboard_id)
+        leaderboard = self.ddb_manager.get_leaderboard(leaderboard_id)
         if not leaderboard:
             await ctx.send(
                 f"Leaderboard {leaderboard_id} not found. Use /list_leaderboards to check which ones exist.",
@@ -221,7 +222,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to set main leaderboard to {leaderboard_id} from user {ctx.message.author.name}"
         )
 
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
         leaderboard_ids = [leaderboard.leaderboard_id for leaderboard in leaderboards]
 
         if leaderboard_id not in leaderboard_ids:
@@ -253,7 +254,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to create rank {rank_id} from user {ctx.message.author.name}."
         )
 
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
         leaderboard_ids = [leaderboard.leaderboard_id for leaderboard in leaderboards]
 
         if leaderboard_id not in leaderboard_ids:
@@ -291,7 +292,7 @@ class LeaderboardViewBuilder(commands.Cog):
             f"Processing command to list ranks for leaderboard {leaderboard_id} from user {ctx.message.author.name}."
         )
 
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
         leaderboard_ids = [leaderboard.leaderboard_id for leaderboard in leaderboards]
 
         if leaderboard_id not in leaderboard_ids:
@@ -320,6 +321,72 @@ class LeaderboardViewBuilder(commands.Cog):
             embed.add_field(name=rank.rank_id, value=value, inline=False)
 
         await ctx.send(embed=embed, ephemeral=True)
+
+    @commands.hybrid_command(
+        name="disable_leaderboard",
+        description="Disable a leaderboard so it no longer shows up in its channel.",
+    )
+    @commands.has_role(ROLE_MOD)
+    async def disable_leaderboard(
+        self, ctx: commands.Context, leaderboard_id: str
+    ) -> None:
+        logging.info(
+            f"Processing command to disable leaderboard {leaderboard_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the leaderboard exists
+        leaderboard = self.ddb_manager.get_leaderboard(leaderboard_id)
+
+        if not leaderboard:
+            await ctx.send(
+                f"Leaderboard {leaderboard_id} not found. Use /list_leaderboards to check which ones exist.",
+                ephemeral=True,
+            )
+            return
+
+        # Update the leaderboard in dynamo
+        leaderboard.active = False
+        self.ddb_manager.update_leaderboard(leaderboard)
+
+        # Stop the leaderboard view task and remove it
+        for view in self.views:
+            if view.leaderboard_id == leaderboard_id:
+                await view.stop_task()
+                self.views.remove(view)
+                break
+
+        await ctx.send(f"Leaderboard {leaderboard_id} disabled.", ephemeral=True)
+
+    @commands.hybrid_command(
+        name="reenable_leaderboard",
+        description="Re-enable an existing leaderboard to make it appear in its channel and become joinable.",
+    )
+    @commands.has_role(ROLE_MOD)
+    async def reenable_leaderboard(
+        self, ctx: commands.Context, leaderboard_id: str
+    ) -> None:
+        logging.info(
+            f"Processing command to re-enable leaderboard {leaderboard_id} from user {ctx.message.author.name}."
+        )
+
+        # Check if the leaderboard exists
+        leaderboard = self.ddb_manager.get_leaderboard(leaderboard_id)
+
+        if not leaderboard:
+            await ctx.send(
+                f"Leaderboard {leaderboard_id} not found. Use /list_leaderboards to check which ones exist.",
+                ephemeral=True,
+            )
+            return
+
+        # Update the leaderboard in dynamo
+        leaderboard.active = True
+        self.ddb_manager.update_leaderboard(leaderboard)
+
+        # Add the leaderboard view task back
+        await self.add_leaderboard_view(leaderboard)
+
+        await ctx.send(f"Leaderboard {leaderboard_id} re-enabled.", ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
