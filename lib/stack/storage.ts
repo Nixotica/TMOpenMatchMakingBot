@@ -121,6 +121,7 @@ export class StorageStack extends Stack {
          * A table for storing different leaderboards consisting of:
          * - `leaderboard_id`: Leaderboard ID (Primary Key)
          * - `display_name`: The displayed name of the leaderboard by the bot
+         * - `active`: Boolean to enable/disable the leaderboard
          * - `channel_id`: Channel ID to host leaderboard view in Discord
          */
         this.leaderboardsTable = new Table(this, "LeaderboardsTable", {

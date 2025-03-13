@@ -154,7 +154,7 @@ class QueueViewBuilder(commands.Cog):
         )
 
         # TODO - this is making pointless scans on dynamo
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
         ]:
@@ -271,7 +271,7 @@ class QueueViewBuilder(commands.Cog):
             return
 
         # TODO - this is making pointless scans on dynamo
-        leaderboards = self.ddb_manager.get_leaderboards()
+        leaderboards = self.ddb_manager.get_active_leaderboards()
         if leaderboard_id not in [
             leaderboard.leaderboard_id for leaderboard in leaderboards
         ]:

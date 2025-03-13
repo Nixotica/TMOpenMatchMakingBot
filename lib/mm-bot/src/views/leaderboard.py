@@ -136,7 +136,7 @@ class LeaderboardView(ui.View):
         """Updates the embed with the latest leaderboard state."""
         logging.debug(f"Updating embed for leaderboard: {self.leaderboard_id}.")
 
-        leaderboard = self.ddb_manager.query_leaderboard_by_id(self.leaderboard_id)
+        leaderboard = self.ddb_manager.get_leaderboard(self.leaderboard_id)
 
         if leaderboard is None:
             logging.error(
