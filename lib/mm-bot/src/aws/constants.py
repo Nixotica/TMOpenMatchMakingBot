@@ -22,6 +22,7 @@ KEY_QUEUE_TYPE = "type"
 KEY_ACTIVE = "active"
 KEY_CHANNEL_ID = "channel_id"
 KEY_LEADERBOARD_IDS = "leaderboard_ids"
+KEY_CATEGORY_ID = "category_id"
 
 KEY_BOT_MATCH_ID = "bot_match_id"
 KEY_TM_MATCH_ID = "tm_match_id"

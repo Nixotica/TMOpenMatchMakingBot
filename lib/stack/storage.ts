@@ -107,6 +107,7 @@ export class StorageStack extends Stack {
          * - `leaderboard_ids`: List of leadboard IDs for which elo is distributed to players. 
          * - `primary_leaderboard_id`: The primary leaderboard ID for which a player's rank is determined to display for the queue.
          * - `ping_role_id`: The ping role for queue notifications directed at general queue audience. 
+         * - `category_id`: The discord category ID under which active match channels will be created for players.
          */
         this.matchQueuesTable = new Table(this, "MatchQueuesTable", {
             partitionKey: { name: "queue_id", type: AttributeType.STRING },

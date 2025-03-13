@@ -147,6 +147,18 @@ async def get_ping_channel(
     return ping_channel
 
 
+def get_guild(bot: commands.Bot) -> discord.Guild:
+    """Returns the guild for the bot. NOTE: this assumes the bot is only in one guild (server).
+
+    Args:
+        bot (commands.Bot): The discord bot.
+
+    Returns:
+        discord.Guild: The (first) guild the bot is in.
+    """
+    return bot.guilds[0]
+
+
 async def get_party_channel(
     bot: commands.Bot,
     s3_manager: S3ClientManager,

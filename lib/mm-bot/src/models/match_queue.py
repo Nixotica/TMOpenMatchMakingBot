@@ -5,6 +5,7 @@ from aws.constants import (
     KEY_ACTIVE,
     KEY_CAMPAIGN_CLUB_ID,
     KEY_CAMPAIGN_ID,
+    KEY_CATEGORY_ID,
     KEY_CHANNEL_ID,
     KEY_DISPLAY_NAME,
     KEY_LEADERBOARD_IDS,
@@ -30,6 +31,7 @@ class MatchQueue:
     primary_leaderboard_id: Optional[str]
     ping_role_id: Optional[int]
     display_name: Optional[str]
+    category_id: Optional[int]
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
@@ -44,6 +46,7 @@ class MatchQueue:
         primary_leaderboard_id = data.get(KEY_PRIMARY_LEADERBOARD_ID)
         ping_role_id = data.get(KEY_PING_ROLE_ID)
         display_name = data.get(KEY_DISPLAY_NAME)
+        category_id = data.get(KEY_CATEGORY_ID)
 
         if (
             not queue_id
@@ -67,6 +70,7 @@ class MatchQueue:
             primary_leaderboard_id,
             ping_role_id,
             display_name,
+            category_id,
         )
 
     def to_dict(self):
@@ -82,4 +86,5 @@ class MatchQueue:
             KEY_PRIMARY_LEADERBOARD_ID: self.primary_leaderboard_id,
             KEY_PING_ROLE_ID: self.ping_role_id,
             KEY_DISPLAY_NAME: self.display_name,
+            KEY_CATEGORY_ID: self.category_id,
         }

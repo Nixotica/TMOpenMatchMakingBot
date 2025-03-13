@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Iterator
 
 from models.player_profile import PlayerProfile
@@ -9,6 +10,14 @@ class ActiveParty:
     # For now, parties ONLY consist of 2 players
     requester: PlayerProfile
     accepter: PlayerProfile
+
+    # Keep track of party activity, to know when to disband it
+    last_activity_time: datetime
+
+    def __init__(self, requester: PlayerProfile, accepter: PlayerProfile):
+        self.requester = requester
+        self.accepter = accepter
+        self.last_activity_time = datetime.utcnow()
 
     def __iter__(self) -> Iterator[PlayerProfile]:
         yield self.requester

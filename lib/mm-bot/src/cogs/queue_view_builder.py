@@ -119,6 +119,7 @@ class QueueViewBuilder(commands.Cog):
             primary_leaderboard_id=None,  # Currently requires admin to add primary leaderboard
             ping_role_id=None,  # Currently requires admin to add ping role
             display_name=display_name,
+            category_id=None,  # Currently requires admin to add category id
         )
 
         # Add to dynamo table so it will load automatically next time bot starts up
@@ -289,6 +290,48 @@ class QueueViewBuilder(commands.Cog):
         await ctx.send(
             f"Primary leaderboard for queue {queue_id} set to {leaderboard_id}.",
             ephemeral=True,
+        )
+
+    @commands.hybrid_command(
+        name="set_queue_category",
+        description="Set the category for a queue, used when displaying rank counts in queue.",
+    )
+    @commands.has_role(ROLE_MOD)
+    async def set_queue_category(
+        self,
+        ctx: commands.Context,
+        queue_id: str,
+        category_id: str,  # Cannot be int - too long for discord bot
+    ) -> None:
+        logging.info(
+            f"Processing command to set category {category_id} "
+            f"for queue {queue_id} from user {ctx.message.author.name}."
+        )
+
+        category_id = eval(category_id)
+        if not isinstance(category_id, int):
+            await ctx.send(f"Invalid category ID: {category_id}.", ephemeral=True)
+            return
+
+        # Check if the queue exists
+        queue = self.ddb_manager.get_match_queue(queue_id)
+        if not queue:
+            await ctx.send(
+                f"Queue {queue_id} not found. Use /list_queues to check which ones exist."
+            )
+            return
+
+        # Update in dynamo
+        queue.category_id = category_id
+        self.ddb_manager.update_match_queue(queue)
+
+        # Also update in matchmaking manager (if it's active)
+        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        if active_queue is not None:
+            active_queue.queue.category_id = category_id
+
+        await ctx.send(
+            f"Category for queue {queue_id} set to {category_id}.", ephemeral=True
         )
 
     @commands.hybrid_command(
