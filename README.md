@@ -10,6 +10,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
 
 2. Create `.env` file in `/lib/mm-bot/` and update the required variables:
     ```
+        STAGE=dev
         SECRETS_BUCKET=secrets.json
         PLAYER_PROFILES_TABLE=tm-mm-bot-player-profiles-dev-<account-id>
         PLAYER_ELOS_TABLE=tm-mm-bot-player-elos-dev-<account-id>
@@ -26,7 +27,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
     ```
     These will be used when you run your container locally for faster testing. 
 
-3. Set environment variable `STAGE="dev"` on your system. This will be used to differentiate resources to deploy for prod vs development and testing. 
+3. Set environment variable `STAGE="dev"` on your system (not just the .env used in docker container). This will be used to differentiate resources to deploy for prod vs development and testing. 
 
 4. Run `cdk deploy` to deploy your stack to your AWS account. **IMPORTANT**: If you want to limit your spend, go to the AWS console and disable or terminate your ECS task and delete the flexible IP address. If you are only running the bot via your local docker container (for test or otherwise) you will not need these resources. 
 

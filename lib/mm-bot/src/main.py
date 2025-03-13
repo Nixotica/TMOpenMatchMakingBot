@@ -68,9 +68,8 @@ class DiscordBot(Bot):
 
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s"
-)
+log_level = logging.DEBUG if os.getenv("STAGE") == "dev" else logging.INFO
+logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
 
 
 async def main():
