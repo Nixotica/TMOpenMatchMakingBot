@@ -28,6 +28,7 @@ class TestActiveMatchQueues(unittest.TestCase):
                 primary_leaderboard_id=None,
                 ping_role_id=None,
                 display_name=None,
+                category_id=None,
             )
         )
 

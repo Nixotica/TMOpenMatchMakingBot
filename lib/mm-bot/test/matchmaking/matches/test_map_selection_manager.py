@@ -12,10 +12,32 @@ class TestMapSelectionManager(unittest.TestCase):
         self.campaign = MagicMock()
         self.campaign._playlist = [MagicMock(_uuid="map1"), MagicMock(_uuid="map2")]
         self.match_queue_1 = MatchQueue(
-            "queue_1", 0, 0, 0, QueueType.Queue1v1v1v1, True, 0, None, None, None, None
+            "queue_1",
+            0,
+            0,
+            0,
+            QueueType.Queue1v1v1v1,
+            True,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         self.match_queue_2 = MatchQueue(
-            "queue_2", 0, 0, 0, QueueType.Queue2v2, True, 0, None, None, None, None
+            "queue_2",
+            0,
+            0,
+            0,
+            QueueType.Queue2v2,
+            True,
+            0,
+            None,
+            None,
+            None,
+            None,
+            None,
         )
         self.map_selection_manager = MapSelectionManager()
 
