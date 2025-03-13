@@ -34,6 +34,7 @@ class LeaderboardView(ui.View):
         """
         Unloads the view.
         """
+        self.update_embed.cancel()
         await self.message.delete()
 
     @ui.button(label="See my Position", style=discord.ButtonStyle.blurple)
