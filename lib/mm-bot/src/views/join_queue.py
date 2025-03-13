@@ -75,6 +75,9 @@ class MatchQueueView(ui.View):
         if party_manager:
             player_party = party_manager.get_player_party(player_profile)
         if player_party is not None:
+            # Update this party's inactivity expiration date
+            party_manager.update_party_activity(player_party)  # type: ignore
+
             queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
             if not queue:
                 logging.warning(

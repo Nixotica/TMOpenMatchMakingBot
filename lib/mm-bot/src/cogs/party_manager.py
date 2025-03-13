@@ -9,7 +9,10 @@ from cogs.constants import COG_PARTY_MANAGER, COLOR_EMBED
 from discord.ext import commands, tasks
 from helpers import get_party_channel, safe_delete_message
 from matchmaking.party.active_party import ActiveParty
-from matchmaking.party.constants import PARTY_MANAGER_CHECK_STALE_PARTY_REQUESTS_SEC
+from matchmaking.party.constants import (
+    PARTY_MANAGER_ACTIVE_PARTY_EXPIRATION_SEC,
+    PARTY_MANAGER_CHECK_STALE_PARTY_REQUESTS_SEC,
+)
 from matchmaking.party.party_request import PartyRequest
 from matchmaking.party.request_status import PartyRequestStatus
 from models.player_profile import PlayerProfile
@@ -36,11 +39,13 @@ class PartyManager(commands.Cog):
         logging.info("Party Manager loading...")
         self.check_party_requests_status.start()
         self.check_for_stale_party_requests.start()
+        self.check_inactive_parties_to_disband.start()
 
     def cog_unload(self):
         logging.info("Party manager unloading...")
         self.check_party_requests_status.cancel()
         self.check_for_stale_party_requests.cancel()
+        self.check_inactive_parties_to_disband.cancel()
 
     async def add_outstanding_party_request(
         self, requester: PlayerProfile, accepter: PlayerProfile
@@ -76,6 +81,16 @@ class PartyManager(commands.Cog):
         self.outstanding_party_request_messages[active_party] = PartyRequest(
             message, view
         )
+
+    def update_party_activity(self, party: ActiveParty) -> None:
+        """Updates the party activity such that it pushes back the party disband expiration.
+
+        Args:
+            party (ActiveParty): The party to update as active.
+        """
+        now = datetime.utcnow()
+        logging.debug(f"Updating party {party} activity to now ({now})")
+        party.last_activity_time = now
 
     def get_player_party(self, player: PlayerProfile) -> Optional[ActiveParty]:
         """Get the active party that the player is in.
@@ -151,12 +166,6 @@ class PartyManager(commands.Cog):
 
                 self.outstanding_party_request_messages.pop(active_party)
 
-                if not self.bot:
-                    logging.error(
-                        "Bot is not initialized in party manager. Skipping pinging stale party request."
-                    )
-                    continue
-
                 party_channel = await get_party_channel(self.bot, self.s3_manager)
 
                 if party_channel:
@@ -173,8 +182,40 @@ class PartyManager(commands.Cog):
                         embed=embed,
                     )
 
+    @tasks.loop(seconds=1)
+    async def check_inactive_parties_to_disband(self):
+        now = datetime.utcnow()
+
+        active_parties_copy = self.active_parties.copy()
+        for party in active_parties_copy:
+            if (
+                now - timedelta(seconds=PARTY_MANAGER_ACTIVE_PARTY_EXPIRATION_SEC)
+                > party.last_activity_time
+            ):
+                logging.info(f"Party {party} is inactive. Disbanding...")
+
+                self.active_parties.remove(party)
+
+                party_channel = await get_party_channel(self.bot, self.s3_manager)
+
+                if party_channel:
+                    embed = discord.Embed(
+                        color=COLOR_EMBED, timestamp=datetime.utcnow()
+                    )
+                    embed.add_field(
+                        name="❗ Party System",
+                        value="Your party was detected as inactive and disbanded. "
+                        "Use /party again if you want to play with a party again!",
+                    )
+
+                    await party_channel.send(
+                        content=f"<@{party.requester.discord_account_id}> <@{party.accepter.discord_account_id}>",
+                        embed=embed,
+                    )
+
     @check_for_stale_party_requests.before_loop
     @check_for_stale_party_requests.before_loop
+    @check_inactive_parties_to_disband.before_loop
     async def before_checks(self):
         """Wait until the bot is ready before starting the loop."""
         await self.bot.wait_until_ready()
