@@ -41,6 +41,7 @@ class MatchQueueView(ui.View):
 
     async def stop_task(self):
         await self.active_queue_message.delete()
+        self.update_queue_embed.stop()
         for _, message in self.active_match_messages.items():
             await message.delete()
 

@@ -299,23 +299,29 @@ class DynamoDbManager:
             logging.error(f"Error updating player profile in DynamoDB: {e}")
             raise
 
-    def get_active_match_queues(self) -> List[MatchQueue]:
+    def get_match_queues(self, omit_disabled: bool = True) -> List[MatchQueue]:
         """Get a list of active match queues from the MatchQueues table.
+
+        Args:
+            omit_disabled (bool): Whether to return queues which have flag "active" set to False.
 
         Returns:
             List[MatchQueue]: List of match queues marked as "active" in DDB.
         """
         try:
-            response = self._match_queues_table.scan(
-                FilterExpression=Attr(KEY_ACTIVE).eq(True)
-            )
+            if omit_disabled:
+                response = self._match_queues_table.scan(
+                    FilterExpression=Attr(KEY_ACTIVE).eq(True)
+                )
+            else:
+                response = self._match_queues_table.scan()
             items = response.get("Items", [])
             if not items:
                 return []
-            active_matches = [MatchQueue.from_dict(items[i]) for i in range(len(items))]
-            return active_matches
+            match_queues = [MatchQueue.from_dict(items[i]) for i in range(len(items))]
+            return match_queues
         except Exception as e:
-            logging.error(f"Error getting active match queues from DynamoDB: {e}")
+            logging.error(f"Error getting match queues from DynamoDB: {e}")
             raise
 
     def get_match_queue(self, queue_id: str) -> Optional[MatchQueue]:
@@ -465,16 +471,22 @@ class DynamoDbManager:
             logging.error(f"Error creating leaderboard in DynamoDB: {e}")
             raise
 
-    def get_active_leaderboards(self) -> List[Leaderboard]:
+    def get_leaderboards(self, omit_disabled: bool = True) -> List[Leaderboard]:
         """Get a list of leaderboards from the Leaderboards table.
+
+        Args:
+            omit_disabled (bool): Whether to return leaderboards which have flag "active" set to False.
 
         Returns:
             List[Leaderboard]: List of leaderboards in DDB.
         """
         try:
-            response = self._leaderboards_table.scan(
-                FilterExpression=Attr(KEY_ACTIVE).eq(True)
-            )
+            if omit_disabled:
+                response = self._leaderboards_table.scan(
+                    FilterExpression=Attr(KEY_ACTIVE).eq(True)
+                )
+            else:
+                response = self._leaderboards_table.scan()
             items = response.get("Items", [])
             if not items:
                 return []

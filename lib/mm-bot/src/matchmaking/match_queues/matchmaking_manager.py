@@ -39,7 +39,7 @@ class MatchmakingManager:
             self._initialized = True
             self.active_queues: List[ActiveMatchQueue] = []
             self.ddb_manager = DynamoDbManager()
-            match_queues = self.ddb_manager.get_active_match_queues()
+            match_queues = self.ddb_manager.get_match_queues()
             logging.info(
                 f"Instantiating matchmaking manager with active match queues {match_queues}."
             )
