@@ -104,6 +104,41 @@ class ActiveMatchQueue:
         self.remove_player(party.accepter)
         self.remove_player(party.requester)
 
+    def add_party_v2(self, players: List[PlayerProfile]) -> bool:
+        """Adds a party to the active queue.
+
+        Args:
+            party (ActiveParty): The party to add to the queue.
+
+        Returns:
+            bool: True if party was added to queue, False if they were already in the queue.
+        """
+        # TODO MMv2
+        return False
+
+    def remove_party_v2(self, players: List[PlayerProfile]) -> None:
+        """Removes a party from the queue.
+
+        Args:
+            players (List[PlayerProfile]): The party to remove from the queue.
+        """
+        # TODO MMv2
+
+    def can_add_party(self, players: List[PlayerProfile]) -> bool:
+        """Verifies if the given players can join the queue as a party.
+
+        Args:
+            players (List[PlayerProfile]): The party to verify if can queue together.
+
+        Returns:
+            bool: True if the party can join, False otherwise.
+        """
+        # Only for 2v2 matches can parties of 2+ players join.
+        if self.queue.type != QueueType.Queue2v2 and len(players) > 1:
+            return False
+
+        return True
+
     def should_generate_match(self) -> bool:
         """Determines if a match should be generated from the current queue
 
