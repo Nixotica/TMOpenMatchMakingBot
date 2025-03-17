@@ -4,13 +4,15 @@ from typing import Dict, List, Optional
 
 import discord
 from aws.dynamodb import DynamoDbManager
-from cogs.constants import COLOR_EMBED
+from aws.s3 import S3ClientManager
+from cogs.constants import COLOR_EMBED, JOIN_MATCH_2V2_TIMEOUT_SEC, ROLE_ADMIN, ROLE_MOD
+from matchmaking.matches.completed_match import CompletedMatch
 from matchmaking.mm_event_bus import EventType, MatchmakingManagerEventBus
 from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from cogs.party_manager import get_party_manager
 from discord import TextChannel, ui
 from discord.ext import commands, tasks
-from helpers import get_rank_for_player
+from helpers import get_guild, get_ping_channel, get_rank_for_player
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
@@ -23,10 +25,11 @@ class MatchQueueView(ui.View):
     A view for joining and leaving a matchmaking queue, plus the players in the queue and active queues.
     """
 
-    def __init__(self, bot: commands.Bot, queue_id: str, channel: TextChannel):
+    def __init__(self, bot: commands.Bot, queue_id: str, queue_channel: TextChannel):
         super().__init__(timeout=None)
         self.bot = bot
         self.ddb_manager = DynamoDbManager()
+        self.s3_manager = S3ClientManager()
 
         mm_manager = get_matchmaking_manager_v2()
         if mm_manager is None:
@@ -37,8 +40,11 @@ class MatchQueueView(ui.View):
         self.mm_event_bus = MatchmakingManagerEventBus()
 
         self.queue_id = queue_id
-        self.channel = channel
+        self.queue_channel = queue_channel
         self.active_match_messages: Dict[int, discord.message.Message] = {}
+
+        # Maps bot_match_id -> channel for active matches
+        self.active_match_channels: Dict[int, discord.TextChannel] = {}
 
         self.prev_num_queued_players: int = -1
 
@@ -52,14 +58,15 @@ class MatchQueueView(ui.View):
 
     async def start_task(self, message: discord.message.Message):
         self.active_queue_message = message
-        self.update_embed_task = self.update_queue_embed.start()
-        self.update_active_matches_embeds_task = (
-            self.update_active_matches_embeds.start()
-        )
+        self.update_queue_embed.start()
+        self.process_active_matches.start()
+        self.process_completed_matches.start()
 
     async def stop_task(self):
         await self.active_queue_message.delete()
         self.update_queue_embed.stop()
+        self.process_active_matches.stop()
+        self.process_completed_matches.stop()
         for _, message in self.active_match_messages.items():
             await message.delete()
 
@@ -276,13 +283,218 @@ class MatchQueueView(ui.View):
         except Exception as e:
             logging.warning(f"Failed to update queue {queue_name} embed: {e}")
 
-    async def process_new_active_solo_match(self, active_match: ActiveMatch) -> None:
+    async def create_active_match_channel(
+        self, active_match: ActiveMatch
+    ) -> Optional[discord.TextChannel]:
+        """Creates an active match channel and adds all match players.
+
+        Args:
+            active_match (ActiveMatch): The match to create a channel for.
+
+        Returns:
+            discord.TextChannel: The discord channel for the match.
+        """
+
+        async def maybe_return_bot_ping_channel_id() -> Optional[discord.TextChannel]:
+            ping_channel = await get_ping_channel(self.bot, self.s3_manager)
+            if not ping_channel:
+                logging.warning(
+                    "No bot ping channel provided. Players won't get any indication of their match starting."
+                )
+                return None
+            return ping_channel
+
+        category_id = active_match.match_queue.category_id
+        if category_id is None:
+            logging.warning(
+                f"No category ID found for match {active_match}, using generic bot pings channel."
+            )
+            return await maybe_return_bot_ping_channel_id()
+
+        # Get the category to create channel in
+        guild = get_guild(self.bot)
+        category: Optional[discord.CategoryChannel] = discord.utils.get(
+            guild.categories, id=category_id
+        )
+        if not category:
+            logging.warning(
+                f"No category found in channel with id {category_id}, using generic bot pings channel."
+            )
+            return await maybe_return_bot_ping_channel_id()
+
+        # Overwrite permissions so only players in the match (and mods+) can see it
+        overwrites = {}
+        overwrites[guild.default_role] = discord.PermissionOverwrite(view_channel=False)
+        for player in active_match.participants():
+            member = guild.get_member(player.discord_account_id)
+            if member:
+                overwrites[member] = discord.PermissionOverwrite(view_channel=True)
+        overwrites[discord.utils.get(guild.roles, name=ROLE_MOD)] = (
+            discord.PermissionOverwrite(view_channel=True)
+        )
+        overwrites[discord.utils.get(guild.roles, name=ROLE_ADMIN)] = (
+            discord.PermissionOverwrite(view_channel=True)
+        )
+        overwrites[guild.me] = discord.PermissionOverwrite(
+            view_channel=True,  # Needed to get responses
+            send_messages=True,  # Obviously
+            manage_channels=True,  # Needed to delete channel
+            manage_messages=True,
+            embed_links=True,  # Needed to send embeds
+            use_application_commands=True,  # Needed for buttons
+            read_messages=True,
+            read_message_history=True,
+        )
+
+        channel = await guild.create_text_channel(
+            name=f"BMM - #{active_match.bot_match_id}",
+            category=category,
+            overwrites=overwrites,
+        )
+
+        # Add to active channels to be tracked until completion
+        self.active_match_channels[active_match.bot_match_id] = channel
+
+        logging.info(f"Created channel for match {active_match.bot_match_id}.")
+        return channel
+
+    async def delete_active_match_channel(
+        self, completed_match: CompletedMatch
+    ) -> None:
+        """Deletes an active match channel after the match has finished.
+
+        Args:
+            completed_match (CompletedMatch): The match to delete the channel for.
+        """
+        channel = self.active_match_channels.pop(
+            completed_match.active_match.bot_match_id, None
+        )
+        if channel:
+            await channel.delete()
+            logging.info(
+                f"Deleted channel for match {completed_match.active_match.bot_match_id}."
+            )
+        else:
+            logging.error(
+                f"Channel for match {completed_match.active_match.bot_match_id} not found. Not deleting."
+            )
+
+    async def send_players_match_start_notification(
+        self,
+        players: List[PlayerProfile],
+        bot_match_id: int,
+        match_channel: TextChannel,
+    ) -> None:
+        """Sends a ping to all match players in discord that their match has started.
+
+        Args:
+            players (List[PlayerProfile]): The players in the match to ping.
+            bot_match_id (int): The bot match ID of the match starting.
+            match_channel (TextChannel): The channel in which to ping for the new match.
+        """
+        try:
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name="❗ Match Found",
+                value=f'Pinged players, join the Better Matchmaking club and click activity "BMM - #{bot_match_id}"!',
+            )
+
+            content = ""
+            for player in players:
+                content += f"<@{player.discord_account_id}> "
+
+            await match_channel.send(content=content, embed=embed)
+        except Exception as e:
+            logging.error(
+                f"Error sending message for match start to players {players}: {e}"
+            )
+
+    async def send_2v2_players_match_start_notification(
+        self,
+        teams: Teams2v2,
+        bot_match_id: int,
+        match_channel: TextChannel,
+    ) -> None:
+        """Sends a ping in discord in order of players to join 2v2 match.
+
+        Args:
+            teams (Teams2v2): The teams in the match to ping.
+            bot_match_id (int): The bot match ID of the match starting.
+            match_channel (TextChannel): The channel in which to ping for the new match.
+        """
+        # This is a unique work-around of a Nadeo bug where we ping players
+        # Blue-Red-Blue-Red to ensure they join in the right order.
+
+        try:
+            player_join_order = [
+                teams.team_a.player_a,
+                teams.team_b.player_a,
+                teams.team_a.player_b,
+                teams.team_b.player_b,
+            ]
+
+            for player in player_join_order:
+                # Add match joined ack button
+                button = discord.ui.Button(
+                    label="I joined the Server", style=discord.ButtonStyle.green
+                )
+                view = discord.ui.View(timeout=JOIN_MATCH_2V2_TIMEOUT_SEC)
+                view.add_item(button)
+
+                # Corouting to await button interaction
+                def check(interaction: discord.Interaction):
+                    return (
+                        interaction.user.id == player.discord_account_id
+                        and interaction.channel.id == match_channel.id  # type: ignore
+                    )
+
+                _ = await match_channel.send(
+                    content=f"<@{player.discord_account_id}> Your 2v2 match is ready. Please join "
+                    f"BMM - #{bot_match_id} in-game **then click the button** once you're in.",
+                    view=view,
+                )
+
+                try:
+                    # Wait for player ack
+                    interaction = await self.bot.wait_for(
+                        "interaction", check=check, timeout=JOIN_MATCH_2V2_TIMEOUT_SEC
+                    )
+                    await interaction.response.send_message(
+                        f"<@{player.discord_account_id}> joined match, pinging next player.",
+                        ephemeral=True,
+                    )
+                except Exception:
+                    logging.warning(
+                        f"Player {player.discord_account_id} did not join in time."
+                    )
+                    await match_channel.send(
+                        content=f"<@{player.discord_account_id}> did not join in time for "
+                        f"BMM - #{bot_match_id}, please ping for a Mod.",
+                    )
+                    return
+
+            # Match is ready to go
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name="❗ Match Ready",
+                value=f"All players have joined BMM - #{bot_match_id}, starting match.",
+            )
+
+            await match_channel.send(embed=embed)
+
+        except Exception as e:
+            logging.error(f"Error sending message for match start to players: {e}")
+
+    async def process_new_active_solo_match(
+        self, active_match: ActiveMatch, match_channel: TextChannel
+    ) -> None:
         if not isinstance(active_match.player_profiles, List):
             logging.error(
                 f"Expected player profiles to be a list, got {type(active_match.player_profiles)} instead."
             )
             return
 
+        # Create an embed to put in the queue channel to display the ongoing match
         players = active_match.player_profiles
 
         value = ""
@@ -294,16 +506,26 @@ class MatchQueueView(ui.View):
             name=f"🏎️ Match #{active_match.bot_match_id} in progress...", value=value
         )
 
-        message = await self.channel.send(embed=embed)
+        message = await self.queue_channel.send(embed=embed)
         self.active_match_messages[active_match.bot_match_id] = message
 
-    async def process_new_active_teams_match(self, active_match: ActiveMatch) -> None:
+        # Ping players
+        await self.send_players_match_start_notification(
+            players, active_match.bot_match_id, match_channel
+        )
+
+    async def process_new_active_teams_match(
+        self,
+        active_match: ActiveMatch,
+        match_channel: TextChannel,
+    ) -> None:
         if not isinstance(active_match.player_profiles, Teams2v2):
             logging.error(
                 f"Expected player profiles to be a Teams2v2, got {type(active_match.player_profiles)} instead."
             )
             return
 
+        # Create an embed to put in the queue channel to display the ongoing match
         embed = discord.Embed(
             title=f"🏎️ Match #{active_match.bot_match_id} in progress...",
             color=COLOR_EMBED,
@@ -322,12 +544,26 @@ class MatchQueueView(ui.View):
             value=f"<@{team_b.player_a.discord_account_id}> & <@{team_b.player_b.discord_account_id}>",
         )
 
-        message = await self.channel.send(embed=embed)
+        message = await self.queue_channel.send(embed=embed)
         self.active_match_messages[active_match.bot_match_id] = message
 
+        # Ping players
+        await self.send_2v2_players_match_start_notification(
+            active_match.player_profiles,
+            active_match.bot_match_id,
+            match_channel,
+        )
+
     @tasks.loop(seconds=5)
-    async def update_active_matches_embeds(self) -> None:
-        logging.debug(f"Updating embeds for active matches in queue {self.queue_id}.")
+    async def process_active_matches(self) -> None:
+        """
+        Adds a message to the queue channel containing active match info.
+        Creates a new discord channel with the match players, handling pings
+        if necessary (2v2 workaround).
+        """
+        logging.debug(
+            f"Match Queue Cog checking for new active matches to process for queue {self.queue_id}"
+        )
 
         # Get new active matches and send the messages for them.
         active_match = self.mm_event_bus.get_new_active_match(self.new_active_match_sub)
@@ -337,10 +573,21 @@ class MatchQueueView(ui.View):
                 return
 
             processed = True
+
+            match_channel = await self.create_active_match_channel(active_match)
+            if not match_channel:
+                logging.error(
+                    f"Failed to create channel for match {active_match.bot_match_id}."
+                )
+
             if isinstance(active_match.player_profiles, List):
-                await self.process_new_active_solo_match(active_match)
+                self.bot.loop.create_task(
+                    self.process_new_active_solo_match(active_match, match_channel)
+                )
             elif isinstance(active_match.player_profiles, Teams2v2):
-                await self.process_new_active_teams_match(active_match)
+                self.bot.loop.create_task(
+                    self.process_new_active_teams_match(active_match, match_channel)
+                )
             else:
                 logging.error(f"Unknown match type {type(active_match)}")
                 processed = False
@@ -349,6 +596,16 @@ class MatchQueueView(ui.View):
                 logging.info(
                     f"New match with bot match ID {active_match.bot_match_id} added to queue view {self.queue_id}"
                 )
+
+    @tasks.loop(seconds=5)
+    async def process_completed_matches(self) -> None:
+        """
+        Deletes the message for the active match of new completed matches.
+        Deletes the channel for that specific match.
+        """
+        logging.debug(
+            f"Match Queue Cog checking for new completed matches to process for queue {self.queue_id}"
+        )
 
         # Get completed matches and delete the messages for them.
         completed_match = self.mm_event_bus.get_new_completed_match(
@@ -365,6 +622,8 @@ class MatchQueueView(ui.View):
                 )
 
                 await message.delete()
+
+                await self.delete_active_match_channel(completed_match)
 
                 logging.info(
                     f"Completed match with bot match ID {completed_match.active_match.bot_match_id} "
@@ -414,7 +673,9 @@ class MatchQueueView(ui.View):
             value=f"{self.queue_id} queue started by <@{queue_started.player.discord_account_id}>.",
             inline=True,
         )
-        msg = await self.channel.send(content=f"{queue_ping_role.mention}", embed=embed)
+        msg = await self.queue_channel.send(
+            content=f"{queue_ping_role.mention}", embed=embed
+        )
 
         # Delete the message after 60 seconds
         await msg.delete(delay=60)

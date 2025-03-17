@@ -14,7 +14,6 @@ from cogs.constants import (
     CHECK_QUEUES_TO_SPAWN_NEW_MATCH_TASK_SEC,
     COG_MATCHMAKING_MANAGER_V2,
     COLOR_EMBED,
-    JOIN_MATCH_2V2_TIMEOUT_SEC,
     MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC,
 )
 from matchmaking.mm_event_bus import MatchmakingManagerEventBus
@@ -29,7 +28,7 @@ from matchmaking.match_queues.match_persistence import (
 )
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
-from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
+from matchmaking.matches.team_2v2 import Team2v2
 from models.match_queue import MatchQueue
 from models.player_profile import PlayerProfile
 
@@ -241,119 +240,6 @@ class MatchmakingManagerV2(commands.Cog):
         """
         for active_queue in self.active_queues:
             active_queue.remove_party([player])
-
-    async def send_players_match_start_notification(
-        self,
-        players: List[PlayerProfile],
-        bot_match_id: int,
-    ) -> None:
-        """Sends a ping to all match players in discord that their match has started.
-
-        Args:
-            players (List[PlayerProfile]): The players in the match to ping.
-            bot_match_id (int): The bot match ID of the match starting.
-        """
-        try:
-            ping_channel = await get_ping_channel(self.bot, self.s3_manager)
-            if ping_channel is None:
-                logging.warning("No ping channel found.")
-                return
-
-            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-            embed.add_field(
-                name="❗ Match Found",
-                value=f'Pinged players, join the Better Matchmaking club and click activity "BMM - #{bot_match_id}"!',
-            )
-
-            content = ""
-            for player in players:
-                content += f"<@{player.discord_account_id}> "
-
-            await ping_channel.send(content=content, embed=embed)
-        except Exception as e:
-            logging.error(
-                f"Error sending message for match start to players {players}: {e}"
-            )
-
-    async def send_2v2_players_match_start_notification(
-        self,
-        teams: Teams2v2,
-        bot_match_id: int,
-    ) -> None:
-        """Sends a ping in discord in order of players to join 2v2 match.
-
-        Args:
-            teams (Teams2v2): The teams in the match to ping.
-            bot_match_id (int): The bot match ID of the match starting.
-        """
-        # This is a unique work-around of a Nadeo bug where we ping players
-        # Blue-Red-Blue-Red to ensure they join in the right order.
-
-        try:
-            ping_channel = await get_ping_channel(self.bot, self.s3_manager)
-
-            if not ping_channel:
-                logging.warning("No ping channel found.")
-                return
-
-            player_join_order = [
-                teams.team_a.player_a,
-                teams.team_b.player_a,
-                teams.team_a.player_b,
-                teams.team_b.player_b,
-            ]
-
-            for player in player_join_order:
-                # Add match joined ack button
-                button = discord.ui.Button(
-                    label="I joined the Server", style=discord.ButtonStyle.green
-                )
-                view = discord.ui.View(timeout=JOIN_MATCH_2V2_TIMEOUT_SEC)
-                view.add_item(button)
-
-                # Corouting to await button interaction
-                def check(interaction: discord.Interaction):
-                    return (
-                        interaction.user.id == player.discord_account_id
-                        and interaction.channel.id == ping_channel.id  # type: ignore
-                    )
-
-                _ = await ping_channel.send(
-                    content=f"<@{player.discord_account_id}> Your 2v2 match is ready. Please join "
-                    f"BMM - #{bot_match_id} in-game **then click the button** once you're in.",
-                    view=view,
-                )
-
-                try:
-                    # Wait for player ack
-                    interaction = await self.bot.wait_for(
-                        "interaction", check=check, timeout=JOIN_MATCH_2V2_TIMEOUT_SEC
-                    )
-                    await interaction.response.send_message(
-                        f"<@{player.discord_account_id}> joined match, pinging next player.",
-                        ephemeral=True,
-                    )
-                except Exception:
-                    logging.warning(
-                        f"Player {player.discord_account_id} did not join in time."
-                    )
-                    await ping_channel.send(
-                        content=f"<@{player.discord_account_id}> did not join in time for "
-                        f"BMM - #{bot_match_id}, please ping for a Mod.",
-                    )
-                    return
-
-            # Match is ready to go
-            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-            embed.add_field(
-                name="❗ Match Ready",
-                value=f"All players have joined BMM - #{bot_match_id}, starting match.",
-            )
-
-            await ping_channel.send(embed=embed)
-
-        except Exception as e:
-            logging.error(f"Error sending message for match start to players: {e}")
 
     async def upload_match_results_and_cleanup_event(
         self, match: CompletedMatch
