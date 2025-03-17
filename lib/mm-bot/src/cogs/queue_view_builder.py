@@ -9,7 +9,7 @@ from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from models.match_queue import MatchQueue
-from views.join_queue import MatchQueueView
+from views.match_queue import MatchQueueView
 
 
 class QueueViewBuilder(commands.Cog):

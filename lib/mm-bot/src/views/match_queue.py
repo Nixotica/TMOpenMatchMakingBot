@@ -5,12 +5,13 @@ from typing import Dict, List, Optional
 import discord
 from aws.dynamodb import DynamoDbManager
 from cogs.constants import COLOR_EMBED
+from cogs.match_status_distributer import MatchStatusDistributer
+from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from cogs.party_manager import get_party_manager
 from discord import TextChannel, ui
 from discord.ext import commands, tasks
 from helpers import get_rank_for_player
 from matchmaking.match_queues.enum import QueueType
-from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Teams2v2
 from models.leaderboard_rank import LeaderboardRank
@@ -25,7 +26,7 @@ class MatchQueueView(ui.View):
     def __init__(self, bot: commands.Bot, queue_id: str, channel: TextChannel):
         super().__init__(timeout=None)
         self.bot = bot
-        self.mm_manager = MatchmakingManager()
+        self.match_status_dist = MatchStatusDistributer()
         self.ddb_manager = DynamoDbManager()
         self.queue_id = queue_id
         self.channel = channel
@@ -53,6 +54,11 @@ class MatchQueueView(ui.View):
             f"Processing button pressed to join queue {self.queue_id} for user {user.name}"
         )
 
+        mm_manager = get_matchmaking_manager_v2()
+        if mm_manager is None:
+            logging.error("Matchmaking manager not found.")
+            return
+
         player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
             user.id
         )
@@ -63,7 +69,7 @@ class MatchQueueView(ui.View):
             )
             return
 
-        if self.mm_manager.is_player_in_match(player_profile):
+        if mm_manager.is_player_in_match(player_profile):
             await interaction.response.send_message(
                 "You are already in a match.", ephemeral=True
             )
@@ -96,23 +102,21 @@ class MatchQueueView(ui.View):
 
             # If their teammate is in a match, warn them and do not allow them to join
             teammate = player_party.teammate(player_profile)
-            if self.mm_manager.is_player_in_match(teammate):
+            if mm_manager.is_player_in_match(teammate):
                 await interaction.response.send_message(
                     f"Your teammate <@{teammate.discord_account_id}> is still in a match.",
                     ephemeral=True,
                 )
                 return
 
-            added_queue = self.mm_manager.add_party_to_queue(
-                player_party, self.queue_id
+            added_queue = mm_manager.add_party_to_queue(
+                player_party.players(), self.queue_id
             )
             with_teammate = teammate
 
         # Otherwise solo queueing
         else:
-            added_queue = self.mm_manager.add_player_to_queue(
-                player_profile, self.queue_id
-            )
+            added_queue = mm_manager.add_party_to_queue([player_profile], self.queue_id)
 
         if not added_queue:
             await interaction.response.send_message(
@@ -137,6 +141,11 @@ class MatchQueueView(ui.View):
             f"Processing button pressed to leave queue {self.queue_id} for user {user.name}"
         )
 
+        mm_manager = get_matchmaking_manager_v2()
+        if mm_manager is None:
+            logging.error("Matchmaking manager not found.")
+            return
+
         player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
             user.id
         )
@@ -145,7 +154,7 @@ class MatchQueueView(ui.View):
             # Don't tell the user anything, they probably aren't registered
             return
 
-        requested_queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
+        requested_queue = mm_manager.get_queue(self.queue_id)
 
         if not requested_queue:
             logging.error(
@@ -168,9 +177,9 @@ class MatchQueueView(ui.View):
         if party_manager:
             player_party = party_manager.get_player_party(player_profile)
         if player_party is not None:
-            self.mm_manager.remove_party_from_queue(player_party, self.queue_id)
+            mm_manager.remove_party_from_queue(player_party.players(), self.queue_id)
         else:
-            self.mm_manager.remove_player_from_queue(player_profile, self.queue_id)
+            mm_manager.remove_party_from_queue([player_profile], self.queue_id)
 
         await interaction.response.send_message(
             f"Left queue {self.queue_id}.", ephemeral=True
@@ -182,7 +191,12 @@ class MatchQueueView(ui.View):
     async def update_queue_embed(self) -> None:
         logging.debug(f"Updating embed for queue {self.queue_id}.")
 
-        queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
+        mm_manager = get_matchmaking_manager_v2()
+        if mm_manager is None:
+            logging.error("Matchmaking manager not found.")
+            return
+
+        queue = mm_manager.get_queue(self.queue_id)
 
         if queue is None:
             logging.error(
@@ -305,13 +319,13 @@ class MatchQueueView(ui.View):
         message = await self.channel.send(embed=embed)
         self.active_match_messages[active_match.bot_match_id] = message
 
-    @tasks.loop(seconds=15)
+    @tasks.loop(seconds=5)
     async def update_active_matches_embeds(self) -> None:
         logging.debug(f"Updating embeds for active matches in queue {self.queue_id}.")
 
         # Get new active matches and send the messages for them.
-        new_active_matches = self.mm_manager.process_new_active_matches_for_queue(
-            self.queue_id
+        new_active_matches = (
+            self.match_status_dist.get_new_active_matches_for_queue_view(self.queue_id)
         )
 
         for new_match in new_active_matches:
@@ -328,8 +342,10 @@ class MatchQueueView(ui.View):
             )
 
         # Get completed matches and delete the messages for them.
-        completed_matches = self.mm_manager.process_completed_matches_for_queue(
-            self.queue_id
+        completed_matches = (
+            self.match_status_dist.get_new_completed_matches_for_queue_view(
+                self.queue_id
+            )
         )
 
         for completed_match in completed_matches:

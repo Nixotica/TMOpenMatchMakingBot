@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterator
+from typing import Iterator, List
 
 from models.player_profile import PlayerProfile
 
@@ -33,3 +33,6 @@ class ActiveParty:
             return self.requester
         else:
             raise ValueError(f"Player {player.tm_account_id} is not in this party.")
+
+    def players(self) -> List[PlayerProfile]:
+        return [self.requester, self.accepter]
