@@ -37,12 +37,12 @@ class QueueViewBuilder(commands.Cog):
         logging.info("Queue View Builder unloading...")
         for view in self.views:
             await view.stop_task()
-            logging.info(f"Unloading view for Queue ID {view.queue.queue_id}.")
+            logging.info(f"Unloading view for Queue ID {view.queue_id}.")
         logging.info("All Queue Views have been unloadded.")
 
     async def add_active_queue_view(self, queue: ActiveMatchQueue) -> None:
         # If view is already setup, ignore (this will sometimes run multiple times on startup...)
-        if any(view.queue.queue_id == queue.queue.queue_id for view in self.views):
+        if any(view.queue_id == queue.queue.queue_id for view in self.views):
             return
 
         channel_id = queue.queue.channel_id
@@ -63,7 +63,7 @@ class QueueViewBuilder(commands.Cog):
         )
 
         # TODO - based on type, different queue views (2v2 should look different...)
-        view = MatchQueueView(self.bot, queue.queue, channel)
+        view = MatchQueueView(self.bot, queue.queue.queue_id, channel)
 
         self.views.append(view)
 
@@ -461,7 +461,7 @@ class QueueViewBuilder(commands.Cog):
 
         # Stop the queue view task and remove it
         for view in self.views:
-            if view.queue.queue_id == queue_id:
+            if view.queue_id == queue_id:
                 await view.stop_task()
                 self.views.remove(view)
                 break
