@@ -337,6 +337,10 @@ class MatchQueueView(ui.View):
         # Get new active matches and send the messages for them.
         active_match = self.mm_event_bus.get_new_active_match(self.new_active_match_sub)
         if active_match is not None:
+            # Ignore if it doesn't belong to this queue
+            if active_match.match_queue.queue_id != self.queue.queue_id:
+                return
+
             processed = True
             if isinstance(active_match.player_profiles, List):
                 await self.process_new_active_solo_match(active_match)
@@ -356,6 +360,10 @@ class MatchQueueView(ui.View):
             self.new_compeleted_match_sub
         )
         if completed_match is not None:
+            # Ignore if it doesn't belong to this queue
+            if completed_match.active_match.match_queue.queue_id != self.queue.queue_id:
+                return
+
             try:
                 message = self.active_match_messages.pop(
                     completed_match.active_match.bot_match_id

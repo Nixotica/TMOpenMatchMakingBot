@@ -6,7 +6,6 @@ from aws.s3 import S3ClientManager
 from cogs.constants import ROLE_MOD
 from cogs.party_manager import get_party_manager
 from discord.ext import commands
-from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
 
 class Party(commands.Cog):
@@ -16,7 +15,6 @@ class Party(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.mm_manager = MatchmakingManager()
         self.ddb_manager = DynamoDbManager()
         self.s3_manager = S3ClientManager()
 

@@ -6,8 +6,8 @@ from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import COLOR_EMBED, ROLE_ADMIN, ROLE_MOD
 from discord.ext import commands
+from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from helpers import get_rank_for_player
-from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 
 
 class General(commands.Cog):
@@ -17,9 +17,15 @@ class General(commands.Cog):
 
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-        self.mm_manager = MatchmakingManager()
         self.s3_manager = S3ClientManager()
         self.ddb_manager = DynamoDbManager()
+
+        mm_manager = get_matchmaking_manager_v2()
+        if mm_manager is None:
+            raise ValueError(
+                "Matchmaking manager, a fatally dependent resource, not found."
+            )
+        self.mm_manager = mm_manager
 
     @commands.hybrid_command(
         name="ping",

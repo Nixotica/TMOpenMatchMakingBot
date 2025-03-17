@@ -45,13 +45,13 @@ class ActiveMatch:
         self._match_info = None
 
     @staticmethod
-    def create_1v1v1v1(
+    async def create_1v1v1v1(
         match_queue: MatchQueue,
         bot_match_id: int,
         players: List[PlayerProfile],
     ) -> ActiveMatch:
         logging.info(f"Creating new match for players: {players}")
-        match_info = create_1v1v1v1_match(match_queue, bot_match_id, players)
+        match_info = await create_1v1v1v1_match(match_queue, bot_match_id, players)
 
         return ActiveMatch(
             match_info.event_id,
@@ -64,13 +64,13 @@ class ActiveMatch:
         )
 
     @staticmethod
-    def create_2v2(
+    async def create_2v2(
         match_queue: MatchQueue,
         bot_match_id: int,
         teams: Teams2v2,
     ) -> ActiveMatch:
         logging.info(f"Creating new 2v2 match for teams {teams}")
-        match_info = create_2v2_match(match_queue, bot_match_id, teams)
+        match_info = await create_2v2_match(match_queue, bot_match_id, teams)
 
         return ActiveMatch(
             match_info.event_id,
@@ -83,13 +83,13 @@ class ActiveMatch:
         )
 
     @staticmethod
-    def create_solo(
+    async def create_solo(
         match_queue: MatchQueue,
         bot_match_id: int,
         player: PlayerProfile,
     ) -> ActiveMatch:
         logging.info(f"Creating new solo match for player {player}")
-        match_info = create_solo_match(match_queue, bot_match_id, player)
+        match_info = await create_solo_match(match_queue, bot_match_id, player)
 
         return ActiveMatch(
             match_info.event_id,
@@ -102,13 +102,13 @@ class ActiveMatch:
         )
 
     @staticmethod
-    def create_lsc(
+    async def create_lsc(
         match_queue: MatchQueue,
         bot_match_id: int,
         players: List[PlayerProfile],
     ) -> ActiveMatch:
         logging.info(f"Creating new LSC match for players {players}")
-        match_info = create_lsc_match(match_queue, bot_match_id, players)
+        match_info = await create_lsc_match(match_queue, bot_match_id, players)
 
         return ActiveMatch(
             match_info.event_id,

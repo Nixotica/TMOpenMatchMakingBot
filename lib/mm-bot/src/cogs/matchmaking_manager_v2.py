@@ -63,6 +63,8 @@ class MatchmakingManagerV2(commands.Cog):
 
         # Add the persisted matches as new active matches to be distributed to concerned parties
         for persisted_match in persisted_matches:
+            # TODO - this is creating it before other cogs are registered, thus no subscribers pick it up.
+            # Not urgent but it's worth addressing by doing this on some other oneshot task with delay
             self.mm_event_bus.add_new_active_match(persisted_match)
 
         # Map queue_id -> timestamp for detecting if should ping queue started
@@ -186,7 +188,7 @@ class MatchmakingManagerV2(commands.Cog):
             return None
 
         # Add party to queue
-        party_added = queue.add_party_v2(players)
+        party_added = queue.add_party(players)
         if not party_added:
             return None
 
@@ -208,7 +210,7 @@ class MatchmakingManagerV2(commands.Cog):
         if queue is None:
             return
 
-        queue.remove_party_v2(players)
+        queue.remove_party(players)
 
     def cancel_match(self, bot_match_id: int) -> Optional[ActiveMatch]:
         """Cancels an active match with the given bot match ID, if one exists.
@@ -224,8 +226,9 @@ class MatchmakingManagerV2(commands.Cog):
             return None
 
         # Complete the match
+        self.active_matches.remove(match)
         canceled_match = CompletedMatch(match, canceled=True)
-        # TODO MMv2 - call something to delete the match's active message in queue view
+        self.mm_event_bus.add_new_completed_match(canceled_match)
         canceled_match.cleanup()
 
         return match
@@ -237,7 +240,7 @@ class MatchmakingManagerV2(commands.Cog):
             player (PlayerProfile): The player to remove.
         """
         for active_queue in self.active_queues:
-            active_queue.remove_party_v2([player])
+            active_queue.remove_party([player])
 
     async def send_players_match_start_notification(
         self,
@@ -608,7 +611,7 @@ class MatchmakingManagerV2(commands.Cog):
                     continue
 
                 bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
-                active_match = active_queue.generate_match(bot_match_id)
+                active_match = await active_queue.generate_match(bot_match_id)
 
                 if active_match is None:
                     logging.error(
@@ -709,7 +712,7 @@ class MatchmakingManagerV2(commands.Cog):
                     > MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC
                 ):
                     for player in queued_party.players():
-                        active_queue.remove_player(player)
+                        active_queue.remove_party([player])
                     logging.info(
                         f"Kicked players {queued_party.players()} from {active_queue.queue.queue_id} queue "
                         f"for exceeding {MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC} seconds in queue."
