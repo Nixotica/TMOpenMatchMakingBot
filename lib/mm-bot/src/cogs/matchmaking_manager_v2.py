@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+import time
 from typing import Dict, List, Optional
 import discord
 from discord.ext import commands, tasks
@@ -9,14 +10,19 @@ from aws.s3 import S3ClientManager
 from cogs import registry
 from cogs.constants import (
     CHECK_ACTIVE_MATCHES_FINISHED_TASK_SEC,
+    CHECK_KICK_QUEUED_PLAYERS_TASK_SEC,
     CHECK_QUEUES_TO_SPAWN_NEW_MATCH_TASK_SEC,
     COG_MATCHMAKING_MANAGER_V2,
     COLOR_EMBED,
     JOIN_MATCH_2V2_TIMEOUT_SEC,
+    MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC,
 )
-from cogs.match_status_distributer import MatchStatusDistributer
+from matchmaking.mm_event_bus import MatchmakingManagerEventBus
 from helpers import get_ping_channel
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
+from matchmaking.match_queues.constants import (
+    QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC,
+)
 from matchmaking.match_queues.match_persistence import (
     get_persisted_matches,
     persist_match,
@@ -37,7 +43,7 @@ class MatchmakingManagerV2(commands.Cog):
         self.bot = bot
         self.s3_manager = S3ClientManager()
         self.ddb_manager = DynamoDbManager()
-        self.match_status_dist = MatchStatusDistributer()
+        self.mm_event_bus = MatchmakingManagerEventBus()
 
         # Populate active queues to manage
         self.active_queues: List[ActiveMatchQueue] = []
@@ -57,7 +63,10 @@ class MatchmakingManagerV2(commands.Cog):
 
         # Add the persisted matches as new active matches to be distributed to concerned parties
         for persisted_match in persisted_matches:
-            self.match_status_dist.add_new_active_match(persisted_match)
+            self.mm_event_bus.add_new_active_match(persisted_match)
+
+        # Map queue_id -> timestamp for detecting if should ping queue started
+        self._last_queue_started_time: Dict[str, float] = {}
 
         registry.register_cog(COG_MATCHMAKING_MANAGER_V2, self)
 
@@ -66,12 +75,14 @@ class MatchmakingManagerV2(commands.Cog):
 
         self.check_queues_to_spawn_new_match.start()
         self.check_active_matches_to_complete.start()
+        self.check_kick_queued_players.start()
 
     def cog_unload(self):
         logging.info("Matchmaking Manager V2 unloading...")
 
         self.check_queues_to_spawn_new_match.cancel()
         self.check_active_matches_to_complete.cancel()
+        self.check_kick_queued_players.cancel()
 
     def add_queue(self, queue: MatchQueue) -> ActiveMatchQueue:
         """Adds a new active queue to the Matchmaking manager.
@@ -179,7 +190,7 @@ class MatchmakingManagerV2(commands.Cog):
         if not party_added:
             return None
 
-        # TODO MMv2 - trigger first joined notification
+        self.maybe_publish_queue_started_message(players[0], queue)
 
         return queue
 
@@ -563,9 +574,33 @@ class MatchmakingManagerV2(commands.Cog):
         except Exception as e:
             logging.error(f"Error sending message to {player.discord_account_id}: {e}")
 
+    def maybe_publish_queue_started_message(
+        self, player: PlayerProfile, queue: ActiveMatchQueue
+    ) -> None:
+        """Checks if a player has joined the queue after sufficient time of inactivity. If so,
+            publish a message that the queue has started.
+
+        Args:
+            added_player (PlayerProfile): The player who joined the queue.
+            queue (ActiveMatchQueue): The queue to check if should ping for.
+        """
+        time_of_last_ping = self._last_queue_started_time.get(queue.queue.queue_id)
+        now = time.time()
+
+        if len(queue.player_parties) == 1 and (
+            time_of_last_ping is None
+            or now - time_of_last_ping
+            > QUEUE_MANAGER_MIN_TIME_PING_FIRST_PLAYER_JOIN_QUEUE_SEC
+        ):
+            logging.info(
+                f"First player {player} joined queue {queue.queue.queue_id}, triggering queue-started message"
+            )
+            self.mm_event_bus.add_new_queue_started(queue.queue.queue_id, player)
+
     @tasks.loop(seconds=CHECK_QUEUES_TO_SPAWN_NEW_MATCH_TASK_SEC)
     async def check_queues_to_spawn_new_match(self):
         """Checks all active queues and spawns a new match if appropriate."""
+        logging.debug("Checking queues to spawn new match...")
         for active_queue in self.active_queues:
             try:
                 should_generate_match = active_queue.should_generate_match()
@@ -603,7 +638,7 @@ class MatchmakingManagerV2(commands.Cog):
                     )
 
                 # Distribute the match to whom it may concern
-                self.match_status_dist.add_new_active_match(active_match)
+                self.mm_event_bus.add_new_active_match(active_match)
 
                 # Add to active matches to be monitored
                 self.active_matches.append(active_match)
@@ -614,6 +649,7 @@ class MatchmakingManagerV2(commands.Cog):
     @tasks.loop(seconds=CHECK_ACTIVE_MATCHES_FINISHED_TASK_SEC)
     async def check_active_matches_to_complete(self):
         """Checks if matches have finished to complete them by deleting and distributing elo."""
+        logging.debug("Checking active matches to complete...")
         for active_match in self.active_matches:
             try:
                 if not active_match.is_match_complete():
@@ -656,13 +692,32 @@ class MatchmakingManagerV2(commands.Cog):
                 )
 
                 # Distribute the completed match to whom it may concern
-                self.match_status_dist.add_new_completed_match(completed_match)
+                self.mm_event_bus.add_new_completed_match(completed_match)
 
             except Exception as e:
                 logging.error(f"Error checking active matches to complete: {e}")
 
+    @tasks.loop(seconds=CHECK_KICK_QUEUED_PLAYERS_TASK_SEC)
+    async def check_kick_queued_players(self):
+        """Checks if players have been queued for too long and kicks them."""
+        logging.debug("Checking queued players to kick...")
+        now = time.time()
+        for active_queue in self.active_queues:
+            for queued_party in active_queue.player_parties:
+                if (
+                    now - queued_party.queue_join_time()
+                    > MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC
+                ):
+                    for player in queued_party.players():
+                        active_queue.remove_player(player)
+                    logging.info(
+                        f"Kicked players {queued_party.players()} from {active_queue.queue.queue_id} queue "
+                        f"for exceeding {MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC} seconds in queue."
+                    )
+
     @check_queues_to_spawn_new_match.before_loop
     @check_active_matches_to_complete.before_loop
+    @check_kick_queued_players.before_loop
     async def before_checks(self):
         """Wait until the bot is ready before starting the loop."""
         await self.bot.wait_until_ready()

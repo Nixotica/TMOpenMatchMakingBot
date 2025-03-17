@@ -9,7 +9,6 @@ from aws.s3 import S3ClientManager
 from discord import Intents
 from discord.ext.commands import Bot
 from health_check import start_health_check_in_thread
-from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from models.bot_secrets import Secrets
 
 
@@ -25,6 +24,11 @@ class DiscordBot(Bot):
         """
         Loads all cogs in this package.
         """
+        # Load the matchmaking manager v2 first to appease dependencies:
+        # PartyManager, QueueViewBuilder, MatchQueueViews, etc
+        await self.load_extension("cogs.matchmaking_manager_v2")
+        logging.info("Loaded extension 'matchmaking_manager_v2")
+
         for file in os.listdir(f"{os.path.realpath(os.path.dirname(__file__))}/cogs"):
             if file.endswith(".py") and "__init__" not in file:
                 extension = file[:-3]
@@ -74,14 +78,11 @@ logging.basicConfig(
 
 
 async def main():
-    # Set up health checks and run (don't do for now)
+    # Set up health checks and run so ECS doesn't kill the container
     start_health_check_in_thread()
 
     # Retrieve secrets from S3
     secrets: Secrets = S3ClientManager().get_secrets()
-
-    # Set up the matchmaking manager and run
-    MatchmakingManager().start_run_forever_in_thread()
 
     # Set up and run bot
     bot = DiscordBot()
@@ -89,7 +90,7 @@ async def main():
     try:
         await bot.start_bot(secrets.discord_bot_token)
     except KeyboardInterrupt:
-        logging.warn("Bot interrupted by keyboard, shutting down...")
+        logging.warning("Bot interrupted by keyboard, shutting down...")
     except Exception as e:
         logging.error(f"Got excepting during bot runtime {e}")
 
