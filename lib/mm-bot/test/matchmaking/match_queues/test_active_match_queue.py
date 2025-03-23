@@ -14,6 +14,9 @@ class TestActiveMatchQueues(unittest.TestCase):
         self.player2 = PlayerProfile(
             tm_account_id="p2", discord_account_id=2, matches_played=1
         )
+        self.player3 = PlayerProfile(
+            tm_account_id="p3", discord_account_id=3, matches_played=0
+        )
 
         self.active_match_queue = ActiveMatchQueue(
             match_queue=MatchQueue(
@@ -32,15 +35,35 @@ class TestActiveMatchQueues(unittest.TestCase):
             )
         )
 
-    def test_add_player(self):
-        added = self.active_match_queue.add_player(self.player1)
-        self.assertTrue(added)
-
-        added = self.active_match_queue.add_player(self.player2)
-        self.assertTrue(added)
-
-        player1_more_matches = PlayerProfile(
-            tm_account_id="p1", discord_account_id=1, matches_played=3
+    def test_add_party_single_player(self):
+        added = self.active_match_queue.add_party(
+            [
+                self.player1,
+            ]
         )
-        added = self.active_match_queue.add_player(player1_more_matches)
+        self.assertTrue(added)
+
+        added = self.active_match_queue.add_party(
+            [
+                self.player1,
+            ]
+        )
+        self.assertFalse(added)
+
+    def test_add_party_multiple_players(self):
+        added = self.active_match_queue.add_party(
+            [
+                self.player1,
+                self.player2,
+            ]
+        )
+        self.assertTrue(added)
+
+        # This fails because player1 is already in the queue
+        added = self.active_match_queue.add_party(
+            [
+                self.player1,
+                self.player3,
+            ]
+        )
         self.assertFalse(added)

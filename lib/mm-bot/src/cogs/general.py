@@ -131,7 +131,7 @@ class General(commands.Cog):
         )
 
         if not player_profile:
-            await ctx.send("No profile found.")
+            await ctx.send("No profile found.", ephemeral=True)
             return
 
         player_elos = self.ddb_manager.get_player_elo_on_all_leaderboards(
@@ -173,6 +173,49 @@ class General(commands.Cog):
 
         await ctx.send(embed=embed, ephemeral=True)
         return
+
+    @commands.hybrid_command(
+        name="fake_join_queue",
+        description="Fake a player joining a queue. Only works on simulated queue types.",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def fake_join_queue(
+        self, ctx: commands.Context, queue_id: str, member: discord.Member
+    ) -> None:
+        logging.info(
+            f"Processing command to fake join queue {queue_id} for {member.name} from {ctx.message.author.name}."
+        )
+
+        player_profile = self.ddb_manager.query_player_profile_for_discord_account_id(
+            member.id
+        )
+
+        if not player_profile:
+            await ctx.send("Player not found.", ephemeral=True)
+            return
+
+        active_queue = self.mm_manager.get_queue(queue_id)
+
+        if active_queue is None:
+            await ctx.send(f"Could not find queue {queue_id}", ephemeral=True)
+            return
+
+        if not active_queue.queue.type.is_simulated():
+            await ctx.send(
+                f"Queue {queue_id} is not a simulated queue. You can't fake join it.",
+                ephemeral=True,
+            )
+            return
+
+        added_party = active_queue.add_party([player_profile])
+        if not added_party:
+            await ctx.send(f"Failed to add player to queue {queue_id}", ephemeral=True)
+            return
+
+        await ctx.send(
+            f"Successfully faked player {member.name} joining queue {queue_id}",
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot) -> None:

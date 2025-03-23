@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from typing import List
+from typing import List, Optional
 
+from matchmaking.constants import SIM_MATCH_DURATION
 from matchmaking.matches.event_creator import (
     create_1v1v1v1_match,
     create_2v2_match,
@@ -83,6 +84,19 @@ class ActiveMatch:
         )
 
     @staticmethod
+    async def create_sim_2v2(
+        match_queue: MatchQueue,
+        bot_match_id: int,
+        teams: Teams2v2,
+    ) -> ActiveMatch:
+        logging.info(f"Creating new simulated 2v2 match for teams {teams}")
+        from matchmaking.matches.simulator import MatchSimulator
+
+        return MatchSimulator().create_sim_2v2_match(
+            match_queue, bot_match_id, teams, SIM_MATCH_DURATION
+        )
+
+    @staticmethod
     async def create_solo(
         match_queue: MatchQueue,
         bot_match_id: int,
@@ -133,11 +147,21 @@ class ActiveMatch:
             return self.player_profiles.players()
         return self.player_profiles
 
+    def teams(self) -> Optional[Teams2v2]:
+        if isinstance(self.player_profiles, Teams2v2):
+            return self.player_profiles
+        return None
+
     def is_match_complete(self) -> bool:
-        self._match_info = get_match_info(self.match_live_id)
-        if self._match_info.status == "COMPLETED":  # type: ignore
-            return True
-        return False
+        if self.match_queue.type.is_simulated():
+            from matchmaking.matches.simulator import MatchSimulator
+
+            return MatchSimulator().is_match_complete(self.bot_match_id)
+        else:
+            self._match_info = get_match_info(self.match_live_id)
+            if self._match_info.status == "COMPLETED":  # type: ignore
+                return True
+            return False
 
     def get_match_join_link(self) -> str | None:
         match_info = self._get_cached_match_info()

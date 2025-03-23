@@ -48,6 +48,7 @@ class ActiveMatchQueue:
 
         # No support for parties more than 2 players
         if len(players) > 2:
+            logging.warning("Attempted to add party of size greater than 2 to queue.")
             return False
 
         if len(players) == 1:
@@ -82,7 +83,7 @@ class ActiveMatchQueue:
             bool: True if the party can join, False otherwise.
         """
         # Only for 2v2 matches can parties of 2+ players join.
-        if self.queue.type != QueueType.Queue2v2 and len(players) > 1:
+        if (not self.queue.type.is_2v2()) and len(players) > 1:
             return False
 
         return True
@@ -99,7 +100,7 @@ class ActiveMatchQueue:
             )
             if len(self.player_parties) >= NUM_1v1v1v1_PLAYERS:
                 return True
-        elif self.queue.type == QueueType.Queue2v2:
+        elif self.queue.type.is_2v2():
             logging.debug(
                 f"Checking if should generate match for {self.queue.queue_id} length {len(self.player_parties)}."
             )
@@ -138,7 +139,7 @@ class ActiveMatchQueue:
                 self.queue, bot_match_id, players_in_match
             )
 
-        elif self.queue.type == QueueType.Queue2v2:
+        elif self.queue.type.is_2v2():
             solo_players: List[PlayerProfile] = []
             teams_in_match: List[Team2v2] = []
 
@@ -167,7 +168,11 @@ class ActiveMatchQueue:
                     break
 
             teams = Teams2v2(teams_in_match[0], teams_in_match[1])
-            return await ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
+
+            if self.queue.type == QueueType.Queue2v2:
+                return await ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
+            elif self.queue.type == QueueType.QueueSim2v2:
+                return await ActiveMatch.create_sim_2v2(self.queue, bot_match_id, teams)
 
         elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.player_parties[0].players()[0]
