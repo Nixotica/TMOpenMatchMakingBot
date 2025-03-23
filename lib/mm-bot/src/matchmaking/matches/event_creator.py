@@ -1,5 +1,5 @@
+import asyncio
 import datetime as dt
-import time
 from typing import List
 
 from matchmaking.constants import POINTS_LIMIT_1v1v1v1
@@ -35,7 +35,7 @@ from nadeo_event_api.api.structure.settings.script_settings import (
 from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import Tmwt2v2PastebinTeam
 
 
-def create_1v1v1v1_match(
+async def create_1v1v1v1_match(
     match_queue: MatchQueue, bot_match_id: int, players: List[PlayerProfile]
 ) -> CreatedMatchInfo:
     """Create a 1v1v1v1 match using Trackmania competition tool.
@@ -95,7 +95,7 @@ def create_1v1v1v1_match(
     round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
     matches = get_matches_for_round(round_id, 1, 0)
     while matches == []:
-        time.sleep(5)
+        await asyncio.sleep(5)
         matches = get_matches_for_round(round_id, 1, 0)
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
@@ -103,7 +103,7 @@ def create_1v1v1v1_match(
     return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
 
 
-def create_lsc_match(
+async def create_lsc_match(
     match_queue: MatchQueue, bot_match_id: int, players: List[PlayerProfile]
 ) -> CreatedMatchInfo:
     """Creates a LSC match (6 lapper - 1 round)
@@ -166,7 +166,7 @@ def create_lsc_match(
     round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
     matches = get_matches_for_round(round_id, 1, 0)
     while matches == []:
-        time.sleep(5)
+        await asyncio.sleep(5)
         matches = get_matches_for_round(round_id, 1, 0)
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
@@ -174,7 +174,7 @@ def create_lsc_match(
     return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
 
 
-def create_2v2_match(
+async def create_2v2_match(
     match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
 ) -> CreatedMatchInfo:
     """Create a 2v2 match using Trackmania competition tool.
@@ -267,7 +267,7 @@ def create_2v2_match(
     round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
     matches = get_matches_for_round(round_id, 1, 0)
     while matches == []:
-        time.sleep(5)
+        await asyncio.sleep(5)
         matches = get_matches_for_round(round_id, 1, 0)
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
@@ -275,7 +275,7 @@ def create_2v2_match(
     return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
 
 
-def create_solo_match(
+async def create_solo_match(
     match_queue: MatchQueue,
     bot_match_id: int,
     player: PlayerProfile,
@@ -329,7 +329,7 @@ def create_solo_match(
     round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
     matches = get_matches_for_round(round_id, 1, 0)
     while matches == []:
-        time.sleep(5)
+        await asyncio.sleep(5)
         matches = get_matches_for_round(round_id, 1, 0)
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id

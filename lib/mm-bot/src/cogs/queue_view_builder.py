@@ -5,11 +5,11 @@ import discord
 from aws.dynamodb import DynamoDbManager
 from cogs.constants import ROLE_ADMIN, ROLE_MOD
 from discord.ext import commands
+from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from matchmaking.match_queues.enum import QueueType
-from matchmaking.match_queues.matchmaking_manager import MatchmakingManager
 from models.match_queue import MatchQueue
-from views.join_queue import MatchQueueView
+from views.match_queue import MatchQueueView
 
 
 class QueueViewBuilder(commands.Cog):
@@ -20,8 +20,14 @@ class QueueViewBuilder(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.ddb_manager = DynamoDbManager()
-        self.mm_manager = MatchmakingManager()
         self.views: List[MatchQueueView] = []
+
+        mm_manager = get_matchmaking_manager_v2()
+        if mm_manager is None:
+            raise ValueError(
+                "Matchmaking manager, a fatally dependent resource, not found."
+            )
+        self.mm_manager = mm_manager
 
     async def cog_load(self) -> None:
         logging.info("Queue View Builder loading...")
@@ -169,8 +175,12 @@ class QueueViewBuilder(commands.Cog):
         # Update the ddb table
         self.ddb_manager.add_leaderboard_to_match_queue(queue_id, leaderboard_id)
 
-        # Update the active match
-        self.mm_manager.add_leaderboard_to_active_queue(queue_id, leaderboard_id)
+        active_queue = self.mm_manager.get_queue(queue_id)
+
+        if active_queue is not None:
+            if active_queue.queue.leaderboard_ids is None:
+                active_queue.queue.leaderboard_ids = []
+            active_queue.queue.leaderboard_ids.append(leaderboard_id)
 
         await ctx.send(
             f"Queue {queue_id} added to leaderboard {leaderboard_id}. Verify with /list_queues.",
@@ -242,7 +252,7 @@ class QueueViewBuilder(commands.Cog):
         self.ddb_manager.update_match_queue(queue)
 
         # Update the active match
-        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        active_queue = self.mm_manager.get_queue(queue.queue_id)
         if active_queue:
             active_queue.queue.ping_role_id = role.id
 
@@ -281,7 +291,7 @@ class QueueViewBuilder(commands.Cog):
         self.ddb_manager.update_match_queue(queue)
 
         # Also update it in the matchmaking manager
-        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        active_queue = self.mm_manager.get_queue(queue.queue_id)
 
         if active_queue is not None:
             active_queue.queue.primary_leaderboard_id = leaderboard_id
@@ -325,7 +335,7 @@ class QueueViewBuilder(commands.Cog):
         self.ddb_manager.update_match_queue(queue)
 
         # Also update in matchmaking manager (if it's active)
-        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        active_queue = self.mm_manager.get_queue(queue.queue_id)
         if active_queue is not None:
             active_queue.queue.category_id = category_id
 
@@ -360,7 +370,7 @@ class QueueViewBuilder(commands.Cog):
         self.ddb_manager.update_match_queue(queue)
 
         # Update the queue in the bot
-        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        active_queue = self.mm_manager.get_queue(queue.queue_id)
 
         if not active_queue:
             logging.warning(
@@ -402,7 +412,7 @@ class QueueViewBuilder(commands.Cog):
         self.ddb_manager.update_match_queue(queue)
 
         # Update the queue in the bot
-        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        active_queue = self.mm_manager.get_queue(queue.queue_id)
 
         if not active_queue:
             logging.warning(

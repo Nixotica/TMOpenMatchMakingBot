@@ -13,6 +13,7 @@ from matchmaking.match_complete.match_positions import get_match_positions_1v1v1
 from matchmaking.match_complete.match_positions_2v2 import MatchPositions2v2
 from matchmaking.match_queues.match_persistence import delete_persisted_match
 from matchmaking.matches.active_match import ActiveMatch
+from matchmaking.matches.simulator import MatchSimulator
 from matchmaking.matches.team_2v2 import Teams2v2
 from models.player_elo import PlayerElo
 from nadeo_event_api.api.event_api import get_match_results
@@ -62,11 +63,16 @@ class CompletedMatch:
                 f"Player profiles for solo match must be a list, not {type(self.active_match.player_profiles)}"
             )
 
-        self.match_results = get_match_results(
-            self.active_match.match_id,
-            length=len(self.active_match.player_profiles),
-            offset=0,
-        )
+        if self.active_match.match_queue.type.is_simulated():
+            self.match_results = MatchSimulator().get_match_results(
+                self.active_match.bot_match_id
+            )
+        else:
+            self.match_results = get_match_results(
+                self.active_match.match_id,
+                length=len(self.active_match.player_profiles),
+                offset=0,
+            )
 
         if self.active_match.match_queue.leaderboard_ids is None:
             logging.info(
@@ -130,11 +136,16 @@ class CompletedMatch:
                 f"Player profiles for 2v2 match must be a Teams2v2, not {type(self.active_match.player_profiles)}"
             )
 
-        self.match_results = get_match_results(
-            self.active_match.match_id,
-            length=4,
-            offset=0,
-        )
+        if self.active_match.match_queue.type.is_simulated():
+            self.match_results = MatchSimulator().get_match_results(
+                self.active_match.bot_match_id
+            )
+        else:
+            self.match_results = get_match_results(
+                self.active_match.match_id,
+                length=4,
+                offset=0,
+            )
 
         if self.active_match.match_queue.leaderboard_ids is None:
             logging.info(
