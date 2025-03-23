@@ -46,7 +46,7 @@ class MatchmakingManagerV2(commands.Cog):
 
         # Populate active queues to manage
         self.active_queues: List[ActiveMatchQueue] = []
-        match_queues = self.ddb_manager.get_active_match_queues()
+        match_queues = self.ddb_manager.get_match_queues()
         logging.info(
             f"Instantiating matchmaking manager v2 with {len(match_queues)} active match queues."
         )
@@ -510,21 +510,11 @@ class MatchmakingManagerV2(commands.Cog):
                 )
 
                 # Remove all players in this match from every other queue
-                for player in active_match.players():
+                for player in active_match.participants():
                     self.remove_player_from_all_active_queues(player)
 
                 # Persist the match in the case of bot going down
                 persist_match(active_match)
-
-                # Notify players of the match in discord
-                if isinstance(active_match.player_profiles, List):
-                    await self.send_players_match_start_notification(
-                        active_match.player_profiles, bot_match_id
-                    )
-                else:
-                    await self.send_2v2_players_match_start_notification(
-                        active_match.player_profiles, bot_match_id
-                    )
 
                 # Distribute the match to whom it may concern
                 self.mm_event_bus.add_new_active_match(active_match)

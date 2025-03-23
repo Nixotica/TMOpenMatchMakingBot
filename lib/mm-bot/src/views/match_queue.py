@@ -104,7 +104,7 @@ class MatchQueueView(ui.View):
             # Update this party's inactivity expiration date
             party_manager.update_party_activity(player_party)  # type: ignore
 
-            queue = self.mm_manager.get_active_queue_by_id(self.queue_id)
+            queue = self.mm_manager.get_queue(self.queue_id)
             if not queue:
                 logging.warning(
                     f"Unexpectedly could not find queue with ID {self.queue_id} in mm manager."
@@ -464,6 +464,9 @@ class MatchQueueView(ui.View):
                         ephemeral=True,
                     )
                 except Exception:
+                    # Note - this will fail for simulated 2v2 matches since they finish before
+                    # this can run but causes no errors, so I won't fix it (plus this will be replaced)
+                    # once the 2v2 join order issue is fixed.
                     logging.warning(
                         f"Player {player.discord_account_id} did not join in time."
                     )

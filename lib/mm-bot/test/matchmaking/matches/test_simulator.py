@@ -87,5 +87,12 @@ class TestSimulator(unittest.TestCase):
         self.assertEqual(team_results.get(team_a), 1)
         self.assertEqual(team_results.get(team_b), 2)
 
+        # Verify that all players are present in individual results
+        individual_results = match_positions.individual_results()
+        self.assertTrue(p1 in individual_results.keys())
+        self.assertTrue(p2 in individual_results.keys())
+        self.assertTrue(p3 in individual_results.keys())
+        self.assertTrue(p4 in individual_results.keys())
+
         # Verify that the match results were deleted
         self.assertEqual(MatchSimulator().get_match_results(bot_match_id), None)

@@ -71,7 +71,9 @@ class MatchSimulator:
             event_id=-1,
             round_id=-1,
             match_id=-1,
-            match_live_id="",
+            match_live_id=str(
+                bot_match_id
+            ),  # This needs to be unique, since it's DDB index key
             bot_match_id=bot_match_id,
             player_profiles=teams,
             match_queue=match_queue,
@@ -147,7 +149,7 @@ class MatchSimulator:
         for player in simulated_match.active_match.participants():
             # Create a "ranked participant" for this player.
             ranked_participant = RankedParticipant(
-                participant=player,
+                participant=player.tm_account_id,
                 rank=idx + 1,  # Ranked in the order they joined the queue.
                 score=0,  # Unused
                 zone=None,  # Unused
@@ -181,7 +183,7 @@ class MatchSimulator:
                 idx += 1
 
         return MatchResults(
-            match_live_id="",
+            match_live_id=simulated_match.active_match.match_live_id,
             round_position=0,
             results=results,
             teams=teams,

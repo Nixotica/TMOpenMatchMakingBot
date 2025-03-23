@@ -77,9 +77,6 @@ def calculate_elo_2v2_ratings(
     team_a_adjustment = K_team * (actual_score_team_a - expected_score_a)
     team_b_adjustment = K_team * (actual_score_team_b - expected_score_b)
 
-    print("team a adjustment:", team_a_adjustment)
-    print("team b adjustment:", team_b_adjustment)
-
     individual_results = match_positions.individual_results()
 
     def get_player_placement(

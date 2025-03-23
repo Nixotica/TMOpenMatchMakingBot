@@ -72,10 +72,6 @@ If you want to make commits and pull requests to master, there are a few differe
 
 4. Make your pull request, which will validate the same checks. 
 
-## Gotchas
-
-There currently isn't any CI/CD so deploying to prod is done from command line by running `export STAGE=prod` and then deploying. However, this *sometimes* makes the nadeo event api out of date, and it will cause deployment to fail. In that case, run `git ls-remote https://github.com/Nixotica/NadeoEventAPIWrapper.git release`, copy the hash, and paste it in `requirements.txt` instead of "release" in the final line. 
-
 ## Commands
 
 ### Create Queue

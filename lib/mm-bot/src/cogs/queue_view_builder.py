@@ -335,7 +335,7 @@ class QueueViewBuilder(commands.Cog):
         self.ddb_manager.update_match_queue(queue)
 
         # Also update in matchmaking manager (if it's active)
-        active_queue = self.mm_manager.get_active_queue_by_id(queue.queue_id)
+        active_queue = self.mm_manager.get_queue(queue.queue_id)
         if active_queue is not None:
             active_queue.queue.category_id = category_id
 
