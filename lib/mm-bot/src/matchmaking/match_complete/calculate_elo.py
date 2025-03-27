@@ -1,4 +1,6 @@
 from dataclasses import dataclass
+import logging
+import math
 from typing import Dict, List
 
 from matchmaking.match_complete.match_positions_2v2 import MatchPositions2v2
@@ -20,6 +22,64 @@ def expected_score(elo_i: int, elo_j: int):
     Calculate the expected score for player i against player j.
     """
     return 1 / (1 + 10 ** ((elo_j - elo_i) / 400))
+
+
+def get_team_points_multiplier(
+    player: PlayerElo, placement: int, teammate_placement: int, won: bool
+) -> float:
+    """Gets a player's share of the team's points won or lost based on their position and
+        their teammate's position.
+
+    Args:
+        player (PlayerElo): The player whose points are being calculated, as their current elo.
+        placement (int): The player's individual placement in the match.
+        teammate_placement (int): The player's teammate's individual placement in the match.
+        won (bool): Whether the player's team won the match.
+
+    Returns:
+        float: The elo diff multiplier to be applied to this player's elo change.
+    """
+
+    # Simply enumerate all possibilities and return the multiplier
+    if placement == 1:
+        if teammate_placement == 2:
+            return 0.5
+        elif teammate_placement == 3:
+            return 0.6 if won else 0.4
+        elif teammate_placement == 4:
+            return 0.8 if won else 0.2
+
+    if placement == 2:
+        if teammate_placement == 1:
+            return 0.5
+        elif teammate_placement == 3:
+            return 0.5
+        elif teammate_placement == 4:
+            return 0.7 if won else 0.3
+
+    if placement == 3:
+        if teammate_placement == 1:
+            return 0.4 if won else 0.6
+        elif teammate_placement == 2:
+            return 0.5
+        elif teammate_placement == 4:
+            return 0.5
+
+    if placement == 4:
+        if teammate_placement == 1:
+            return 0.2 if won else 0.8
+        elif teammate_placement == 2:
+            return 0.3 if won else 0.7
+        elif teammate_placement == 3:
+            return 0.5
+
+    # If we reach here, something went wrong
+    logging.error(
+        f"Could not calculate team points multiplier for player {player} with "
+        f"placement {placement} and teammate placement {teammate_placement}, "
+        f"won {won}. This should not happen. Returning 0.5"
+    )
+    return 0.5
 
 
 def calculate_elo_2v2_ratings(
@@ -74,10 +134,37 @@ def calculate_elo_2v2_ratings(
     actual_score_team_a = 1 if team_a_position == 1 else 0
     actual_score_team_b = 1 - actual_score_team_a
 
-    team_a_adjustment = K_team * (actual_score_team_a - expected_score_a)
-    team_b_adjustment = K_team * (actual_score_team_b - expected_score_b)
+    def symmetric_round(x):
+        """
+        Round the elo symmetrically around zero such that no elo is gained nor lost.
+        """
+        if x > 0:
+            return math.floor(x + 0.5)
+        else:
+            return math.ceil(x - 0.5)
 
-    individual_results = match_positions.individual_results()
+    def force_even_symmetrically(x):
+        """
+        Force the result to be even so it can be split evenly in case of 50/50,
+        accounting for the fact that we want to subtract if it's elo loss.
+        """
+        if x % 2 == 0:
+            return x
+        elif x > 0:
+            return x + 1
+        else:
+            return x - 1
+
+    team_a_adjustment: int = force_even_symmetrically(
+        symmetric_round(K_team * (actual_score_team_a - expected_score_a))
+    )
+    team_b_adjustment: int = force_even_symmetrically(
+        symmetric_round(K_team * (actual_score_team_b - expected_score_b))
+    )
+
+    print(
+        f"team_a_adjustment {team_a_adjustment} team_b_adjustment {team_b_adjustment}"
+    )
 
     def get_player_placement(
         player: PlayerElo, individual_results: Dict[PlayerProfile, int]
@@ -86,13 +173,39 @@ def calculate_elo_2v2_ratings(
             if player_profile.tm_account_id == player.tm_account_id:
                 return placement
 
-        raise ValueError(f"Could not find player {player} in {individual_results}")
+        raise ValueError(
+            f"Could not find player {player} in individual results {individual_results}"
+        )
+
+    def get_player_teammate_placement(
+        player: PlayerElo, team: Team2v2, individual_results: Dict[PlayerProfile, int]
+    ) -> int:
+        teammate_account_id = (
+            team.player_b.tm_account_id
+            if player.tm_account_id == team.player_a.tm_account_id
+            else team.player_a.tm_account_id
+        )
+
+        for player_profile, placement in individual_results.items():
+            if player_profile.tm_account_id == teammate_account_id:
+                return placement
+
+        raise ValueError(
+            f"Could not find teammate {teammate_account_id} in individual results {individual_results}"
+        )
+
+    individual_results = match_positions.individual_results()
 
     # Calculate new elo for each player with adjusted distribution to avoid boosting
     updated_elo_ratings = {}
     elo_differences = {}
     for player in player_elos:
-        R_i = player.elo
+        # Get the player's team
+        player_team = (
+            match_positions.teams.team_a
+            if match_positions.teams.team_a.__contains__(player.tm_account_id)
+            else match_positions.teams.team_b
+        )
 
         # Determine the player's team's expected and actual scores, and total adjustment
         player_in_team_a = match_positions.teams.team_a.__contains__(
@@ -100,34 +213,30 @@ def calculate_elo_2v2_ratings(
         )
         team_adjustment = team_a_adjustment if player_in_team_a else team_b_adjustment
 
-        # Calculate individual adjustment based on head-to-head performance
-        individual_adjustment = 0
-        for opponent in player_elos:
-            if opponent.tm_account_id == player.tm_account_id:
-                continue  # Skip self
+        # Based on the player's placement and their teammate's placement, calculate multiplier to apply
+        # to their team adjustment to split the amount won or lost
+        player_placement = get_player_placement(player, individual_results)
+        teammate_placement = get_player_teammate_placement(
+            player, player_team, individual_results
+        )
+        team_points_multiplier = get_team_points_multiplier(
+            player, player_placement, teammate_placement, team_adjustment > 0
+        )
 
-            # Calculate expected score against this opponent
-            E_ij = expected_score(R_i, opponent.elo)
+        print(
+            f"player {player.tm_account_id} elo_diff {team_adjustment * team_points_multiplier}"
+        )
 
-            # Determine actual score against this opponent (1 if player placed higher, 0 otherwise)
-            player_placement = get_player_placement(player, individual_results)
-            opponent_placement = get_player_placement(opponent, individual_results)
-            S_ij = 1 if player_placement < opponent_placement else 0
+        # Use symmetric rounding again to avoid bleeding or synthesis of elo
+        new_elo = symmetric_round(team_adjustment * team_points_multiplier) + player.elo
+        elo_diff = new_elo - player.elo
 
-            # Add to individual adjustment
-            individual_adjustment += K_individual * (S_ij - E_ij)
+        print(
+            f"player {player.tm_account_id} new_elo {new_elo} and elo_diff {elo_diff}"
+        )
 
-        # Combine team and individual adjustments
-        total_adjustment = team_adjustment + individual_adjustment
-
-        # Calculate the updated elo and diff
-        R_i_prime = R_i + total_adjustment
-        diff = R_i_prime - R_i
-
-        print(f"player {player.tm_account_id} R_i_prime {R_i_prime} and diff {diff}")
-
-        updated_elo_ratings[player] = round(R_i_prime)
-        elo_differences[player] = round(diff)
+        updated_elo_ratings[player] = new_elo
+        elo_differences[player] = elo_diff
 
     return UpdatedElos(
         updated_elo_ratings=updated_elo_ratings,

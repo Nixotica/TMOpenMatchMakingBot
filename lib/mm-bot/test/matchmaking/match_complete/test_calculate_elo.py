@@ -12,6 +12,7 @@ from src.matchmaking.match_complete.calculate_elo import (  # Assuming this code
     UpdatedElos,
     calculate_elo_2v2_ratings,
     calculate_elo_ratings,
+    get_team_points_multiplier,
 )
 from src.models.player_elo import PlayerElo
 
@@ -129,6 +130,44 @@ class TestEloSystem(unittest.TestCase):
             ),
         )
 
+    def test_get_team_points_multiplier(self):
+        # Test getting the points multiplier for a player based on their position relative to teammate
+        player_elo = PlayerElo("acc", "lb", 1000)
+
+        # Always 50/50 split for 1st and 2nd win or lose
+        self.assertEqual(get_team_points_multiplier(player_elo, 1, 2, True), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 1, 2, False), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 2, 1, True), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 2, 1, False), 0.5)
+
+        # Always 50/50 split for 2nd/3rd win or lose
+        self.assertEqual(get_team_points_multiplier(player_elo, 2, 3, True), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 2, 3, False), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 3, 2, True), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 3, 2, False), 0.5)
+
+        # Always 50/50 split for 3rd/4th win or lose
+        self.assertEqual(get_team_points_multiplier(player_elo, 3, 4, True), 0.5)
+        self.assertEqual(get_team_points_multiplier(player_elo, 3, 4, False), 0.5)
+
+        # 60/40 split for 1st/3rd win
+        self.assertEqual(get_team_points_multiplier(player_elo, 1, 3, True), 0.6)
+
+        # 40/60 split for 1st/3rd lose
+        self.assertEqual(get_team_points_multiplier(player_elo, 1, 3, False), 0.4)
+
+        # 80/20 split for 1st/4th win
+        self.assertEqual(get_team_points_multiplier(player_elo, 1, 4, True), 0.8)
+
+        # 20/80 split for 1st/4th lose
+        self.assertEqual(get_team_points_multiplier(player_elo, 1, 4, False), 0.2)
+
+        # 70/30 split for 2nd/4th win
+        self.assertEqual(get_team_points_multiplier(player_elo, 2, 4, True), 0.7)
+
+        # 30/70 split for 2nd/4th lose
+        self.assertEqual(get_team_points_multiplier(player_elo, 2, 4, False), 0.3)
+
     def test_calculate_elo_2v2_ratings(self):
         # Test calculating Elo ratings for 2v2 matches also accounting for match positions
         updated_elos: UpdatedElos = calculate_elo_2v2_ratings(
@@ -155,15 +194,24 @@ class TestEloSystem(unittest.TestCase):
         self.assertLess(elo_differences[self.player1_elo], 0)
         self.assertLess(elo_differences[self.player2_elo], 0)
 
-        # Ensure that since P1 came in last, they have lower elo diff than P2
-        self.assertLess(
-            elo_differences[self.player2_elo], elo_differences[self.player1_elo]
+        # Ensure that since P1 came in last and P2 came in first, P2 elo diff is approx 4x P1 elo diff
+        # (0.8/0.2) - accounting for the fact we have to round (-3.2 -> -3, -12.8 -> -13)
+        self.assertAlmostEqual(
+            elo_differences[self.player1_elo] * 4,
+            elo_differences[self.player2_elo],
+            delta=1,
         )
 
-        # Ensure that since P3 came in third, they have lower elo diff than P4
-        self.assertLess(
-            elo_differences[self.player3_elo], elo_differences[self.player4_elo]
+        # Ensure that since P3 came in third and P4 came in second, P3 and P4 have same elo diff (0.5/0.5)
+        self.assertAlmostEqual(
+            elo_differences[self.player3_elo],
+            elo_differences[self.player4_elo],
+            places=5,
         )
+
+        # Ensure that the sum of all Elo differences is approximately zero (conservation principle)
+        total_difference = sum(elo_differences.values())
+        self.assertAlmostEqual(total_difference, 0, places=5)
 
     def test_calculate_elo_ratings(self):
         # Test calculating Elo ratings for multiple players based on match positions
