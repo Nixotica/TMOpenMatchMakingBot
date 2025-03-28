@@ -61,12 +61,14 @@ class MatchQueueView(ui.View):
         self.update_queue_embed.start()
         self.process_active_matches.start()
         self.process_completed_matches.start()
+        self.ping_queue_started_event.start()
 
     async def stop_task(self):
         await self.active_queue_message.delete()
         self.update_queue_embed.stop()
         self.process_active_matches.stop()
         self.process_completed_matches.stop()
+        self.ping_queue_started_event.stop()
         for _, message in self.active_match_messages.items():
             await message.delete()
 
@@ -582,6 +584,7 @@ class MatchQueueView(ui.View):
                 logging.error(
                     f"Failed to create channel for match {active_match.bot_match_id}."
                 )
+                return
 
             if isinstance(active_match.player_profiles, List):
                 self.bot.loop.create_task(
