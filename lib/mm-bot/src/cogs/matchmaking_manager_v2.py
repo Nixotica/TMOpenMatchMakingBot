@@ -193,6 +193,9 @@ class MatchmakingManagerV2(commands.Cog):
 
         self.maybe_publish_queue_started_message(players[0], queue)
 
+        # Update this here so that only periods of no parties joining for >1hr will ping
+        self._last_queue_started_time[queue.queue.queue_id] = time.time()
+
         return queue
 
     def remove_party_from_queue(
