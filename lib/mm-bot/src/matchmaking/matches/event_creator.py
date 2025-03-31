@@ -224,7 +224,7 @@ async def create_2v2_match(
 
     teams_url = post_tmwt_2v2(
         teams_paste,
-        event_name,
+        f"BMM{bot_match_id}",
         pastes_io_token,
     )
 
@@ -260,7 +260,6 @@ async def create_2v2_match(
                         ready_minimum_team_size=2,
                         pick_ban_start_auto=False,
                         pick_ban_order="",
-                        enable_ready_manager=False,
                     ),
                 ),
             )
