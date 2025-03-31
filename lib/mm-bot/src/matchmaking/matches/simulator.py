@@ -126,7 +126,7 @@ class MatchSimulator:
         Returns:
             MatchResults: The simulated match results.
         """
-        return self.match_results.pop(bot_match_id, None)
+        return self.match_results.pop(bot_match_id, None)  # type: ignore
 
     def get_simulated_matches(self) -> List[SimulatedMatch]:
         return self.simulated_matches
@@ -157,7 +157,7 @@ class MatchSimulator:
             )
 
             # Overwrite the team if the match is a team match.
-            for team in simulated_match.active_match.teams():
+            for team in simulated_match.active_match.teams():  # type: ignore
                 if player in team:
                     ranked_participant.team = team.name
 
@@ -170,7 +170,7 @@ class MatchSimulator:
         if simulated_match.active_match.match_queue.type.is_2v2():
 
             idx = 0
-            for team in simulated_match.active_match.teams():
+            for team in simulated_match.active_match.teams():  # type: ignore
                 ranked_team = RankedTeam(
                     position=idx + 1,  # Blue wins, red loses.
                     team=team.name,

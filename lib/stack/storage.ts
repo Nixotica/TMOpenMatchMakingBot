@@ -201,7 +201,9 @@ export class StorageStack extends Stack {
          * ```
          * { 
          *      "UBI_AUTHS": ["Basic <base64(user:pass)>", ...],
-         *      "DISCORD_BOT_TOKEN": "bot_token"
+         *      "DISCORD_BOT_TOKEN": "<bot_token>",
+         *      "PASTES_IO_LOGIN": "<username>",
+         *      "PASTES_IO_PASSWORD": "<password>",
          * }
          * ```
          * 
