@@ -2,6 +2,7 @@ import asyncio
 import datetime as dt
 from typing import List
 
+from aws.s3 import S3ClientManager
 from matchmaking.constants import POINTS_LIMIT_1v1v1v1
 from matchmaking.matches.created_match_info import CreatedMatchInfo
 from matchmaking.matches.map_selection_manager import MapSelectionManager
@@ -30,9 +31,14 @@ from nadeo_event_api.api.structure.settings.script_settings import (
     BaseScriptSettings,
     CupSpecialScriptSettings,
     RoundsScriptSettings,
-    TMWTScriptSettings,
+    TMWT2025ScriptSettings,
+    BaseTMWTScriptSettings,
 )
-from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import Tmwt2v2PastebinTeam
+from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import (
+    Tmwt2v2Paste,
+    Tmwt2v2PasteTeam,
+)
+from nadeo_event_api.api.pastesio.pastesio_api import login, post_tmwt_2v2
 
 
 async def create_1v1v1v1_match(
@@ -193,24 +199,34 @@ async def create_2v2_match(
 
     map_to_use = MapSelectionManager().get_random_map(match_queue)
 
-    # pastebin_api_dev_key = S3ClientManager().get_secrets().pastebin_api_dev_key
+    # Authenticate with pastes.io
+    s3_secrets = S3ClientManager().get_secrets()
+    pastes_io_login = s3_secrets.pastes_io_login
+    pastes_io_password = s3_secrets.pastes_io_password
+    pastes_io_token = login(pastes_io_login, pastes_io_password)
 
-    team_a = Tmwt2v2PastebinTeam(
+    team_a = Tmwt2v2PasteTeam(
+        teams.team_a.name,
         teams.team_a.name,
         teams.team_a.player_a.tm_account_id,
         teams.team_a.player_b.tm_account_id,
     )
-    team_b = Tmwt2v2PastebinTeam(
+    team_b = Tmwt2v2PasteTeam(
+        teams.team_b.name,
         teams.team_b.name,
         teams.team_b.player_a.tm_account_id,
         teams.team_b.player_b.tm_account_id,
     )
+    teams_paste = Tmwt2v2Paste(
+        team_a,
+        team_b,
+    )
 
-    # paste = Tmwt2v2Pastebin(
-    #     team_a,
-    #     team_b,
-    # )
-    # teams_url = post_tmwt_2v2(paste, pastebin_api_dev_key)
+    teams_url = post_tmwt_2v2(
+        teams_paste,
+        f"BMM{bot_match_id}",
+        pastes_io_token,
+    )
 
     event = Event(
         name=event_name,
@@ -227,15 +243,17 @@ async def create_2v2_match(
                 ],
                 config=RoundConfig(
                     map_pool=[map_to_use],
-                    script=ScriptType.TMWT_TEAMS,
+                    script=ScriptType.TMWT_2025,
                     max_players=4,
-                    script_settings=TMWTScriptSettings(
-                        base_script_settings=BaseScriptSettings(
-                            warmup_number=1,
+                    script_settings=TMWT2025ScriptSettings(
+                        base_tmwt_script_settings=BaseTMWTScriptSettings(
+                            base_script_settings=BaseScriptSettings(
+                                warmup_number=1,
+                            ),
+                            match_points_limit=1,
+                            teams_url=teams_url,
+                            match_info=event_name,
                         ),
-                        match_points_limit=1,
-                        # teams_url=teams_url, # TODO - add this back if/when pastebin API limit is resolved
-                        match_info=f"BMM - #{bot_match_id}",
                     ),
                     plugin_settings=TMWTPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,

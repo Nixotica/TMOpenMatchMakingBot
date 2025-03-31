@@ -5,7 +5,7 @@ from typing import Dict, List, Optional
 import discord
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
-from cogs.constants import COLOR_EMBED, JOIN_MATCH_2V2_TIMEOUT_SEC, ROLE_ADMIN, ROLE_MOD
+from cogs.constants import COLOR_EMBED, ROLE_ADMIN, ROLE_MOD
 from matchmaking.matches.completed_match import CompletedMatch
 from matchmaking.mm_event_bus import EventType, MatchmakingManagerEventBus
 from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
@@ -15,7 +15,6 @@ from discord.ext import commands, tasks
 from helpers import get_guild, get_ping_channel, get_rank_for_player
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
-from matchmaking.matches.team_2v2 import Teams2v2
 from models.leaderboard_rank import LeaderboardRank
 from models.player_profile import PlayerProfile
 
@@ -411,152 +410,52 @@ class MatchQueueView(ui.View):
                 f"Error sending message for match start to players {players}: {e}"
             )
 
-    async def send_2v2_players_match_start_notification(
-        self,
-        teams: Teams2v2,
-        bot_match_id: int,
-        match_channel: TextChannel,
-    ) -> None:
-        """Sends a ping in discord in order of players to join 2v2 match.
-
-        Args:
-            teams (Teams2v2): The teams in the match to ping.
-            bot_match_id (int): The bot match ID of the match starting.
-            match_channel (TextChannel): The channel in which to ping for the new match.
-        """
-        # This is a unique work-around of a Nadeo bug where we ping players
-        # Blue-Red-Blue-Red to ensure they join in the right order.
-
-        try:
-            player_join_order = [
-                teams.team_a.player_a,
-                teams.team_b.player_a,
-                teams.team_a.player_b,
-                teams.team_b.player_b,
-            ]
-
-            for player in player_join_order:
-                # Add match joined ack button
-                button = discord.ui.Button(
-                    label="I joined the Server", style=discord.ButtonStyle.green
-                )
-                view = discord.ui.View(timeout=JOIN_MATCH_2V2_TIMEOUT_SEC)
-                view.add_item(button)
-
-                # Corouting to await button interaction
-                def check(interaction: discord.Interaction):
-                    return (
-                        interaction.user.id == player.discord_account_id
-                        and interaction.channel.id == match_channel.id  # type: ignore
-                    )
-
-                _ = await match_channel.send(
-                    content=f"<@{player.discord_account_id}> Your 2v2 match is ready. Please join "
-                    f"BMM - #{bot_match_id} in-game **then click the button** once you're in.",
-                    view=view,
-                )
-
-                try:
-                    # Wait for player ack
-                    interaction = await self.bot.wait_for(
-                        "interaction", check=check, timeout=JOIN_MATCH_2V2_TIMEOUT_SEC
-                    )
-                    await interaction.response.send_message(
-                        f"<@{player.discord_account_id}> joined match, pinging next player.",
-                        ephemeral=True,
-                    )
-                except Exception:
-                    # Note - this will fail for simulated 2v2 matches since they finish before
-                    # this can run but causes no errors, so I won't fix it (plus this will be replaced)
-                    # once the 2v2 join order issue is fixed.
-                    logging.warning(
-                        f"Player {player.discord_account_id} did not join in time."
-                    )
-                    await match_channel.send(
-                        content=f"<@{player.discord_account_id}> did not join in time for "
-                        f"BMM - #{bot_match_id}, please ping for a Mod.",
-                    )
-                    return
-
-            # Match is ready to go
-            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-            embed.add_field(
-                name="❗ Match Ready",
-                value=f"All players have joined BMM - #{bot_match_id}, starting match.",
-            )
-
-            await match_channel.send(embed=embed)
-
-        except Exception as e:
-            logging.error(f"Error sending message for match start to players: {e}")
-
-    async def process_new_active_solo_match(
+    async def process_new_active_match(
         self, active_match: ActiveMatch, match_channel: TextChannel
     ) -> None:
-        if not isinstance(active_match.player_profiles, List):
-            logging.error(
-                f"Expected player profiles to be a list, got {type(active_match.player_profiles)} instead."
+        # Handle solo match specific cases
+        if isinstance(active_match.player_profiles, List):
+            # Create an embed to put in the queue channel to display the ongoing match
+            players = active_match.player_profiles
+
+            value = ""
+            for player in players:
+                value += f"<@{player.discord_account_id}>\n"
+
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name=f"🏎️ Match #{active_match.bot_match_id} in progress...", value=value
             )
-            return
 
-        # Create an embed to put in the queue channel to display the ongoing match
-        players = active_match.player_profiles
+            message = await self.queue_channel.send(embed=embed)
+        # Handle 2v2 match specific cases
+        else:
+            # Create an embed to put in the queue channel to display the ongoing match
+            embed = discord.Embed(
+                title=f"🏎️ Match #{active_match.bot_match_id} in progress...",
+                color=COLOR_EMBED,
+                timestamp=datetime.utcnow(),
+            )
 
-        value = ""
-        for player in players:
-            value += f"<@{player.discord_account_id}>\n"
+            team_a = active_match.player_profiles.team_a
+            embed.add_field(
+                name="Blue Team",
+                value=f"<@{team_a.player_a.discord_account_id}> & <@{team_a.player_b.discord_account_id}>",
+            )
 
-        embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-        embed.add_field(
-            name=f"🏎️ Match #{active_match.bot_match_id} in progress...", value=value
-        )
+            team_b = active_match.player_profiles.team_b
+            embed.add_field(
+                name="Red Team",
+                value=f"<@{team_b.player_a.discord_account_id}> & <@{team_b.player_b.discord_account_id}>",
+            )
 
-        message = await self.queue_channel.send(embed=embed)
+            message = await self.queue_channel.send(embed=embed)
+
         self.active_match_messages[active_match.bot_match_id] = message
 
         # Ping players
         await self.send_players_match_start_notification(
-            players, active_match.bot_match_id, match_channel
-        )
-
-    async def process_new_active_teams_match(
-        self,
-        active_match: ActiveMatch,
-        match_channel: TextChannel,
-    ) -> None:
-        if not isinstance(active_match.player_profiles, Teams2v2):
-            logging.error(
-                f"Expected player profiles to be a Teams2v2, got {type(active_match.player_profiles)} instead."
-            )
-            return
-
-        # Create an embed to put in the queue channel to display the ongoing match
-        embed = discord.Embed(
-            title=f"🏎️ Match #{active_match.bot_match_id} in progress...",
-            color=COLOR_EMBED,
-            timestamp=datetime.utcnow(),
-        )
-
-        team_a = active_match.player_profiles.team_a
-        embed.add_field(
-            name="Blue Team",
-            value=f"<@{team_a.player_a.discord_account_id}> & <@{team_a.player_b.discord_account_id}>",
-        )
-
-        team_b = active_match.player_profiles.team_b
-        embed.add_field(
-            name="Red Team",
-            value=f"<@{team_b.player_a.discord_account_id}> & <@{team_b.player_b.discord_account_id}>",
-        )
-
-        message = await self.queue_channel.send(embed=embed)
-        self.active_match_messages[active_match.bot_match_id] = message
-
-        # Ping players
-        await self.send_2v2_players_match_start_notification(
-            active_match.player_profiles,
-            active_match.bot_match_id,
-            match_channel,
+            active_match.participants(), active_match.bot_match_id, match_channel
         )
 
     @tasks.loop(seconds=5)
@@ -586,17 +485,9 @@ class MatchQueueView(ui.View):
                 )
                 return
 
-            if isinstance(active_match.player_profiles, List):
-                self.bot.loop.create_task(
-                    self.process_new_active_solo_match(active_match, match_channel)
-                )
-            elif isinstance(active_match.player_profiles, Teams2v2):
-                self.bot.loop.create_task(
-                    self.process_new_active_teams_match(active_match, match_channel)
-                )
-            else:
-                logging.error(f"Unknown match type {type(active_match)}")
-                processed = False
+            self.bot.loop.create_task(
+                self.process_new_active_match(active_match, match_channel)
+            )
 
             if processed:
                 logging.info(
