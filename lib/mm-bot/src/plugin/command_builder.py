@@ -5,6 +5,7 @@ from matchmaking.matches.completed_match import CompletedMatch
 from plugin.commands.queue_update import QueueUpdateCommand
 from plugin.commands.match_ready import MatchReadyCommand
 from plugin.commands.match_results import MatchResultsCommand
+from plugin.responses.leave_queue import LeaveQueueResponse
 
 class CommandBuilder:
     _instance = None
@@ -24,6 +25,9 @@ class CommandBuilder:
             queue_id=queue.queue.queue_id,
             player_count=queue.player_count()
         )
+    
+    def build_leave_queue(self) -> LeaveQueueResponse:
+        return LeaveQueueResponse()
     
     def build_match_ready(self, match: ActiveMatch) -> MatchReadyCommand:
         command = MatchReadyCommand(
