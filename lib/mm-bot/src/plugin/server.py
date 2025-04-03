@@ -8,6 +8,7 @@ from plugin.connection import PluginConnection
 from plugin.responses.base_response import BaseResponse
 from plugin.command_builder import CommandBuilder
 
+
 class PluginServer:
     _instance = None
 
@@ -27,14 +28,18 @@ class PluginServer:
             self._ddb_manager = DynamoDbManager()
             self._mm_manager = get_matchmaking_manager_v2()
             self._mm_event_bus = MatchmakingManagerEventBus()
-            self._match_ready_queue = self._mm_event_bus.subscribe(EventType.NEW_ACTIVE_MATCH)
-            self._match_complete_queue = self._mm_event_bus.subscribe(EventType.NEW_COMPLETED_MATCH)
-            self._joined_queue_queue = self._mm_event_bus.subscribe(EventType.JOINED_QUEUE)
+            self._match_ready_queue = self._mm_event_bus.subscribe(
+                EventType.NEW_ACTIVE_MATCH
+            )
+            self._match_complete_queue = self._mm_event_bus.subscribe(
+                EventType.NEW_COMPLETED_MATCH
+            )
+            self._joined_queue_queue = self._mm_event_bus.subscribe(
+                EventType.JOINED_QUEUE
+            )
             self._left_queue_queue = self._mm_event_bus.subscribe(EventType.LEFT_QUEUE)
 
-            logging.info(
-                f"Instantiating plugin server."
-            )
+            logging.info("Instantiating plugin server.")
 
     def start_run_forever_in_thread(self):
         logging.info("Starting plugin server in a separate thread...")
@@ -42,7 +47,9 @@ class PluginServer:
         self._thread.start()
 
         logging.info("Starting plugin event bus worker in a separate thread...")
-        self._event_thread = threading.Thread(target=self._start_event_worker_loop, daemon=True)
+        self._event_thread = threading.Thread(
+            target=self._start_event_worker_loop, daemon=True
+        )
         self._event_thread.start()
 
     async def try_send_command(self, tm_account_id: str, response: BaseResponse):
@@ -52,9 +59,11 @@ class PluginServer:
                 await client.send_command(response)
                 return True
         except Exception as e:
-            logging.exception(f"Failed trying to sending command to user: {tm_account_id}", e)
-        return False  
-    
+            logging.exception(
+                f"Failed trying to sending command to user: {tm_account_id}", e
+            )
+        return False
+
     def _start_event_worker_loop(self):
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -68,37 +77,59 @@ class PluginServer:
                     self._match_complete_queue
                 )
                 if completed_match is not None:
-                    logging.info(f"Sending Match Completed request to players connected via plugin for match: {completed_match.active_match.match_id}")
-                    completed_match_command = self._command_builder.build_match_results(completed_match)
+                    logging.info(
+                        f"Sending Match Completed request to plugins for match {completed_match.active_match.match_id}"
+                    )
+                    completed_match_command = self._command_builder.build_match_results(
+                        completed_match
+                    )
                     for player in completed_match.active_match.participants():
-                        await self.try_send_command(player.tm_account_id, completed_match_command)
+                        await self.try_send_command(
+                            player.tm_account_id, completed_match_command
+                        )
 
                 new_match = self._mm_event_bus.get_new_active_match(
                     self._match_ready_queue
                 )
                 if new_match is not None:
-                    logging.info(f"Sending Match Ready request to players connected via plugin for match: {new_match.match_id}")
-                    new_match_command = self._command_builder.build_match_ready(new_match)
+                    logging.info(
+                        f"Sending Match Ready request to plugins for match {new_match.match_id}"
+                    )
+                    new_match_command = self._command_builder.build_match_ready(
+                        new_match
+                    )
                     for player in new_match.participants():
-                        await self.try_send_command(player.tm_account_id, new_match_command)
+                        await self.try_send_command(
+                            player.tm_account_id, new_match_command
+                        )
 
-                joined_queue = self._mm_event_bus.get_new_joined_queue(self._joined_queue_queue)
+                joined_queue = self._mm_event_bus.get_new_joined_queue(
+                    self._joined_queue_queue
+                )
                 if joined_queue is not None:
                     queue = self._mm_manager.get_queue(joined_queue)
                     if queue:
-                        queue_update_command = self._command_builder.build_queue_update(queue)
+                        queue_update_command = self._command_builder.build_queue_update(
+                            queue
+                        )
                         for tm_account_id, _ in self._connected_clients.items():
-                            await self.try_send_command(tm_account_id, queue_update_command)
+                            await self.try_send_command(
+                                tm_account_id, queue_update_command
+                            )
 
-                left_queue = self._mm_event_bus.get_new_left_queue(self._left_queue_queue)
+                left_queue = self._mm_event_bus.get_new_left_queue(
+                    self._left_queue_queue
+                )
                 if left_queue is not None:
                     left_queue_command = self._command_builder.build_leave_queue()
                     for player in left_queue:
-                        await self.try_send_command(player.tm_account_id, left_queue_command)
+                        await self.try_send_command(
+                            player.tm_account_id, left_queue_command
+                        )
             except Exception as e:
-                logging.exception(f"Exception occurred in plugin event worker", e)
+                logging.exception("Exception occurred in plugin event worker", e)
             finally:
-                asyncio.sleep(100)
+                await asyncio.sleep(100)
 
     def _start_event_loop(self):
         """Starts an event loop in the current thread to run async methods."""
@@ -108,14 +139,19 @@ class PluginServer:
         loop.run_forever()
 
     async def _start_listen_server(self):
-        logging.info(f"Plugin Server is listening on 0.0.0.0:27990")
-        self._server = await asyncio.start_server(self._handle_connection, "0.0.0.0", 27990)
+        logging.info("Plugin Server is listening on 0.0.0.0:27990")
+        self._server = await asyncio.start_server(
+            self._handle_connection, "0.0.0.0", 27990
+        )
         async with self._server:
             await self._server.serve_forever()
 
-    async def _handle_connection(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter):
-        logging.info(f"A new plugin connection from {writer.transport.get_extra_info('peername')} has been established")
-        
+    async def _handle_connection(
+        self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
+    ):
+        peer_info = writer.transport.get_extra_info("peername")
+        logging.info(f"A new plugin connection from {peer_info} has been established")
+
         connection = PluginConnection(reader, writer)
 
         connection_id = None
@@ -134,12 +170,16 @@ class PluginServer:
             del self._connected_clients[connection_id]
             self.remove_player_from_queue(connection_id)
 
-        logging.info(f"Plugin connection from {writer.transport.get_extra_info('peername')} ({connection_id}) has been disconnected")
+        logging.info(
+            f"Plugin connection from {peer_info} ({connection_id}) has been disconnected"
+        )
 
     def remove_player_from_queue(self, tm_account_id: str):
         try:
-            profile = self._ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
+            profile = self._ddb_manager.query_player_profile_for_tm_account_id(
+                tm_account_id
+            )
             if profile:
                 self._mm_manager.remove_player_from_all_active_queues(profile)
-        except:
+        except Exception:
             logging.error(f"Unable to remove player {tm_account_id} from queues")

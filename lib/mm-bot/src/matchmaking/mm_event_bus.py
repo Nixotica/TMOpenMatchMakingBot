@@ -123,10 +123,10 @@ class MatchmakingManagerEventBus:
             return queue.get_nowait()
         except asyncio.QueueEmpty:
             return None
-        
+
     def add_player_joined_queue(self, queue_id: str) -> None:
         """Adds a new player joined queue event to a pub-sub queue to be consumed by subscribers.
-        
+
         Args:
             queue_id (str): The queue that was joined by a player.
             player (PlayerProfile): The player that joined the queue.
@@ -135,9 +135,7 @@ class MatchmakingManagerEventBus:
         for sub in joined_queue_subs:
             sub.put_nowait(queue_id)
 
-    def get_new_joined_queue(
-        self, queue: asyncio.Queue
-    ) -> Optional[str]:
+    def get_new_joined_queue(self, queue: asyncio.Queue) -> Optional[str]:
         """Gets a new joined queue event from the given queue, None if empty.
 
         Args:
@@ -153,7 +151,7 @@ class MatchmakingManagerEventBus:
 
     def add_player_left_queue(self, players: list[PlayerProfile]) -> None:
         """Adds a new player left queue event to a pub-sub queue to be consumed by subscribers.
-        
+
         Args:
             players (list[PlayerProfile]): The players that left the queue.
         """
@@ -161,9 +159,7 @@ class MatchmakingManagerEventBus:
         for sub in joined_queue_subs:
             sub.put_nowait(players)
 
-    def get_new_left_queue(
-        self, queue: asyncio.Queue
-    ) -> Optional[list[PlayerProfile]]:
+    def get_new_left_queue(self, queue: asyncio.Queue) -> Optional[list[PlayerProfile]]:
         """Gets a new left queue event from the given queue, None if empty.
 
         Args:

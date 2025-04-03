@@ -9,6 +9,7 @@ from plugin.requests.get_leaderboards import GetLeaderboardsRequest
 from plugin.requests.get_stats import GetStatsRequest
 from plugin.requests.ping import PingRequest
 
+
 class RequestParser:
     _instance = None
 
@@ -16,7 +17,7 @@ class RequestParser:
         if not cls._instance:
             cls._instance = super(RequestParser, cls).__new__(cls)
         return cls._instance
-    
+
     def from_buffer(self, buffer: str) -> BaseRequest:
         try:
             obj: dict = json.loads(buffer)
@@ -26,10 +27,10 @@ class RequestParser:
         if "User" not in obj or "Command" not in obj:
             logging.info(f"Invalid command received: {obj}")
             return None
-        
-        user: str = obj.get('User')
-        command: str = obj.get('Command')
-        payload: dict = obj.get('Payload')
+
+        user: str = obj.get("User", "")
+        command: str = obj.get("Command", "")
+        payload: dict = obj.get("Payload", {})
 
         match command:
             case "GetQueues":

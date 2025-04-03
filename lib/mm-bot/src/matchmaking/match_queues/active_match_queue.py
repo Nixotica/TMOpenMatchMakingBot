@@ -19,7 +19,7 @@ class ActiveMatchQueue:
 
     def player_count(self) -> int:
         """Get the number of players currently queued in this match queue.
-        
+
         Returns:
             int: Number of players currently queued
         """

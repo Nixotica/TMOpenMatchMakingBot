@@ -1,5 +1,6 @@
 from plugin.responses.base_response import BaseResponse
 
+
 class GetQueuesResponse(BaseResponse):
     def __init__(self, queues):
         super().__init__()
@@ -7,11 +8,9 @@ class GetQueuesResponse(BaseResponse):
 
     def name(self) -> str:
         return "GetQueuesResponse"
-    
+
     def payload(self) -> dict:
-        return {
-            "Queues": self._queues
-        }
-    
+        return {"Queues": self._queues}
+
     def status_code(self):
         return 200

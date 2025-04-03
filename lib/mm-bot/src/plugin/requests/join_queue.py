@@ -1,7 +1,8 @@
 from plugin.requests.base_request import BaseRequest
 
+
 class JoinQueueRequest(BaseRequest):
-    queue_id: str = None
+    queue_id: str | None = None
 
     def __init__(self, user, queue_id):
         super().__init__(user)

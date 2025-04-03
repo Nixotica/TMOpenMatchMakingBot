@@ -12,6 +12,7 @@ from health_check import start_health_check_in_thread
 from models.bot_secrets import Secrets
 from plugin.server import PluginServer
 
+
 # Define bot
 class DiscordBot(Bot):
     def __init__(self) -> None:

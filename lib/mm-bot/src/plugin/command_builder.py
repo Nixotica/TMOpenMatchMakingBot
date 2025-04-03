@@ -7,6 +7,7 @@ from plugin.commands.match_ready import MatchReadyCommand
 from plugin.commands.match_results import MatchResultsCommand
 from plugin.responses.leave_queue import LeaveQueueResponse
 
+
 class CommandBuilder:
     _instance = None
 
@@ -14,7 +15,7 @@ class CommandBuilder:
         if not cls._instance:
             cls._instance = super(CommandBuilder, cls).__new__(cls)
         return cls._instance
-    
+
     def __init__(self):
         if not hasattr(self, "_initialized"):  # Avoid re-initializing the instance
             self._initialized = True
@@ -22,19 +23,18 @@ class CommandBuilder:
 
     def build_queue_update(self, queue: ActiveMatchQueue) -> QueueUpdateCommand:
         return QueueUpdateCommand(
-            queue_id=queue.queue.queue_id,
-            player_count=queue.player_count()
+            queue_id=queue.queue.queue_id, player_count=queue.player_count()
         )
-    
+
     def build_leave_queue(self) -> LeaveQueueResponse:
         return LeaveQueueResponse()
-    
+
     def build_match_ready(self, match: ActiveMatch) -> MatchReadyCommand:
         command = MatchReadyCommand(
             match_id=match.match_id,
-            club_name="Better Matchmaking", # TODO: This should be retrieved by the club_id
+            club_name="Better Matchmaking",  # TODO: This should be retrieved by the club_id
             activity_name=match.event_name,
-            is_team_mode=match.match_queue.type.is_2v2()
+            is_team_mode=match.match_queue.type.is_2v2(),
         )
 
         join_link = match.get_match_join_link()
@@ -45,22 +45,32 @@ class CommandBuilder:
         if match.match_queue.type.is_2v2():
             team_id = 0
             for team in match.teams():
-                player_a_elo = self._ddb_manager.get_or_create_player_elo(team.player_a.tm_account_id, leaderboard_id)
-                player_b_elo = self._ddb_manager.get_or_create_player_elo(team.player_b.tm_account_id, leaderboard_id)
-                command.add_player(team.player_a.tm_account_id, player_a_elo.elo, team_id)
-                command.add_player(team.player_b.tm_account_id, player_b_elo.elo, team_id)
+                player_a_elo = self._ddb_manager.get_or_create_player_elo(
+                    team.player_a.tm_account_id, leaderboard_id
+                )
+                player_b_elo = self._ddb_manager.get_or_create_player_elo(
+                    team.player_b.tm_account_id, leaderboard_id
+                )
+                command.add_player(
+                    team.player_a.tm_account_id, player_a_elo.elo, team_id
+                )
+                command.add_player(
+                    team.player_b.tm_account_id, player_b_elo.elo, team_id
+                )
                 team_id += 1
         else:
             for player in match.participants():
-                player_elo = self._ddb_manager.get_or_create_player_elo(player.tm_account_id, leaderboard_id)
+                player_elo = self._ddb_manager.get_or_create_player_elo(
+                    player.tm_account_id, leaderboard_id
+                )
                 command.add_player(player.tm_account_id, player_elo.elo)
-        
+
         return command
-    
+
     def build_match_results(self, match: CompletedMatch):
         command = MatchResultsCommand(
             match_id=match.active_match.match_id,
-            is_team_mode=match.active_match.match_queue.type.is_2v2()
+            is_team_mode=match.active_match.match_queue.type.is_2v2(),
         )
 
         player_map = {}
@@ -74,17 +84,15 @@ class CommandBuilder:
                     team_id = 1
 
                 command.add_player(
-                    player.tm_account_id, 
+                    player.tm_account_id,
                     player_map[player.tm_account_id],
                     player.elo,
-                    team_id
+                    team_id,
                 )
         else:
             for player in match.elo_differences:
                 command.add_player(
-                    player.tm_account_id, 
-                    player_map[player.tm_account_id],
-                    player.elo
+                    player.tm_account_id, player_map[player.tm_account_id], player.elo
                 )
 
         return command

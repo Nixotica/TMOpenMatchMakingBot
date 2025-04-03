@@ -1,11 +1,12 @@
 import json
 from abc import abstractmethod
 
+
 class BaseResponse:
     @abstractmethod
     def name(self) -> str:
         pass
-    
+
     @abstractmethod
     def payload(self) -> dict:
         pass
@@ -20,10 +21,10 @@ class BaseResponse:
 
     @abstractmethod
     def encode(self) -> bytes:
-        return json.dumps({
-            "Command": self.name(),
-            "Payload": self.payload(),
-            "StatusCode": self.status_code()
-        }).encode()
-
-
+        return json.dumps(
+            {
+                "Command": self.name(),
+                "Payload": self.payload(),
+                "StatusCode": self.status_code(),
+            }
+        ).encode()
