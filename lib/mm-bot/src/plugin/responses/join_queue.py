@@ -1,7 +1,7 @@
 from plugin.responses.base_response import BaseResponse
 
 class JoinQueueResponse(BaseResponse):
-    def __init__(self, player_count: int, party_members: list | None):
+    def __init__(self, player_count: int, party_members: list | None = None):
         super().__init__()
         self._player_count = player_count
         self._party_members = party_members

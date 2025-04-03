@@ -57,7 +57,7 @@ class ResponseBuilder:
     def _get_queues_response(self, profile: PlayerProfile, request: GetQueuesRequest) -> BaseResponse:
         queues: list[dict] = []
         for active_queue in self._mm_manager.active_queues:
-            player_elo = self._ddb_manager.get_or_create_player_elo(profile.tm_account_id, active_queue.queue.primary_leaderboard_id)
+            player_elo = self._ddb_manager.get_or_create_player_elo(profile.tm_account_id, active_queue.queue.get_primary_leaderboard())
                 
             queues.append({
                 "Id": active_queue.queue.queue_id,
@@ -98,7 +98,7 @@ class ResponseBuilder:
                 
             party_members: list[dict] = []
             for player in player_party:
-                player_elo = self._ddb_manager.get_or_create_player_elo(player.tm_account_id, queue.queue.primary_leaderboard_id)
+                player_elo = self._ddb_manager.get_or_create_player_elo(player.tm_account_id, queue.queue.get_primary_leaderboard())
                 party_members.append({
                     "TmAccountId": player.tm_account_id,
                     "Points": player_elo.elo

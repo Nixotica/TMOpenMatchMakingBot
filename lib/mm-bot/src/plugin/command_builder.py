@@ -37,7 +37,7 @@ class CommandBuilder:
         if join_link:
             command.add_join_link(join_link)
 
-        leaderboard_id = match.match_queue.primary_leaderboard_id
+        leaderboard_id = match.match_queue.get_primary_leaderboard()
         if match.match_queue.type.is_2v2():
             team_id = 0
             for team in match.teams():

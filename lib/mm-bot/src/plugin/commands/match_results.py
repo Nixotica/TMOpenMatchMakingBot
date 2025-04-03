@@ -11,7 +11,11 @@ class MatchResultsCommand(BaseResponse):
         return "MatchResults"
     
     def payload(self) -> dict:
-        return {}
+        return {
+            "MatchId": self._match_id,
+            "IsTeamMode": self._is_team_mode,
+            "Players": self._players
+        }
     
     def status_code(self):
         return 200

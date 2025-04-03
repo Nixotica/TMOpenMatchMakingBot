@@ -30,19 +30,19 @@ class RequestParser:
         user: str = obj.get('User')
         command: str = obj.get('Command')
         payload: dict = obj.get('Payload')
-        
+
         match command:
-            case GetQueuesRequest.name():
+            case "GetQueues":
                 return GetQueuesRequest(user)
-            case JoinQueueRequest.name():
+            case "JoinQueue":
                 return JoinQueueRequest(user, payload.get("QueueId"))
-            case LeaveQueueRequest.name():
+            case "LeaveQueue":
                 return LeaveQueueRequest(user, payload.get("QueueId"))
-            case GetLeaderboardsRequest.name():
+            case "GetLeaderboards":
                 return GetLeaderboardsRequest(user)
-            case GetStatsRequest.name():
+            case "GetStats":
                 return GetStatsRequest(user)
-            case PingRequest.name():
+            case "Ping":
                 return PingRequest(user)
             case _:
                 return None

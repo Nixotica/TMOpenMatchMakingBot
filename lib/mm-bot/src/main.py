@@ -60,7 +60,7 @@ class DiscordBot(Bot):
         await self.tree.sync()
 
         # Set up the plugin server and run
-        # PluginServer().start_run_forever_in_thread()
+        PluginServer().start_run_forever_in_thread()
 
         # Register signal handlers for SIGINT and SIGTERM to gracefully shutdown
         loop = asyncio.get_running_loop()

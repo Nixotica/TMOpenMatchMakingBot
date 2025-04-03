@@ -33,6 +33,9 @@ class MatchQueue:
     display_name: Optional[str]
     category_id: Optional[int]
 
+    def get_primary_leaderboard(self) -> str:
+        return self.leaderboard_ids[0] if self.primary_leaderboard_id is None else self.primary_leaderboard_id
+
     @classmethod
     def from_dict(cls, data: Dict[str, Any]):
         queue_id = data.get(KEY_QUEUE_ID)
