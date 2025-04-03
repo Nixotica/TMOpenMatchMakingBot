@@ -10,7 +10,7 @@ from discord import Intents
 from discord.ext.commands import Bot
 from health_check import start_health_check_in_thread
 from models.bot_secrets import Secrets
-
+from plugin.server import PluginServer
 
 # Define bot
 class DiscordBot(Bot):
@@ -80,6 +80,9 @@ logging.basicConfig(
 async def main():
     # Set up health checks and run so ECS doesn't kill the container
     start_health_check_in_thread()
+
+    # Set up the plugin server and run
+    PluginServer().start_run_forever_in_thread()
 
     # Retrieve secrets from S3
     secrets: Secrets = S3ClientManager().get_secrets()
