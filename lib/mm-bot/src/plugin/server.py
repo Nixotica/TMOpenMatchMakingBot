@@ -116,6 +116,9 @@ class PluginServer:
         logging.info(f"Plugin connection from {writer.transport.get_extra_info('peername')} ({connection_id}) has been disconnected")
 
     def remove_player_from_queue(self, tm_account_id: str):
-        profile = self._ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
-        if profile:
-            self._mm_manager.remove_player_from_all_active_queues(profile)
+        try:
+            profile = self._ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
+            if profile:
+                self._mm_manager.remove_player_from_all_active_queues(profile)
+        except:
+            logging.error(f"Unable to remove player {tm_account_id} from queues")
