@@ -4,6 +4,9 @@ FROM python:3.11-slim
 # Expose port 80
 EXPOSE 80
 
+# Expose port 27990 for plugin server
+EXPOSE 27990
+
 # Set the working directory in the container
 WORKDIR /app
 
