@@ -1,16 +1,16 @@
 from plugin.responses.base_response import BaseResponse
 
-class GetQueuesResponse(BaseResponse):
-    def __init__(self, queues):
+class GetLeaderboardsResponse(BaseResponse):
+    def __init__(self, leaderboards):
         super().__init__()
-        self._queues: list[dict] = queues
+        self._leaderboards: list[dict] = leaderboards
 
     def name(self) -> str:
-        return "GetQueuesResponse"
+        return "GetLeaderboardsResponse"
     
     def payload(self) -> dict:
         return {
-            "Queues": self._queues
+            "Leaderboards": self._leaderboards
         }
     
     def status_code(self):

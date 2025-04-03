@@ -17,6 +17,19 @@ class ActiveMatchQueue:
         self.player_parties: List[QueuedParty] = []
         self.queue = match_queue
 
+    def player_count(self) -> int:
+        """Get the number of players currently queued in this match queue.
+        
+        Returns:
+            int: Number of players currently queued
+        """
+        if self.queue.type.is_2v2():
+            total_players = 0
+            for party in self.player_parties:
+                total_players += len(party.players())
+            return total_players
+        return len(self.player_parties)
+
     def is_player_queued(self, player: PlayerProfile) -> bool:
         """Check if player is in this match queue.
 
