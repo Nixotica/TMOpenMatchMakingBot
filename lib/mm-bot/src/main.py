@@ -59,6 +59,9 @@ class DiscordBot(Bot):
         await self.load_cogs()
         await self.tree.sync()
 
+        # Set up the plugin server and run
+        # PluginServer().start_run_forever_in_thread()
+
         # Register signal handlers for SIGINT and SIGTERM to gracefully shutdown
         loop = asyncio.get_running_loop()
         for signal_type in (signal.SIGINT, signal.SIGTERM):
@@ -80,9 +83,6 @@ logging.basicConfig(
 async def main():
     # Set up health checks and run so ECS doesn't kill the container
     start_health_check_in_thread()
-
-    # Set up the plugin server and run
-    PluginServer().start_run_forever_in_thread()
 
     # Retrieve secrets from S3
     secrets: Secrets = S3ClientManager().get_secrets()

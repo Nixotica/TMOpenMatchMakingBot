@@ -1,8 +1,12 @@
 import asyncio
 import logging
 import threading
+from aws.dynamodb import DynamoDbManager
+from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
+from matchmaking.mm_event_bus import EventType, MatchmakingManagerEventBus
 from plugin.connection import PluginConnection
 from plugin.responses.base_response import BaseResponse
+from plugin.command_builder import CommandBuilder
 
 class PluginServer:
     _instance = None
@@ -17,8 +21,15 @@ class PluginServer:
             self._initialized = True
             self._server = None
             self._thread = None
+            self._event_thread = None
             self._connected_clients = {}
-            
+            self._command_builder = CommandBuilder()
+            self._ddb_manager = DynamoDbManager()
+            self._mm_manager = get_matchmaking_manager_v2()
+            self._mm_event_bus = MatchmakingManagerEventBus()
+            self._match_ready_queue = self._mm_event_bus.subscribe(EventType.NEW_ACTIVE_MATCH)
+            self._match_complete_queue = self._mm_event_bus.subscribe(EventType.NEW_COMPLETED_MATCH)
+
             logging.info(
                 f"Instantiating plugin server."
             )
@@ -27,6 +38,10 @@ class PluginServer:
         logging.info("Starting plugin server in a separate thread...")
         self._thread = threading.Thread(target=self._start_event_loop, daemon=True)
         self._thread.start()
+
+        logging.info("Starting plugin event bus worker in a separate thread...")
+        self._event_thread = threading.Thread(target=self._start_event_worker_loop, daemon=True)
+        self._event_thread.start()
 
     async def try_send_command(self, tm_account_id: str, response: BaseResponse):
         try:
@@ -37,13 +52,39 @@ class PluginServer:
         except Exception as e:
             logging.exception(f"Failed trying to sending command to user: {tm_account_id}", e)
         return False  
+    
+    def _start_event_worker_loop(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._start_event_worker())
+        loop.run_forever()
+
+    async def _start_event_worker(self):
+        while True:
+            completed_match = self._mm_event_bus.get_new_completed_match(
+                self._match_complete_queue
+            )
+            if completed_match is not None:
+                logging.info(f"Sending Match Completed request to players connected via plugin for match: {completed_match.active_match.match_id}")
+                completed_match_command = self._command_builder.build_match_results(completed_match)
+                for player in completed_match.active_match.participants():
+                    await self.try_send_command(player.tm_account_id, completed_match_command)
+
+            new_match = self._mm_event_bus.get_new_active_match(
+                self._match_ready_queue
+            )
+            if new_match is not None:
+                logging.info(f"Sending Match Ready request to players connected via plugin for match: {new_match.match_id}")
+                new_match_command = self._command_builder.build_match_ready(new_match)
+                for player in new_match.participants():
+                    await self.try_send_command(player.tm_account_id, new_match_command)
 
     def _start_event_loop(self):
         """Starts an event loop in the current thread to run async methods."""
-        loop = asyncio.new_event_loop()  # Create a new event loop
-        asyncio.set_event_loop(loop)  # Set this loop as the current event loop
-        loop.run_until_complete(self._start_listen_server())  # Run the async method
-        loop.run_forever()  # Keep the loop running
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        loop.run_until_complete(self._start_listen_server())
+        loop.run_forever()
 
     async def _start_listen_server(self):
         logging.info(f"Plugin Server is listening on 0.0.0.0:27990")
@@ -70,9 +111,11 @@ class PluginServer:
 
         if connection_id and self._connected_clients.get(connection_id):
             del self._connected_clients[connection_id]
-
-        # remove player from queue if they disconnect
+            self.remove_player_from_queue(connection_id)
 
         logging.info(f"Plugin connection from {writer.transport.get_extra_info('peername')} ({connection_id}) has been disconnected")
 
-
+    def remove_player_from_queue(self, tm_account_id: str):
+        profile = self._ddb_manager.query_player_profile_for_tm_account_id(tm_account_id)
+        if profile:
+            self._mm_manager.remove_player_from_all_active_queues(profile)

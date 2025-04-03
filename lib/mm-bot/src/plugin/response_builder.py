@@ -1,7 +1,6 @@
 from aws.dynamodb import DynamoDbManager
-from cogs.matchmaking_manager_v2 import MatchmakingManagerV2
+from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from cogs.party_manager import get_party_manager
-from matchmaking.match_queues.enum import QueueType
 from models.player_profile import PlayerProfile
 from plugin.requests.base_request import BaseRequest
 from plugin.requests.base_request import BaseRequest
@@ -31,7 +30,7 @@ class ResponseBuilder:
     def __init__(self):
         if not hasattr(self, "_initialized"):  # Avoid re-initializing the instance
             self._initialized = True
-            self._mm_manager = MatchmakingManagerV2()
+            self._mm_manager = get_matchmaking_manager_v2()
             self._ddb_manager = DynamoDbManager()
 
     def build_response(self, request: BaseRequest) -> BaseResponse:

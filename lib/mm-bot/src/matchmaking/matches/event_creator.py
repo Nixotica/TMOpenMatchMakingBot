@@ -106,7 +106,7 @@ async def create_1v1v1v1_match(
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
 
-    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
+    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
 
 
 async def create_lsc_match(
@@ -177,7 +177,7 @@ async def create_lsc_match(
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
 
-    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
+    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
 
 
 async def create_2v2_match(
@@ -290,7 +290,7 @@ async def create_2v2_match(
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
 
-    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
+    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
 
 
 async def create_solo_match(
@@ -352,4 +352,4 @@ async def create_solo_match(
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
 
-    return CreatedMatchInfo(event_id, round_id, match_id, match_live_id)  # type: ignore
+    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore

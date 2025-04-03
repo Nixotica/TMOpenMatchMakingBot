@@ -69,6 +69,7 @@ class MatchSimulator:
 
         active_match = ActiveMatch(
             event_id=-1,
+            event_name="Sim Match",
             round_id=-1,
             match_id=-1,
             match_live_id=str(
