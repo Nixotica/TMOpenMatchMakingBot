@@ -45,6 +45,9 @@ class DiscordBot(Bot):
         logging.info("Shutting down bot gracefully...")
         await self.close()
 
+        logging.info("Shutting down plugin server connections...")
+        await PluginServer().notify_shutdown()
+
     async def setup_hook(self) -> None:
         """
         Executed when the bot starts for first time.

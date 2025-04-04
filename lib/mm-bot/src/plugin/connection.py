@@ -77,9 +77,11 @@ class PluginConnection:
         self._writer.write(command.encode())
         await self._writer.drain()
 
-    async def try_send_error(self):
+    async def try_send_error(
+        self, error_message: str = "An error occurred processing request"
+    ):
         try:
-            error = ErrorResponse("An error occurred processing request")
+            error = ErrorResponse(error_message)
             await self.send_command(error)
         except Exception:
             pass

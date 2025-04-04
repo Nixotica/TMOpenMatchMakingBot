@@ -23,7 +23,7 @@ class PluginServer:
             self._server = None
             self._thread = None
             self._event_thread = None
-            self._connected_clients = {}
+            self._connected_clients: dict[str, PluginConnection] = {}
             self._command_builder = CommandBuilder()
             self._ddb_manager = DynamoDbManager()
             self._mm_manager = get_matchmaking_manager_v2()
@@ -34,8 +34,8 @@ class PluginServer:
             self._match_complete_queue = self._mm_event_bus.subscribe(
                 EventType.NEW_COMPLETED_MATCH
             )
-            self._joined_queue_queue = self._mm_event_bus.subscribe(
-                EventType.JOINED_QUEUE
+            self._queue_update_queue = self._mm_event_bus.subscribe(
+                EventType.QUEUE_UPDATE
             )
             self._left_queue_queue = self._mm_event_bus.subscribe(EventType.LEFT_QUEUE)
 
@@ -51,6 +51,10 @@ class PluginServer:
             target=self._start_event_worker_loop, daemon=True
         )
         self._event_thread.start()
+
+    async def notify_shutdown(self):
+        for _, client in self._connected_clients.items():
+            await client.try_send_error("Better Matchmaking server shutdown")
 
     async def try_send_command(self, tm_account_id: str, response: BaseResponse):
         try:
@@ -103,20 +107,6 @@ class PluginServer:
                             player.tm_account_id, new_match_command
                         )
 
-                joined_queue = self._mm_event_bus.get_new_joined_queue(
-                    self._joined_queue_queue
-                )
-                if joined_queue is not None:
-                    queue = self._mm_manager.get_queue(joined_queue)
-                    if queue:
-                        queue_update_command = self._command_builder.build_queue_update(
-                            queue
-                        )
-                        for tm_account_id, _ in self._connected_clients.items():
-                            await self.try_send_command(
-                                tm_account_id, queue_update_command
-                            )
-
                 left_queue = self._mm_event_bus.get_new_left_queue(
                     self._left_queue_queue
                 )
@@ -126,10 +116,24 @@ class PluginServer:
                         await self.try_send_command(
                             player.tm_account_id, left_queue_command
                         )
+
+                queue_update = self._mm_event_bus.get_new_queue_update(
+                    self._queue_update_queue
+                )
+                if queue_update is not None:
+                    queue = self._mm_manager.get_queue(queue_update)
+                    if queue:
+                        queue_update_command = self._command_builder.build_queue_update(
+                            queue
+                        )
+                        for tm_account_id, _ in self._connected_clients.items():
+                            await self.try_send_command(
+                                tm_account_id, queue_update_command
+                            )
             except Exception as e:
                 logging.exception("Exception occurred in plugin event worker", e)
             finally:
-                await asyncio.sleep(100)
+                await asyncio.sleep(1)
 
     def _start_event_loop(self):
         """Starts an event loop in the current thread to run async methods."""
@@ -150,8 +154,6 @@ class PluginServer:
         self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter
     ):
         peer_info = writer.transport.get_extra_info("peername")
-        logging.info(f"A new plugin connection from {peer_info} has been established")
-
         connection = PluginConnection(reader, writer)
 
         connection_id = None
@@ -164,15 +166,17 @@ class PluginServer:
 
             connection_id = connection.identifier()
             if self._connected_clients.get(connection_id) is None:
+                logging.info(
+                    f"A new plugin connection from {peer_info} has been established"
+                )
                 self._connected_clients[connection_id] = connection
 
         if connection_id and self._connected_clients.get(connection_id):
             del self._connected_clients[connection_id]
             self.remove_player_from_queue(connection_id)
-
-        logging.info(
-            f"Plugin connection from {peer_info} ({connection_id}) has been disconnected"
-        )
+            logging.info(
+                f"Plugin connection from {peer_info} ({connection_id}) has been disconnected"
+            )
 
     def remove_player_from_queue(self, tm_account_id: str):
         try:

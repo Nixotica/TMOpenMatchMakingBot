@@ -191,7 +191,7 @@ class MatchmakingManagerV2(commands.Cog):
         if not party_added:
             return None
 
-        self.mm_event_bus.add_player_joined_queue(queue.queue.queue_id)
+        self.mm_event_bus.add_queue_update(queue.queue.queue_id)
 
         self.maybe_publish_queue_started_message(players[0], queue)
 
@@ -216,7 +216,7 @@ class MatchmakingManagerV2(commands.Cog):
 
         queue.remove_party(players)
 
-        self.mm_event_bus.add_player_left_queue(players)
+        self.mm_event_bus.add_player_left_queue(queue_id, players)
 
     def cancel_match(self, bot_match_id: int) -> Optional[ActiveMatch]:
         """Cancels an active match with the given bot match ID, if one exists.
