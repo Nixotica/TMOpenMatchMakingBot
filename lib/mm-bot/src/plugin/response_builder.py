@@ -157,7 +157,11 @@ class ResponseBuilder:
         self, profile: PlayerProfile, request: GetLeaderboardsRequest
     ):
         leaderboards: list[dict] = []
-        for leaderboard in self._ddb_manager.get_leaderboards():
+        for active_queue in self._mm_manager.active_queues:
+            leaderboard = self._ddb_manager.get_leaderboard(
+                active_queue.queue.get_primary_leaderboard()
+            )
+
             player_elo = self._ddb_manager.get_or_create_player_elo(
                 profile.tm_account_id, leaderboard.leaderboard_id
             )

@@ -4,6 +4,7 @@ from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
 from plugin.commands.queue_update import QueueUpdateCommand
 from plugin.commands.match_ready import MatchReadyCommand
+from plugin.commands.match_canceled import MatchCanceledCommand
 from plugin.commands.match_results import MatchResultsCommand
 from plugin.responses.leave_queue import LeaveQueueResponse
 
@@ -68,6 +69,9 @@ class CommandBuilder:
         return command
 
     def build_match_results(self, match: CompletedMatch):
+        if match.canceled:
+            return MatchCanceledCommand(match_id=match.active_match.match_id)
+
         command = MatchResultsCommand(
             match_id=match.active_match.match_id,
             is_team_mode=match.active_match.match_queue.type.is_2v2(),
