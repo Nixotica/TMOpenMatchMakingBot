@@ -79,6 +79,7 @@ class ActiveMatch:
 
         return ActiveMatch(
             match_info.event_id,
+            match_info.event_name,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
