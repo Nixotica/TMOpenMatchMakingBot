@@ -89,25 +89,6 @@ class ActiveMatch:
         )
 
     @staticmethod
-    async def create_1v1(
-        match_queue: MatchQueue,
-        bot_match_id: int,
-        players: List[PlayerProfile],
-    ) -> ActiveMatch:
-        logging.info(f"Creating new 1v1 match for players: {players}")
-        match_info = await create_1v1_match(match_queue, bot_match_id, players)
-
-        return ActiveMatch(
-            match_info.event_id,
-            match_info.round_id,
-            match_info.match_id,
-            match_info.match_live_id,
-            bot_match_id,
-            players,
-            match_queue,
-        )
-
-    @staticmethod
     async def create_2v2(
         match_queue: MatchQueue,
         bot_match_id: int,
