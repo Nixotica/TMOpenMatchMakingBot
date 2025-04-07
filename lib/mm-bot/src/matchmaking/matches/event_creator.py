@@ -85,6 +85,7 @@ async def create_1v1v1v1_match(
                     ),
                     plugin_settings=ClassicPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,
+                        enable_ready_manager=True,
                     ),
                 ),
             )
@@ -151,9 +152,14 @@ async def create_1v1_match(
                         number_of_winners=1,
                         finish_timeout=5,
                         points_limit=4,
+                        cup_points_limit=4,
                         rounds_per_map=99,
-                        ko_checkpoint_number=2,
+                        ko_checkpoint_number=0,
                         hide_scores_header=True,
+                    ),
+                    plugin_settings=ClassicPluginSettings(
+                        auto_start_mode=AutoStartMode.DISABLED,
+                        enable_ready_manager=True,
                     ),
                 ),
             )
@@ -225,6 +231,7 @@ async def create_lsc_match(
                     ),
                     plugin_settings=ClassicPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,
+                        enable_ready_manager=True,
                     ),
                 ),
             )
@@ -401,6 +408,7 @@ async def create_solo_match(
                     ),
                     plugin_settings=ClassicPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,
+                        enable_ready_manager=True,
                     ),
                 ),
             )
