@@ -1,7 +1,7 @@
 import logging
 from typing import List
 
-from matchmaking.constants import NUM_LSC_PLAYERS, NUM_1v1v1v1_PLAYERS
+from matchmaking.constants import NUM_LSC_PLAYERS, NUM_1v1_PLAYERS, NUM_1v1v1v1_PLAYERS
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.queued_party import QueuedParty, QueuedPlayer, QueuedTeam
 from matchmaking.matches.active_match import ActiveMatch
@@ -94,30 +94,24 @@ class ActiveMatchQueue:
         Returns:
             bool: True if a match should be generated, False otherwise.
         """
+        logging.debug(
+            f"Checking if should generate match for {self.queue.queue_id} length {len(self.player_parties)}."
+        )
         if self.queue.type == QueueType.Queue1v1v1v1:
-            logging.debug(
-                f"Checking if should generate match for {self.queue.queue_id} length {len(self.player_parties)}."
-            )
             if len(self.player_parties) >= NUM_1v1v1v1_PLAYERS:
                 return True
+        elif self.queue.type == QueueType.Queue1v1:
+            if len(self.player_parties) >= NUM_1v1_PLAYERS:
+                return True
         elif self.queue.type.is_2v2():
-            logging.debug(
-                f"Checking if should generate match for {self.queue.queue_id} length {len(self.player_parties)}."
-            )
             total_players = 0
             for party in self.player_parties:
                 total_players += len(party.players())
             return total_players >= 4
         elif self.queue.type == QueueType.QueueSoloTest:
-            logging.debug(
-                f"Checking if should generate match for {self.queue.queue_id} length {len(self.player_parties)}."
-            )
             if len(self.player_parties) >= 1:
                 return True
         elif self.queue.type == QueueType.QueueLSC:
-            logging.debug(
-                f"Checking if should generate match for {self.queue.queue_id} length {len(self.player_parties)}."
-            )
             if len(self.player_parties) >= NUM_LSC_PLAYERS:
                 return True
 
@@ -136,6 +130,13 @@ class ActiveMatchQueue:
             players_in_match = self.player_parties[:NUM_1v1v1v1_PLAYERS]
             players_in_match = [p.players()[0] for p in players_in_match]
             return await ActiveMatch.create_1v1v1v1(
+                self.queue, bot_match_id, players_in_match
+            )
+
+        elif self.queue.type == QueueType.Queue1v1:
+            players_in_match = self.player_parties[:NUM_1v1_PLAYERS]
+            players_in_match = [p.players()[0] for p in players_in_match]
+            return await ActiveMatch.create_1v1(
                 self.queue, bot_match_id, players_in_match
             )
 
@@ -173,6 +174,8 @@ class ActiveMatchQueue:
                 return await ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
             elif self.queue.type == QueueType.QueueSim2v2:
                 return await ActiveMatch.create_sim_2v2(self.queue, bot_match_id, teams)
+            else:
+                raise Exception("Invalid queue type")
 
         elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.player_parties[0].players()[0]
