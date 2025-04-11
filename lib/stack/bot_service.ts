@@ -76,6 +76,7 @@ export class BotServiceStack extends Stack {
         });
         ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(80), 'Allow HTTP traffic');
         ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(443), 'Allow HTTPS traffic');
+        ecsSecurityGroup.addIngressRule(Peer.anyIpv4(), Port.tcp(27990), 'Allow TCP traffic for plugin connections')
 
         /**
          * ECS Cluster
@@ -160,6 +161,10 @@ export class BotServiceStack extends Stack {
             containerPort: 80,  // This is the port that your application listens to inside the container
             hostPort: 0,        // Setting hostPort to 0 allows ECS to assign an available port dynamically
             protocol: Protocol.TCP,  // Protocol can be TCP or UDP
+        }, {
+            containerPort: 27990,
+            hostPort: 0,
+            protocol: Protocol.TCP  
         });
         
     

@@ -22,6 +22,8 @@ class EventType(Enum):
     NEW_ACTIVE_MATCH = 1
     NEW_COMPLETED_MATCH = 2
     QUEUE_STARTED = 3
+    QUEUE_UPDATE = 4
+    LEFT_QUEUE = 5
 
 
 class MatchmakingManagerEventBus:
@@ -116,6 +118,61 @@ class MatchmakingManagerEventBus:
 
         Returns:
             Optional[QueueStartedEvent]: QueueStartedEvent if a new one exists, False otherwise.
+        """
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_queue_update(self, queue_id: str) -> None:
+        """Adds a queue update event to a pub-sub queue to be consumed by subscribers.
+
+        Args:
+            queue_id (str): The queue that was joined by a player.
+        """
+        joined_queue_subs = self.subscriptions[EventType.QUEUE_UPDATE]
+        for sub in joined_queue_subs:
+            sub.put_nowait(queue_id)
+
+    def get_new_queue_update(self, queue: asyncio.Queue) -> Optional[str]:
+        """Gets a new queue update event from the given queue, None if empty.
+
+        Args:
+            queue (asyncio.Queue): A queue subscribed to QUEUE_UPDATE event.
+
+        Returns:
+            Optional[str]: queue_id if a new one exists, False otherwise.
+        """
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_player_left_queue(
+        self, queue_id: str, players: list[PlayerProfile]
+    ) -> None:
+        """Adds a new player left queue event to a pub-sub queue to be consumed by subscribers.
+
+        Args:
+            queue_id: The queue that the players left
+            players (list[PlayerProfile]): The players that left the queue.
+        """
+        joined_queue_subs = self.subscriptions[EventType.LEFT_QUEUE]
+        for sub in joined_queue_subs:
+            sub.put_nowait(players)
+
+        queue_update_subs = self.subscriptions[EventType.QUEUE_UPDATE]
+        for sub in queue_update_subs:
+            sub.put_nowait(queue_id)
+
+    def get_new_left_queue(self, queue: asyncio.Queue) -> Optional[list[PlayerProfile]]:
+        """Gets a new left queue event from the given queue, None if empty.
+
+        Args:
+            queue (asyncio.Queue): A queue subscribed to LEFT_QUEUE event.
+
+        Returns:
+            Optional[list[PlayerProfile]]: list[PlayerProfile] if a new one exists, False otherwise.
         """
         try:
             return queue.get_nowait()

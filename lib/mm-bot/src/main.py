@@ -10,6 +10,7 @@ from discord import Intents
 from discord.ext.commands import Bot
 from health_check import start_health_check_in_thread
 from models.bot_secrets import Secrets
+from plugin.server import PluginServer
 
 
 # Define bot
@@ -44,6 +45,9 @@ class DiscordBot(Bot):
         logging.info("Shutting down bot gracefully...")
         await self.close()
 
+        logging.info("Shutting down plugin server connections...")
+        await PluginServer().notify_shutdown()
+
     async def setup_hook(self) -> None:
         """
         Executed when the bot starts for first time.
@@ -58,6 +62,9 @@ class DiscordBot(Bot):
 
         await self.load_cogs()
         await self.tree.sync()
+
+        # Set up the plugin server and run
+        PluginServer().start_run_forever_in_thread()
 
         # Register signal handlers for SIGINT and SIGTERM to gracefully shutdown
         loop = asyncio.get_running_loop()

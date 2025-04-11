@@ -27,6 +27,7 @@ class ActiveMatch:
     def __init__(
         self,
         event_id: int,
+        event_name: str,
         round_id: int,
         match_id: int,
         match_live_id: str,
@@ -37,6 +38,7 @@ class ActiveMatch:
         match_queue: MatchQueue,
     ):
         self.event_id = event_id
+        self.event_name = event_name
         self.round_id = round_id
         self.match_id = match_id
         self.match_live_id = match_live_id
@@ -57,6 +59,7 @@ class ActiveMatch:
 
         return ActiveMatch(
             match_info.event_id,
+            match_info.event_name,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
@@ -76,6 +79,7 @@ class ActiveMatch:
 
         return ActiveMatch(
             match_info.event_id,
+            match_info.event_name,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
@@ -95,6 +99,7 @@ class ActiveMatch:
 
         return ActiveMatch(
             match_info.event_id,
+            match_info.event_name,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
@@ -127,6 +132,7 @@ class ActiveMatch:
 
         return ActiveMatch(
             match_info.event_id,
+            match_info.event_name,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
@@ -146,6 +152,7 @@ class ActiveMatch:
 
         return ActiveMatch(
             match_info.event_id,
+            match_info.event_name,
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,

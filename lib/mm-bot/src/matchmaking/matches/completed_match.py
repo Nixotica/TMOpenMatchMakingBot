@@ -31,6 +31,7 @@ class CompletedMatch:
         self.time_completed = dt.datetime.utcnow()
         self.ddb_manager = DynamoDbManager()
         self.active_match = active_match
+        self.canceled = canceled
 
         if canceled:
             return
