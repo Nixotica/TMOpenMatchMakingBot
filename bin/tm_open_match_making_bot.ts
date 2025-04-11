@@ -29,6 +29,9 @@ if (process.env.STAGE == 'dev') {
   //   leaderboardsTable: storage.leaderboardsTable,
   //   ranksTable: storage.ranksTable,
   //   leaderboardRanksTable: storage.leaderboardRanksTable,
+  //   nextBotMatchIdTable: storage.nextBotMatchIdTable,
+  //   persistedMatchesTable: storage.persistedMatchesTable,
+  //   terminationProtection: false,
   // })
 } else if (process.env.STAGE == 'prod') {
   const storage = new StorageStack(app, 'TmOpenMatchMakingBotStack-Storage-prod', {
