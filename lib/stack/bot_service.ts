@@ -1,6 +1,6 @@
 import { BlockDeviceVolume, EbsDeviceVolumeType } from "aws-cdk-lib/aws-autoscaling";
 import { Table } from "aws-cdk-lib/aws-dynamodb";
-import { Instance, InstanceClass, InstanceSize, InstanceType, MachineImage, Peer, Port, RouterType, SecurityGroup, Subnet, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
+import { CfnEIP, Instance, InstanceClass, InstanceSize, InstanceType, MachineImage, Peer, Port, RouterType, SecurityGroup, Subnet, SubnetType, Vpc } from "aws-cdk-lib/aws-ec2";
 import { BlockDevice } from "aws-cdk-lib/aws-autoscaling";
 import { DockerImageAsset } from "aws-cdk-lib/aws-ecr-assets";
 import { AwsLogDriver, Cluster, ContainerImage, DeploymentControllerType, Ec2Service, Ec2TaskDefinition, PlacementConstraint, Protocol } from "aws-cdk-lib/aws-ecs";
@@ -49,6 +49,8 @@ export interface BotServiceStackProps extends StackProps {
  * A construct for deploying a container to host the bot. 
  */
 export class BotServiceStack extends Stack {
+    public readonly eip: CfnEIP;
+
     constructor(scope: Construct, id: string, props: BotServiceStackProps) {
         super(scope, id, props);
 
@@ -163,7 +165,7 @@ export class BotServiceStack extends Stack {
             protocol: Protocol.TCP,  // Protocol can be TCP or UDP
         }, {
             containerPort: 27990,
-            hostPort: 0,
+            hostPort: 27990,
             protocol: Protocol.TCP  
         });
         
@@ -185,5 +187,10 @@ export class BotServiceStack extends Stack {
             minHealthyPercent: 0,
             maxHealthyPercent: 200,
         });
+
+        /**
+         * Elastic IP
+         */
+        this.eip = new CfnEIP(this, 'MM-Bot-ElasticIP');
     }
 }

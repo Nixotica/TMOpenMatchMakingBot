@@ -2,6 +2,16 @@
 
 This is a WIP open source project for creating a matchmaking bot in discord. 
 
+## Production 
+
+Due to the limitations with association an elastic IP to EC2 instances on ECS, we are just doing it manually. This seems to keep the IP even when making updates to the ECS task (which is good because this happens every time we push a new code change). The steps to associate a new IP, in the case that ever happens (or you are developing with the bot-service stack enabled) do the following:
+
+1. Go to AWS Console, VPC section
+
+2. Click on "Elastic IPs" and select the IP address created by the CDK.
+
+3. Click "Associate Elastic IP address" and associate it to the EC2 instance defined by CDK (dev/prod depending on the circumstances). 
+
 ## Development
 
 WARNING! Deploying a stack locally can currently cost up to $10/mo. This is primarily due to the constant uptime of the ECS task.
@@ -58,6 +68,10 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
 11. Go to the server with the bot added to it, and try running some commands. Now you can either use it or continue to develop this bot. Enjoy!
 
 12. To stop running the bot, you should run `docker-compose stop` from the same directory (in a separate terminal instance if your logs are being output to the first instance), which will run through the necessary tear-down steps to remove queues from the discord server channels, etc. 
+
+### Windows development differences
+
+There's a minor change to the `docker-compose.yaml` file that needs to be made if you're running on windows. Instead of `0.0.0.0` for the localhost definition, use `127.0.0.1` for both. 
 
 ## Testing
 
