@@ -20,6 +20,7 @@ class DiscordBot(Bot):
             command_prefix="/",
             intents=Intents.all(),
         )
+        self.is_shutdown = False
 
     async def load_cogs(self) -> None:
         """
@@ -42,11 +43,13 @@ class DiscordBot(Bot):
 
     async def shutdown(self):
         """Gracefully shutdown the bot."""
+        self.is_shutdown = True
+
+        logging.info("Shutting down plugin server gracefully...")
+        await PluginServer().shutdown()
+
         logging.info("Shutting down bot gracefully...")
         await self.close()
-
-        logging.info("Shutting down plugin server connections...")
-        await PluginServer().notify_shutdown()
 
     async def setup_hook(self) -> None:
         """
@@ -63,8 +66,8 @@ class DiscordBot(Bot):
         await self.load_cogs()
         await self.tree.sync()
 
-        # Set up the plugin server and run
-        PluginServer().start_run_forever_in_thread()
+        # Startup the plugin listen server
+        PluginServer().startup()
 
         # Register signal handlers for SIGINT and SIGTERM to gracefully shutdown
         loop = asyncio.get_running_loop()
@@ -101,7 +104,8 @@ async def main():
     except Exception as e:
         logging.error(f"Got excepting during bot runtime {e}")
 
-    await bot.shutdown()
+    if not bot.is_shutdown:
+        await bot.shutdown()
 
 
 if __name__ == "__main__":
