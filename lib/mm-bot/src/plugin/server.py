@@ -20,9 +20,9 @@ class PluginServer:
     def __init__(self):
         if not hasattr(self, "_initialized"):  # Avoid re-initializing the instance
             self._initialized = True
-            self._server = None
             self._thread = None
-            self._event_thread = None
+            self._loop = None
+            self._server = None
             self._connected_clients: dict[str, PluginConnection] = {}
             self._command_builder = CommandBuilder()
             self._ddb_manager = DynamoDbManager()
@@ -41,20 +41,36 @@ class PluginServer:
 
             logging.info("Instantiating plugin server.")
 
-    def start_run_forever_in_thread(self):
-        logging.info("Starting plugin server in a separate thread...")
-        self._thread = threading.Thread(target=self._start_event_loop, daemon=True)
+    def startup(self):
+        self._stopped = False
+        self._thread = threading.Thread(daemon=True, target=self._start_event_loops)
         self._thread.start()
 
-        logging.info("Starting plugin event bus worker in a separate thread...")
-        self._event_thread = threading.Thread(
-            target=self._start_event_worker_loop, daemon=True
-        )
-        self._event_thread.start()
-
-    async def notify_shutdown(self):
+    async def shutdown(self):
         for _, client in self._connected_clients.items():
             await client.try_send_error("Better Matchmaking server shutdown")
+
+        if self._server:
+            logging.info("Stopping plugin server listen server")
+            self._server.close()
+
+        if self._loop:
+            logging.info("Stopping plugin server event loop")
+            self._loop.stop()
+
+        if self._thread:
+            logging.info("Waiting for plugin server thread to exit")
+            self._thread.join()
+
+    def remove_player_from_queue(self, tm_account_id: str):
+        try:
+            profile = self._ddb_manager.query_player_profile_for_tm_account_id(
+                tm_account_id
+            )
+            if profile:
+                self._mm_manager.remove_player_from_all_active_queues(profile)
+        except Exception:
+            logging.error(f"Unable to remove player {tm_account_id} from queues")
 
     async def try_send_command(self, tm_account_id: str, response: BaseResponse):
         try:
@@ -68,14 +84,17 @@ class PluginServer:
             )
         return False
 
-    def _start_event_worker_loop(self):
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._start_event_worker())
-        loop.run_forever()
+    def _start_event_loops(self):
+        self._loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(self._loop)
 
-    async def _start_event_worker(self):
-        while True:
+        self._loop.create_task(self._server_loop())
+        self._loop.create_task(self._event_bus_loop())
+        self._loop.run_forever()
+
+    async def _event_bus_loop(self):
+        logging.info("Starting plugin server event bus loop")
+        while not self._stopped:
             try:
                 completed_match = self._mm_event_bus.get_new_completed_match(
                     self._match_complete_queue
@@ -135,18 +154,12 @@ class PluginServer:
             finally:
                 await asyncio.sleep(1)
 
-    def _start_event_loop(self):
-        """Starts an event loop in the current thread to run async methods."""
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        loop.run_until_complete(self._start_listen_server())
-        loop.run_forever()
-
-    async def _start_listen_server(self):
-        logging.info("Plugin Server is listening on 0.0.0.0:27990")
+    async def _server_loop(self):
+        logging.info("Starting plugin server on 0.0.0.0:27990")
         self._server = await asyncio.start_server(
             self._handle_connection, "0.0.0.0", 27990
         )
+
         async with self._server:
             await self._server.serve_forever()
 
@@ -177,13 +190,3 @@ class PluginServer:
             logging.info(
                 f"Plugin connection from {peer_info} ({connection_id}) has been disconnected"
             )
-
-    def remove_player_from_queue(self, tm_account_id: str):
-        try:
-            profile = self._ddb_manager.query_player_profile_for_tm_account_id(
-                tm_account_id
-            )
-            if profile:
-                self._mm_manager.remove_player_from_all_active_queues(profile)
-        except Exception:
-            logging.error(f"Unable to remove player {tm_account_id} from queues")

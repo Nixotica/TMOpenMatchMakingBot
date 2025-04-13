@@ -1,6 +1,7 @@
 from aws.dynamodb import DynamoDbManager
 from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from cogs.party_manager import get_party_manager
+from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from models.player_profile import PlayerProfile
 from plugin.requests.base_request import BaseRequest
 from plugin.requests.get_queues import GetQueuesRequest
@@ -61,22 +62,28 @@ class ResponseBuilder:
     def _get_queues_response(
         self, profile: PlayerProfile, request: GetQueuesRequest
     ) -> BaseResponse:
-        queues: list[dict] = []
-        for active_queue in self._mm_manager.active_queues:
-            player_elo = self._ddb_manager.get_or_create_player_elo(
-                profile.tm_account_id, active_queue.queue.get_primary_leaderboard()
+        response = GetQueuesResponse()
+
+        sorted_queues: list[ActiveMatchQueue] = sorted(
+            self._mm_manager.active_queues, key=lambda x: x.queue.display_name
+        )
+        for active_queue in sorted_queues:
+            player_elo = 0
+            try:
+                player_elo = self._ddb_manager.get_or_create_player_elo(
+                    profile.tm_account_id, active_queue.queue.get_primary_leaderboard()
+                ).elo
+            except Exception:
+                pass
+
+            response.add_queue(
+                active_queue.queue.queue_id,
+                active_queue.queue.display_name,
+                active_queue.player_count(),
+                player_elo,
             )
 
-            queues.append(
-                {
-                    "Id": active_queue.queue.queue_id,
-                    "Name": active_queue.queue.display_name,
-                    "Count": active_queue.player_count(),
-                    "Points": player_elo.elo,
-                }
-            )
-
-        return GetQueuesResponse(queues)
+        return response
 
     def _join_queue_response(self, profile: PlayerProfile, request: JoinQueueRequest):
         if self._mm_manager.is_player_in_match(profile):
@@ -157,10 +164,15 @@ class ResponseBuilder:
         self, profile: PlayerProfile, request: GetLeaderboardsRequest
     ):
         leaderboards: list[dict] = []
-        for active_queue in self._mm_manager.active_queues:
-            leaderboard = self._ddb_manager.get_leaderboard(
-                active_queue.queue.get_primary_leaderboard()
-            )
+        leaderboard_ids: set[str] = set(
+            [
+                aq.queue.get_primary_leaderboard()
+                for aq in self._mm_manager.active_queues
+            ]
+        )
+
+        for leaderboard_id in leaderboard_ids:
+            leaderboard = self._ddb_manager.get_leaderboard(leaderboard_id)
 
             player_elo = self._ddb_manager.get_or_create_player_elo(
                 profile.tm_account_id, leaderboard.leaderboard_id
