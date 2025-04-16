@@ -14,6 +14,7 @@ from aws.constants import (
     KEY_LEADERBOARD_ID,
     KEY_LEADERBOARD_IDS,
     KEY_MATCHES_PLAYED,
+    KEY_MATCHES_WON,
     KEY_QUEUE_ID,
     KEY_RANK_ID,
     KEY_RANK_ROLE_ID,
@@ -94,6 +95,11 @@ class DynamoDbManager:
         if persisted_matches_table is None:
             raise ValueError("PERSISTED_MATCHES_TABLE environment variable is not set")
         self._persisted_matches_table = self._resource.Table(persisted_matches_table)
+
+        matches_played_table = os.environ.get("MATCHES_PLAYED_TABLE")
+        if matches_played_table is None:
+            raise ValueError("MATCHES_PLAYED_TABLE environment variable is not set")
+        self._matches_played_table = self._resource.Table(matches_played_table)
 
     def _create_client(self) -> DynamoDBClient:
         try:
@@ -178,7 +184,7 @@ class DynamoDbManager:
                 {
                     KEY_TM_ACCOUNT_ID: tm_account_id,
                     KEY_DISCORD_ACCOUNT_ID: discord_account_id,
-                    KEY_MATCHES_PLAYED: 0,
+                    KEY_MATCHES_PLAYED: 0,  # Deprecated, but keeping for schema consistency for now
                 }
             )
 
@@ -221,41 +227,50 @@ class DynamoDbManager:
             logging.error(f"Error getting player profiles from DynamoDB: {e}")
             raise
 
-    def update_player_matches_complete(self, tm_account_id: str) -> bool:
-        """Updates player profile for completing a new match by incrementing matches played by 1.
+    def update_player_matches_played(
+        self, tm_account_id: str, queue_id: str, won: bool
+    ) -> bool:
+        """Updates the matches played info for a player on a given queue by incrementing the
+            number of matches played by 1 and incrementing number of wins by 1 if the player
+            won the match.
 
         Args:
             tm_account_id (str): The TM acccount for which the match was completed.
+            queue_id (str): The queue ID of the match that was completed.
+            won (bool): True if the player won the match, False otherwise.
 
         Returns:
-            bool: True if the profile was successfully updated, False otherwise.
+            bool: True if the record was updated successfully, False otherwise.
         """
         try:
-            self._player_profiles_table.update_item(
-                Key={KEY_TM_ACCOUNT_ID: tm_account_id},
-                UpdateExpression="SET #matches_played = #matches_played + :increment",
+            self._matches_played_table.update_item(
+                Key={
+                    KEY_TM_ACCOUNT_ID: tm_account_id,
+                    KEY_QUEUE_ID: queue_id,
+                },
+                UpdateExpression="""
+                    SET
+                        #matches_played = if_not_exists(#matches_played, :zero) + :incr_played
+                        #matches_won = if_not_exists(#matches_won, :zero) + :maybe_incr_won
+                """,
                 ExpressionAttributeNames={
                     "#matches_played": KEY_MATCHES_PLAYED,
+                    "#matches_won": KEY_MATCHES_WON,
                 },
                 ExpressionAttributeValues={
-                    ":increment": 1,
+                    ":zero": 0,
+                    ":incr_played": 1,
+                    ":maybe_incr_won": 1 if won else 0,
                 },
-                ConditionExpression=Attr(KEY_TM_ACCOUNT_ID).exists(),
                 ReturnValues="UPDATED_NEW",
             )
             return True
-        except ClientError as e:
-            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
-                logging.warning(
-                    f"Player profile for TM account ID {tm_account_id} does not exist."
-                )
-                return False
-            else:
-                logging.error(f"ClientError when updating player profile: {e}")
-                raise
         except Exception as e:
-            logging.error(f"Error updating player profile in DynamoDB: {e}")
-            raise
+            logging.error(
+                f"Error updating matches played for player {tm_account_id} "
+                f"on queue {queue_id}: {e}"
+            )
+            return False
 
     def update_player_elo(
         self, tm_account_id: str, leaderboard_id: str, new_elo: int

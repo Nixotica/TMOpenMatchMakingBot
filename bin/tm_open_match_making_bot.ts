@@ -53,6 +53,7 @@ if (process.env.STAGE == 'dev') {
     leaderboardRanksTable: storage.leaderboardRanksTable,
     nextBotMatchIdTable: storage.nextBotMatchIdTable,
     persistedMatchesTable: storage.persistedMatchesTable,
+    matchesPlayedTable: storage.matchesPlayedTable,
     terminationProtection: true,
   })
 } else {

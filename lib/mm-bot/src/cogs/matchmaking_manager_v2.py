@@ -28,7 +28,6 @@ from matchmaking.match_queues.match_persistence import (
 )
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
-from matchmaking.matches.team_2v2 import Team2v2
 from models.match_queue import MatchQueue
 from models.player_profile import PlayerProfile
 
@@ -271,10 +270,7 @@ class MatchmakingManagerV2(commands.Cog):
         )
 
         for player in match.active_match.player_profiles:
-            if isinstance(player, Team2v2):
-                # A) nobody cares about profile right now, B) there's a ticket to
-                # redo the whole match result counting process for players
-                continue
+            # TODO - update MatchResults to have get_player_position method return for team/individual
 
             self.ddb_manager.update_player_matches_complete(player.tm_account_id)
 
