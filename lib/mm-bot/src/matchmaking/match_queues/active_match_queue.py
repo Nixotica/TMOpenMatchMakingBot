@@ -81,9 +81,13 @@ class ActiveMatchQueue:
         Args:
             players (List[PlayerProfile]): The party to remove from the queue.
         """
-        for queued_party in self.player_parties:
+        player_parties_copy = self.player_parties.copy()
+        for queued_party in player_parties_copy:
             for player in players:
-                if player in queued_party.players():
+                if (
+                    player in queued_party.players()
+                    and queued_party in self.player_parties
+                ):
                     self.player_parties.remove(queued_party)
 
     def can_add_party(self, players: List[PlayerProfile]) -> bool:
@@ -96,6 +100,7 @@ class ActiveMatchQueue:
             bool: True if the party can join, False otherwise.
         """
         # Only for 2v2 matches can parties of 2+ players join.
+        # TODO - parties should be allowed to do 1v1 against each other
         if (not self.queue.type.is_2v2()) and len(players) > 1:
             return False
 

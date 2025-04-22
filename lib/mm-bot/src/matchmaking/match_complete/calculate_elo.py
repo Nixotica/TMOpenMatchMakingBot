@@ -161,10 +161,6 @@ def calculate_elo_2v2_ratings(
         symmetric_round(K_team * (actual_score_team_b - expected_score_b))
     )
 
-    print(
-        f"team_a_adjustment {team_a_adjustment} team_b_adjustment {team_b_adjustment}"
-    )
-
     def get_player_placement(
         player: PlayerElo, individual_results: Dict[PlayerProfile, int]
     ) -> int:
@@ -222,17 +218,9 @@ def calculate_elo_2v2_ratings(
             player, player_placement, teammate_placement, team_adjustment > 0
         )
 
-        print(
-            f"player {player.tm_account_id} elo_diff {team_adjustment * team_points_multiplier}"
-        )
-
         # Use symmetric rounding again to avoid bleeding or synthesis of elo
         new_elo = symmetric_round(team_adjustment * team_points_multiplier) + player.elo
         elo_diff = new_elo - player.elo
-
-        print(
-            f"player {player.tm_account_id} new_elo {new_elo} and elo_diff {elo_diff}"
-        )
 
         updated_elo_ratings[player] = new_elo
         elo_differences[player] = elo_diff
