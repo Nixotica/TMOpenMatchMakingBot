@@ -103,7 +103,8 @@ class General(commands.Cog):
 
         if not canceled_match:
             await ctx.send(
-                f"Failed to cancel match {bot_match_id}. Is it already finished?"
+                f"Failed to cancel match {bot_match_id}. Is it already finished?",
+                ephemeral=True,
             )
             return
 
@@ -113,7 +114,8 @@ class General(commands.Cog):
             player_discord_ids_str += f"<@{player.discord_account_id}> "
 
         await ctx.send(
-            f"Match {bot_match_id} cancelled. Affected players: {player_discord_ids_str}."
+            f"Match {bot_match_id} cancelled. Affected players: {player_discord_ids_str}.",
+            ephemeral=True,
         )
 
     @commands.hybrid_command(name="profile", description="See your profile")
