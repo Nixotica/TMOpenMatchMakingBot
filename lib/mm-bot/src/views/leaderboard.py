@@ -173,17 +173,17 @@ class LeaderboardView(ui.View):
                 self.leaderboard_id
             )
         )
-        logging.info(f"Leaderboard ranks: {leaderboard_ranks_descending}")
+        logging.debug(f"Leaderboard ranks: {leaderboard_ranks_descending}")
         prev_player_rank = get_rank_for_player(
             top_25_player_elos[0].elo, self.leaderboard_id, leaderboard_ranks_descending
         )
-        logging.info(
+        logging.debug(
             f"Initial player rank: {prev_player_rank} for player {top_25_player_elos[0]}"
         )
 
         is_ranked = True
         if prev_player_rank is None:
-            logging.info(
+            logging.debug(
                 f"No rank found for player with elo {top_25_player_elos[0].elo} "
                 "while updating leaderboard, creating a 'Rankless' view."
             )

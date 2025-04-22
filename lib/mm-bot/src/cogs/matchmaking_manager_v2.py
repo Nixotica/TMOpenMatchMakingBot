@@ -506,6 +506,15 @@ class MatchmakingManagerV2(commands.Cog):
                     logging.error(
                         f"Error generating match {bot_match_id} for active queue {active_queue}."
                     )
+                    # Remove from active queues so we don't keep retrying with failures
+                    self.active_queues.remove(active_queue)
+                    # Notify players/mods in bot ping channel.
+                    bot_ping_channel = await get_ping_channel(self.bot, self.s3_manager)
+                    if bot_ping_channel is not None:
+                        await bot_ping_channel.send(
+                            f"Error generating match {bot_match_id} for "
+                            f"active queue {active_queue}. Disabling it temporarily."
+                        )
                     continue
 
                 logging.info(
