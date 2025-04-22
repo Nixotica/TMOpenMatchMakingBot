@@ -159,6 +159,21 @@ class MatchmakingManagerV2(commands.Cog):
 
         return False
 
+    def find_match_with_player(self, player: PlayerProfile) -> ActiveMatch | None:
+        """Finds an ActiveMatch with a specific player as participant
+
+        Args:
+            player (PlayerProfile): The player to find in a match.
+
+        Returns:
+            ActiveMatch: Active match record if the player is in a match, None otherwise
+        """
+        for match in self.active_matches:
+            if match.has_player(player):
+                return match
+
+        return None
+
     def add_party_to_queue(
         self, players: List[PlayerProfile], queue_id: str
     ) -> Optional[ActiveMatchQueue]:
