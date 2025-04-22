@@ -3,6 +3,7 @@ from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from cogs.party_manager import get_party_manager
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from models.player_profile import PlayerProfile
+from plugin.command_builder import CommandBuilder
 from plugin.requests.base_request import BaseRequest
 from plugin.requests.get_queues import GetQueuesRequest
 from plugin.requests.join_queue import JoinQueueRequest
@@ -33,6 +34,7 @@ class ResponseBuilder:
             self._initialized = True
             self._mm_manager = get_matchmaking_manager_v2()
             self._ddb_manager = DynamoDbManager()
+            self._command_builder = CommandBuilder()
 
     def build_response(self, request: BaseRequest) -> BaseResponse:
         profile: PlayerProfile = (
@@ -86,8 +88,9 @@ class ResponseBuilder:
         return response
 
     def _join_queue_response(self, profile: PlayerProfile, request: JoinQueueRequest):
-        if self._mm_manager.is_player_in_match(profile):
-            return ErrorResponse("You are already in a match", True)
+        active_match = self._mm_manager.find_match_with_player(profile)
+        if active_match:
+            return self._command_builder.build_match_ready(active_match)
 
         queue = self._mm_manager.get_queue(request.queue_id)
         if not queue:
@@ -96,6 +99,7 @@ class ResponseBuilder:
             )
 
         num_players = queue.player_count()
+        add_count = 0
 
         party_manager = get_party_manager()
         if party_manager:
@@ -120,6 +124,7 @@ class ResponseBuilder:
                 )
                 if result is None:
                     return ErrorResponse("Unable to add your party to queue")
+                add_count = len(player_party.players())
 
             party_members: list[dict] = []
             for player in player_party:
@@ -130,9 +135,7 @@ class ResponseBuilder:
                     {"TmAccountId": player.tm_account_id, "Points": player_elo.elo}
                 )
 
-            return JoinQueueResponse(
-                num_players + len(player_party.players()), party_members
-            )
+            return JoinQueueResponse(num_players + add_count, party_members)
         else:
             if not queue.is_player_queued(profile):
                 result = self._mm_manager.add_party_to_queue(
@@ -140,8 +143,9 @@ class ResponseBuilder:
                 )
                 if result is None:
                     return ErrorResponse("Unable to join queue")
+                add_count = 1
 
-            return JoinQueueResponse(num_players + 1)
+            return JoinQueueResponse(num_players + add_count)
 
     def _leave_queue_response(self, profile: PlayerProfile, request: LeaveQueueRequest):
         if self._mm_manager.is_player_in_match(profile):
