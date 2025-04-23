@@ -451,6 +451,14 @@ class QueueViewBuilder(commands.Cog):
         queue.active = False
         self.ddb_manager.update_match_queue(queue)
 
+        # Stop the queue view task and remove it
+        # We do this before we remove from mm manager to avoid a race condition
+        for view in self.views:
+            if view.queue_id == queue_id:
+                await view.stop_task()
+                self.views.remove(view)
+                break
+
         # Remove the queue from the mm manager
         removed = self.mm_manager.remove_queue(queue.queue_id)
 
@@ -458,13 +466,6 @@ class QueueViewBuilder(commands.Cog):
             logging.warning(
                 f"Queue {queue_id} not found in active queues while disabling."
             )
-
-        # Stop the queue view task and remove it
-        for view in self.views:
-            if view.queue_id == queue_id:
-                await view.stop_task()
-                self.views.remove(view)
-                break
 
         await ctx.send(f"Queue {queue_id} disabled.", ephemeral=True)
 
