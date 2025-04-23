@@ -8,6 +8,7 @@ class QueueType(Enum):
     QueueSoloTest = "solo"
     QueueLSC = "lsc"
     QueueSim2v2 = "Sim2v2"
+    QueueScrim2v2 = "Scrim2v2"
 
     @classmethod
     def from_str(cls, value: str):
@@ -23,11 +24,17 @@ class QueueType(Enum):
             return QueueType.QueueLSC
         elif value == QueueType.QueueSim2v2.value:
             return QueueType.QueueSim2v2
+        elif value == QueueType.QueueScrim2v2.value:
+            return QueueType.QueueScrim2v2
         else:
             raise ValueError(f"Invalid queue type: {value}")
 
     def is_2v2(self) -> bool:
-        return self == QueueType.Queue2v2 or self == QueueType.QueueSim2v2
+        return (
+            self == QueueType.Queue2v2
+            or self == QueueType.QueueSim2v2
+            or self == QueueType.QueueScrim2v2
+        )
 
     def is_simulated(self) -> bool:
         """Returns true if this queue type generates simulated matches. These

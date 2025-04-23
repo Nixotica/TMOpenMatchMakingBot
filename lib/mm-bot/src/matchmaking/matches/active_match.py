@@ -8,6 +8,7 @@ from matchmaking.matches.event_creator import (
     create_1v1_match,
     create_1v1v1v1_match,
     create_2v2_match,
+    create_2v2_bo5_match,
     create_lsc_match,
     create_solo_match,
 )
@@ -96,6 +97,26 @@ class ActiveMatch:
     ) -> ActiveMatch:
         logging.info(f"Creating new 2v2 match for teams {teams}")
         match_info = await create_2v2_match(match_queue, bot_match_id, teams)
+
+        return ActiveMatch(
+            match_info.event_id,
+            match_info.event_name,
+            match_info.round_id,
+            match_info.match_id,
+            match_info.match_live_id,
+            bot_match_id,
+            teams,
+            match_queue,
+        )
+
+    @staticmethod
+    async def create_2v2_scrim(
+        match_queue: MatchQueue,
+        bot_match_id: int,
+        teams: Teams2v2,
+    ) -> ActiveMatch:
+        logging.info(f"Creating new 2v2 scrim match for teams {teams}")
+        match_info = await create_2v2_bo5_match(match_queue, bot_match_id, teams)
 
         return ActiveMatch(
             match_info.event_id,

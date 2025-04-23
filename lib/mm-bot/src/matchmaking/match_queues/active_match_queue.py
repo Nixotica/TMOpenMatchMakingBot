@@ -190,6 +190,10 @@ class ActiveMatchQueue:
 
             if self.queue.type == QueueType.Queue2v2:
                 return await ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
+            elif self.queue.type == QueueType.QueueScrim2v2:
+                return await ActiveMatch.create_2v2_scrim(
+                    self.queue, bot_match_id, teams
+                )
             elif self.queue.type == QueueType.QueueSim2v2:
                 return await ActiveMatch.create_sim_2v2(self.queue, bot_match_id, teams)
             else:
@@ -201,6 +205,7 @@ class ActiveMatchQueue:
                 self.queue, bot_match_id, player_in_match
             )
 
+        # TODO - remove this shitty useless queue type
         elif self.queue.type == QueueType.QueueLSC:
             players_in_match = self.player_parties[:NUM_LSC_PLAYERS]
             players_in_match = [p.players()[0] for p in players_in_match]

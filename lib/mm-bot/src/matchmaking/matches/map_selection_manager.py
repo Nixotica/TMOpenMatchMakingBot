@@ -1,5 +1,5 @@
 import random
-from typing import Dict
+from typing import Dict, List
 
 from models.match_queue import MatchQueue
 from nadeo.ubi_token_vendor import UbiTokenRefresher
@@ -64,6 +64,29 @@ class MapSelectionManager:
         self.last_played_maps_by_queue[match_queue.queue_id] = map_to_use._uuid
 
         return map_to_use
+
+    def get_five_maps(self, match_queue: MatchQueue) -> List[Map]:
+        """Gets 5 maps or all maps in the campaign for a match queue, whichever is less.
+
+        Args:
+            match_queue (MatchQueue): _description_
+
+        Raises:
+            Exception: _description_
+
+        Returns:
+            List[Map]: _description_
+        """
+        campaign = self._get_campaign(match_queue)
+        maps = campaign._playlist
+        if maps is None:
+            raise Exception(
+                f"No campaign playlist found with club id {match_queue.campaign_club_id} "
+                f"and campaign id {match_queue.campaign_id}."
+            )
+
+        maps_to_use = maps[: min(5, len(maps))]
+        return [Map(map._uuid) for map in maps_to_use]
 
     def _get_campaign(self, match_queue: MatchQueue) -> Campaign:
         UbiTokenRefresher().refresh_tokens()
