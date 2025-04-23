@@ -362,6 +362,115 @@ async def create_2v2_match(
     return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
 
 
+async def create_2v2_bo5_match(
+    match_queue: MatchQueue, bot_match_id: int, teams: Teams2v2
+) -> CreatedMatchInfo:
+    """Create a 2v2 Best of 5 match using Trackmania competition tool.
+
+    Args:
+        match_queue (MatchQueue): The match queue from which the map, club, and campaign are derived.
+        team_a (tuple[PlayerProfile, PlayerProfile]): Team A player profiles.
+        team_b (tuple[PlayerProfile, PlayerProfile]): Team B player profiles.
+
+    Returns:
+        CreatedMatchInfo: The info for the created match.
+    """
+
+    event_name = f"BMM - #{bot_match_id}"
+    match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
+
+    map_to_use = MapSelectionManager().get_random_map(match_queue)
+
+    team_a = Tmwt2v2PasteTeam(
+        teams.team_a.name,
+        teams.team_a.name,
+        teams.team_a.player_a.tm_account_id,
+        teams.team_a.player_b.tm_account_id,
+    )
+    team_b = Tmwt2v2PasteTeam(
+        teams.team_b.name,
+        teams.team_b.name,
+        teams.team_b.player_a.tm_account_id,
+        teams.team_b.player_b.tm_account_id,
+    )
+    teams_paste = Tmwt2v2Paste(
+        team_a,
+        team_b,
+    )
+
+    # Doesn't require auth since Matrix whitelisted the IPs of devs and the service stack
+    teams_url = post_tmwt_2v2(
+        teams_paste,
+        f"BMM{bot_match_id}",
+    )
+
+    event = Event(
+        name=event_name,
+        club_id=match_queue.match_club_id,
+        rounds=[
+            Round(
+                name="Match",
+                start_date=match_start_time,
+                end_date=match_start_time + dt.timedelta(hours=1),
+                matches=[
+                    Match(
+                        spots=[TeamMatchSpot(1), TeamMatchSpot(2)],
+                    )
+                ],
+                config=RoundConfig(
+                    map_pool=[map_to_use],
+                    script=ScriptType.TMWT_2025,
+                    max_players=4,
+                    script_settings=TMWT2025ScriptSettings(
+                        base_tmwt_script_settings=BaseTMWTScriptSettings(
+                            base_script_settings=BaseScriptSettings(
+                                warmup_number=1,
+                            ),
+                            match_points_limit=1,
+                            teams_url=teams_url,
+                            match_info=event_name,
+                        ),
+                    ),
+                    plugin_settings=TMWTPluginSettings(
+                        auto_start_mode=AutoStartMode.DISABLED,
+                        ready_minimum_team_size=2,
+                        pick_ban_start_auto=True,
+                        pick_ban_order="p:1,p:0,p:0,p:1,p:r",
+                        use_auto_ready=True,
+                        pick_ban_use_gamepad_version=True,
+                    ),
+                ),
+            )
+        ],
+        participant_type=ParticipantType.TEAM,
+    )
+
+    # TODO - error handling
+    event_id = post_event(event)
+
+    # Add players before event actually starts
+    event.add_team(
+        team_a.team_name,
+        team_a.members(),
+        1,
+    )
+    event.add_team(
+        team_b.team_name,
+        team_b.members(),
+        2,
+    )
+
+    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
+    matches = get_matches_for_round(round_id, 1, 0)
+    while matches == []:
+        await asyncio.sleep(5)
+        matches = get_matches_for_round(round_id, 1, 0)
+    match_id = matches[0].id
+    match_live_id = matches[0].club_match_live_id
+
+    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+
+
 async def create_solo_match(
     match_queue: MatchQueue,
     bot_match_id: int,
