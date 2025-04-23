@@ -426,10 +426,12 @@ async def create_2v2_bo5_match(
                             base_script_settings=BaseScriptSettings(
                                 warmup_number=1,
                             ),
-                            match_points_limit=1,
+                            match_points_limit=3,
                             teams_url=teams_url,
                             match_info=event_name,
                         ),
+                        disable_match_intro=False,
+                        is_matchmaking=True,
                     ),
                     plugin_settings=TMWTPluginSettings(
                         auto_start_mode=AutoStartMode.DISABLED,
