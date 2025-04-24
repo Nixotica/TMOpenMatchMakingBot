@@ -425,6 +425,7 @@ async def create_2v2_bo5_match(
                         base_tmwt_script_settings=BaseTMWTScriptSettings(
                             base_script_settings=BaseScriptSettings(
                                 warmup_number=1,
+                                pick_ban_enable=True,
                             ),
                             match_points_limit=3,
                             teams_url=teams_url,
