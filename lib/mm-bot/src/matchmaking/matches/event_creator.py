@@ -379,7 +379,7 @@ async def create_2v2_bo5_match(
     event_name = f"BMM - #{bot_match_id}"
     match_start_time = dt.datetime.utcnow() + dt.timedelta(seconds=10)
 
-    map_to_use = MapSelectionManager().get_random_map(match_queue)
+    maps_to_use = MapSelectionManager().get_five_maps(match_queue)
 
     team_a = Tmwt2v2PasteTeam(
         teams.team_a.name,
@@ -418,7 +418,7 @@ async def create_2v2_bo5_match(
                     )
                 ],
                 config=RoundConfig(
-                    map_pool=[map_to_use],
+                    map_pool=maps_to_use,
                     script=ScriptType.TMWT_2025,
                     max_players=4,
                     script_settings=TMWT2025ScriptSettings(
