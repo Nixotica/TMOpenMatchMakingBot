@@ -4,6 +4,7 @@ import * as cdk from 'aws-cdk-lib';
 import { StorageStack } from '../lib/stack/storage';
 import { BotServiceStack } from '../lib/stack/bot_service';
 import { ElasticIpStack } from '../lib/stack/elastic_ip';
+import { ReadOnlyAccessStack } from '../lib/stack/read_access';
 
 const app = new cdk.App();
 const env = {
@@ -60,6 +61,10 @@ if (process.env.STAGE == 'dev') {
   new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {
     env: env,
     stage: 'prod',
+    terminationProtection: true,
+  })
+  new ReadOnlyAccessStack(app, 'TmOpenMatchMakingBotStack-ReadOnlyAccess-prod', {
+    env: env,
     terminationProtection: true,
   })
 } else {
