@@ -67,11 +67,6 @@ if (process.env.STAGE == 'dev') {
     env: env,
     terminationProtection: true,
   })
-  new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {
-    env: env,
-    stage: 'prod',
-    terminationProtection: true,
-  })
   new ReadOnlyAccessStack(app, 'TmOpenMatchMakingBotStack-ReadOnlyAccess-prod', {
     env: env,
     terminationProtection: true,

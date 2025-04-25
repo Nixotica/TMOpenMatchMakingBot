@@ -13,7 +13,6 @@ from cogs.party_manager import get_party_manager
 from discord import TextChannel, ui
 from discord.ext import commands, tasks
 from helpers import get_guild, get_ping_channel, get_rank_for_player
-from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
 from models.leaderboard_rank import LeaderboardRank
 from models.player_profile import PlayerProfile
@@ -113,7 +112,7 @@ class MatchQueueView(ui.View):
                 return
 
             # If this is a solo queue, do not allow player to join
-            if queue.queue.type != QueueType.Queue2v2:
+            if not queue.queue.type.is_2v2():
                 await interaction.response.send_message(
                     "This queue does not allowed partied players. Use /unparty first!",
                     ephemeral=True,
