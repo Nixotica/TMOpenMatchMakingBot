@@ -88,6 +88,7 @@ export class BotServiceStack extends Stack {
          */
         const cluster = new Cluster(this, 'MM-Bot-Cluster', {
             vpc,
+            clusterName: `MM-Bot-Cluster-${props.stage}`,
         });
         const rootVolume: BlockDevice = {
             deviceName: '/dev/xvda',
