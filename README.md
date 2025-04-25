@@ -57,8 +57,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
             "PASTEFY_PASSWORD": "<password>"
         }
     ```
-    For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. Currently the pastefy server is hosted by Matrix/skiff. You will need to
-    contact them for credentials!
+    For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. Currently the pastefy server is hosted by Matrix/skiff. You will need to contact them for credentials!
 
 8. Go to S3 and upload `secrets.json` to the bucket `tm-mm-bot-secrets-dev-<account_id>` at the root directory. 
 
