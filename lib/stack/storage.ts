@@ -25,6 +25,7 @@ export class StorageStack extends Stack {
     public readonly leaderboardRanksTable: Table;
     public readonly nextBotMatchIdTable: Table;
     public readonly persistedMatchesTable: Table;
+    public readonly matchesPlayedTable: Table;
 
     constructor(scope: Construct, id: string, props: StorageStackProps) {
         super(scope, id, props);
@@ -35,7 +36,7 @@ export class StorageStack extends Stack {
          * A table for storing player profiles consisting of:
          * - `tm_account_id`: Player's Trackmania account ID (Primary Key)
          * - `discord_account_id`: Player's linked discord account ID (GSI)
-         * - `matches_played`: Player's cached number of matches played, negates checking results table (Number)
+         * - `matches_played`: (DEPRECATED) Player's cached number of matches played, negates checking results table (Number)
          */
         this.playerProfilesTable = new Table(this, "PlayerProfilesTable", {
             partitionKey: { name: "tm_account_id", type: AttributeType.STRING },
@@ -192,6 +193,27 @@ export class StorageStack extends Stack {
             partitionKey: { name: "bot_match_id", type: AttributeType.NUMBER },
             tableName: `tm-mm-bot-persisted-matches-${props.stage}-${props.account}`,
             billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+
+        /**
+         * MatchesPlayed Table
+         * 
+         * A table for storing information related to matches played by each player, separated by queue. 
+         * - `tm_account_id`: The account ID of the player (Primary Key)
+         * - `queue_id`: The queue ID of the match (GSI, Sort Key)
+         * - `matches_played`: The number of matches played by the player in this queue.
+         * - `matches_won`: The number of matches won by the player in this queue.
+         */
+        this.matchesPlayedTable = new Table(this, "MatchesPlayedTable", {
+            partitionKey: { name: "tm_account_id", type: AttributeType.STRING },
+            sortKey: { name: "queue_id", type: AttributeType.STRING },
+            tableName: `tm-mm-bot-matches-played-${props.stage}-${props.account}`,
+            billingMode: BillingMode.PAY_PER_REQUEST,
+        });
+        this.matchesPlayedTable.addGlobalSecondaryIndex({
+            indexName: "queue_id",
+            partitionKey: { name: "queue_id", type: AttributeType.STRING },
+            sortKey: { name: "tm_account_id", type: AttributeType.STRING },
         });
 
         /**

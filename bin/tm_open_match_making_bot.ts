@@ -55,6 +55,16 @@ if (process.env.STAGE == 'dev') {
     leaderboardRanksTable: storage.leaderboardRanksTable,
     nextBotMatchIdTable: storage.nextBotMatchIdTable,
     persistedMatchesTable: storage.persistedMatchesTable,
+    matchesPlayedTable: storage.matchesPlayedTable,
+    terminationProtection: true,
+  })
+  new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {
+    env: env,
+    stage: 'prod',
+    terminationProtection: true,
+  })
+  new ReadOnlyAccessStack(app, 'TmOpenMatchMakingBotStack-ReadOnlyAccess-prod', {
+    env: env,
     terminationProtection: true,
   })
   new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {

@@ -30,6 +30,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
         LEADERBOARD_RANKS_TABLE=tm-mm-bot-leaderboard-ranks-dev-<account-id>
         NEXT_BOT_MATCH_ID_TABLE=tm-mm-bot-next-bot-match-id-dev-<account-id>
         PERSISTED_MATCHES_TABLE=tm-mm-bot-persisted-matches-dev-<account-id>
+        MATCHES_PLAYED_TABLE=tm-mm-bot-matches-played-dev-<account-id>
         AWS_ACCESS_KEY_ID=<your-id>
         AWS_SECRET_ACCESS_KEY=<your-access-key>
         AWS_DEFAULT_REGION=<your-region>

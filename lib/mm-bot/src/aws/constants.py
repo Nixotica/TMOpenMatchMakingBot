@@ -49,4 +49,6 @@ KEY_PING_ROLE_ID = "ping_role_id"
 
 KEY_EVENT_ID = "event_id"
 
+KEY_MATCHES_WON = "matches_won"
+
 INDEX_DISCORD_ACCOUNT_ID = "discord_account_id"

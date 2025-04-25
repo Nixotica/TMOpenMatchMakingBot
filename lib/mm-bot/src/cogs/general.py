@@ -141,9 +141,29 @@ class General(commands.Cog):
         )
 
         profile_title = "Player Profile"
+        matches_played = self.ddb_manager.get_matches_played(
+            player_profile.tm_account_id
+        )
 
-        matches_played_name = "Matches Played"
-        matches_played_value = player_profile.matches_played
+        total_matches_played = 0
+        total_matches_won = 0
+        most_played_queue_id = None
+        most_played_queue_matches = 0
+        for match in matches_played:
+            total_matches_played += match.matches_played
+            total_matches_won += match.matches_won
+
+            if match.matches_played > most_played_queue_matches:
+                most_played_queue_id = match.queue_id
+                most_played_queue_matches = match.matches_played
+
+        # TODO - move to a fake queue with id "legacy" in matches played table for all players
+        total_matches_played += player_profile.matches_played
+
+        total_matches_played_name = "Total Matches Played"
+        total_matches_played_value = (
+            f"{total_matches_played} played | {total_matches_won} won"
+        )
 
         embed = discord.Embed(
             title=profile_title,
@@ -151,7 +171,17 @@ class General(commands.Cog):
             timestamp=datetime.utcnow(),
             description=member.mention,
         )
-        embed.add_field(name=matches_played_name, value=matches_played_value)
+        embed.add_field(
+            name=total_matches_played_name, value=total_matches_played_value
+        )
+
+        most_played_queue_name = "Most Played Queue"
+        most_played_queue_value = (
+            f"{most_played_queue_id} ({most_played_queue_matches} matches)"
+            if most_played_queue_id is not None
+            else "N/A"
+        )
+        embed.add_field(name=most_played_queue_name, value=most_played_queue_value)
 
         for player_elo in player_elos:
             leaderboard_id = player_elo.leaderboard_id
@@ -171,7 +201,9 @@ class General(commands.Cog):
             else:
                 leaderboard_value = f"{player_elo.elo} elo"
 
-            embed.add_field(name=leaderboard_name, value=leaderboard_value)
+            embed.add_field(
+                name=leaderboard_name, value=leaderboard_value, inline=False
+            )
 
         await ctx.send(embed=embed, ephemeral=True)
         return
