@@ -27,6 +27,7 @@ from models.leaderboard import Leaderboard
 from models.leaderboard_rank import LeaderboardRank
 from models.match_queue import MatchQueue
 from models.match_results import DdbMatchResults
+from models.matches_played import MatchesPlayed
 from models.persisted_match import PersistedMatch
 from models.player_elo import PlayerElo
 from models.player_profile import PlayerProfile
@@ -196,7 +197,7 @@ class DynamoDbManager:
 
             return True
         except ClientError as e:
-            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":  # type: ignore
                 logging.warning(
                     f"Player profile already exists for TM account ID {tm_account_id} "
                     f"and Discord account ID {discord_account_id}"
@@ -250,7 +251,7 @@ class DynamoDbManager:
                 },
                 UpdateExpression="""
                     SET
-                        #matches_played = if_not_exists(#matches_played, :zero) + :incr_played
+                        #matches_played = if_not_exists(#matches_played, :zero) + :incr_played,
                         #matches_won = if_not_exists(#matches_won, :zero) + :maybe_incr_won
                 """,
                 ExpressionAttributeNames={
@@ -271,6 +272,30 @@ class DynamoDbManager:
                 f"on queue {queue_id}: {e}"
             )
             return False
+
+    def get_matches_played(self, tm_account_id: str) -> List[MatchesPlayed]:
+        """Returns the matches played for every queue for a given player.
+
+        Args:
+            tm_account_id (str): The player to get matches played for.
+
+        Returns:
+            List[MatchesPlayed]: The matches played for every queue for the given player.
+        """
+        try:
+            response = self._matches_played_table.query(
+                KeyConditionExpression=Key(KEY_TM_ACCOUNT_ID).eq(tm_account_id)
+            )
+            items = response.get("Items", [])
+            if not items:
+                return []
+            matches_played = [
+                MatchesPlayed.from_dict(items[i]) for i in range(len(items))
+            ]
+            return matches_played
+        except Exception as e:
+            logging.error(f"Error getting matches played from DynamoDB: {e}")
+            return []
 
     def update_player_elo(
         self, tm_account_id: str, leaderboard_id: str, new_elo: int
@@ -302,7 +327,7 @@ class DynamoDbManager:
             )
             return True
         except ClientError as e:
-            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
+            if e.response["Error"]["Code"] == "ConditionalCheckFailedException":  # type: ignore
                 logging.warning(
                     f"Player profile for TM account ID {tm_account_id} does not exist."
                 )
@@ -449,7 +474,7 @@ class DynamoDbManager:
 
             return True
         except ClientError as e:
-            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":  # type: ignore
                 logging.warning(f"Queue already exists for queue ID {queue.queue_id}")
                 return False
             else:
@@ -475,7 +500,7 @@ class DynamoDbManager:
 
             return True
         except ClientError as e:
-            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":  # type: ignore
                 logging.warning(
                     f"Leaderboard already exists for leaderboard ID {leaderboard.leaderboard_id}"
                 )
@@ -708,7 +733,7 @@ class DynamoDbManager:
 
             return True
         except ClientError as e:
-            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+            if e.response["Error"]["Code"] != "ConditionalCheckFailedException":  # type: ignore
                 logging.warning(
                     f"Rank role already exists for rank role ID {rank_role.rank_role_id}"
                 )
@@ -792,7 +817,7 @@ class DynamoDbManager:
             return int(response["Attributes"][KEY_CURRENT_VALUE]) + 1  # type: ignore
 
         except ClientError as e:
-            if e.response["Error"]["Code"] == "ValidationException":
+            if e.response["Error"]["Code"] == "ValidationException":  # type: ignore
                 # This error can indicate that the item doesn't exist, so initialize it
                 logging.info("Match ID not initialized yet. Initializing to 1.")
                 try:
@@ -803,7 +828,7 @@ class DynamoDbManager:
                     return 1  # Return 1 since we are initializing it to 1
                 except ClientError as init_e:
                     if (
-                        init_e.response["Error"]["Code"]
+                        init_e.response["Error"]["Code"]  # type: ignore
                         == "ConditionalCheckFailedException"
                     ):
                         # In the event of a race condition, just retry incrementing

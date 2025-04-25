@@ -284,10 +284,21 @@ class MatchmakingManagerV2(commands.Cog):
             match.match_results.__str__(),
         )
 
-        for player in match.active_match.player_profiles:
-            # TODO - update MatchResults to have get_player_position method return for team/individual
+        for player in match.active_match.participants():
+            player_pos = match.match_results.get_rank(player.tm_account_id)
+            if player_pos is None:
+                logging.warning(
+                    f"Could not find player position for player {player.tm_account_id} "
+                    f"in match {match.active_match.match_id}."
+                )
+                continue
+            player_won = True if player_pos == 1 else False
 
-            self.ddb_manager.update_player_matches_complete(player.tm_account_id)
+            self.ddb_manager.update_player_matches_played(
+                player.tm_account_id,
+                match.active_match.match_queue.queue_id,
+                player_won,
+            )
 
         match.cleanup()
 

@@ -12,4 +12,4 @@ pytest-asyncio==0.24.0
 pytz==2024.1
 waitress==3.0.1
 
-git+https://github.com/Nixotica/NadeoEventAPIWrapper.git@cffeda135dfbc408708619c83dfc7cc35df2cc66#egg=nadeo_event_api&subdirectory=nadeo_event_api
+git+https://github.com/Nixotica/NadeoEventAPIWrapper.git@c0e3448caffc397d38238dbc477522c722e057a0#egg=nadeo_event_api&subdirectory=nadeo_event_api
