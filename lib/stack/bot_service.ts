@@ -52,8 +52,6 @@ export interface BotServiceStackProps extends StackProps {
  * A construct for deploying a container to host the bot. 
  */
 export class BotServiceStack extends Stack {
-    public readonly eip: CfnEIP;
-
     constructor(scope: Construct, id: string, props: BotServiceStackProps) {
         super(scope, id, props);
 
@@ -103,7 +101,7 @@ export class BotServiceStack extends Stack {
             instanceType: InstanceType.of(InstanceClass.T3A, InstanceSize.MICRO), 
             blockDevices: [rootVolume],
             vpcSubnets: { subnetType: SubnetType.PUBLIC },
-            associatePublicIpAddress: false,
+            associatePublicIpAddress: true,
         });
         autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
 
@@ -158,7 +156,6 @@ export class BotServiceStack extends Stack {
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
-            memoryReservationMiB: 256,
             memoryLimitMiB: 512,
             healthCheck: {
                 command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
@@ -183,21 +180,10 @@ export class BotServiceStack extends Stack {
             cluster, 
             taskDefinition: ec2TaskDefinition,
             desiredCount: 1,
-            deploymentController: {
-                type: DeploymentControllerType.ECS,
-            },
             placementConstraints: [
                 PlacementConstraint.distinctInstances(),
             ],
             healthCheckGracePeriod: Duration.seconds(120),
-            minHealthyPercent: 0,
-            maxHealthyPercent: 200,
         });
-
-        /**
-         * Elastic IP
-         */
-        this.eip = new CfnEIP(this, 'MM-Bot-ElasticIP');
-        // test - trigger redeploy
     }
 }

@@ -3,6 +3,7 @@ import 'source-map-support/register';
 import * as cdk from 'aws-cdk-lib';
 import { StorageStack } from '../lib/stack/storage';
 import { BotServiceStack } from '../lib/stack/bot_service';
+import { ElasticIpStack } from '../lib/stack/elastic_ip';
 
 const app = new cdk.App();
 const env = {
@@ -54,6 +55,11 @@ if (process.env.STAGE == 'dev') {
     nextBotMatchIdTable: storage.nextBotMatchIdTable,
     persistedMatchesTable: storage.persistedMatchesTable,
     matchesPlayedTable: storage.matchesPlayedTable,
+    terminationProtection: true,
+  })
+  new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {
+    env: env,
+    stage: 'prod',
     terminationProtection: true,
   })
 } else {
