@@ -197,5 +197,6 @@ export class BotServiceStack extends Stack {
          * Elastic IP
          */
         this.eip = new CfnEIP(this, 'MM-Bot-ElasticIP');
+        // test - trigger redeploy
     }
 }
