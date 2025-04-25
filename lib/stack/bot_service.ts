@@ -151,6 +151,7 @@ export class BotServiceStack extends Stack {
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
+            memoryReservationMiB: 256,
             memoryLimitMiB: 1024,
             healthCheck: {
                 command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
