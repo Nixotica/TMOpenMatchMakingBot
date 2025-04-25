@@ -67,10 +67,6 @@ if (process.env.STAGE == 'dev') {
     env: env,
     terminationProtection: true,
   })
-  new ReadOnlyAccessStack(app, 'TmOpenMatchMakingBotStack-ReadOnlyAccess-prod', {
-    env: env,
-    terminationProtection: true,
-  })
 } else {
   throw new Error(`Unsupported stage, must be one of "dev" or "prod", received ${process.env.STAGE}`)
 }
