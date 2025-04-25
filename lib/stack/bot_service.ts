@@ -102,7 +102,7 @@ export class BotServiceStack extends Stack {
             instanceType: InstanceType.of(InstanceClass.T3A, InstanceSize.MICRO), 
             blockDevices: [rootVolume],
             vpcSubnets: { subnetType: SubnetType.PUBLIC },
-            associatePublicIpAddress: true,
+            associatePublicIpAddress: false,
         });
         autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
 
