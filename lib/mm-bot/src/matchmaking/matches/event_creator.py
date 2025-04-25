@@ -2,6 +2,7 @@ import asyncio
 import datetime as dt
 from typing import List
 
+from aws.s3 import S3ClientManager
 from matchmaking.constants import POINTS_LIMIT_1v1v1v1
 from matchmaking.matches.created_match_info import CreatedMatchInfo
 from matchmaking.matches.map_selection_manager import MapSelectionManager
@@ -37,7 +38,7 @@ from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import (
     Tmwt2v2Paste,
     Tmwt2v2PasteTeam,
 )
-from nadeo_event_api.api.pastefy.pastefy_api import post_tmwt_2v2
+from nadeo_event_api.api.pastefy.pastefy_api import post_tmwt_2v2, get_auth
 
 
 async def create_1v1v1v1_match(
@@ -291,10 +292,12 @@ async def create_2v2_match(
         team_b,
     )
 
-    # Doesn't require auth since Matrix whitelisted the IPs of devs and the service stack
+    secrets = S3ClientManager().get_secrets()
+
     teams_url = post_tmwt_2v2(
         teams_paste,
         f"BMM{bot_match_id}",
+        basic_auth=get_auth(secrets.pastefy_login, secrets.pastefy_password),
     )
 
     event = Event(
@@ -398,10 +401,12 @@ async def create_2v2_bo5_match(
         team_b,
     )
 
-    # Doesn't require auth since Matrix whitelisted the IPs of devs and the service stack
+    secrets = S3ClientManager().get_secrets()
+
     teams_url = post_tmwt_2v2(
         teams_paste,
         f"BMM{bot_match_id}",
+        basic_auth=get_auth(secrets.pastefy_login, secrets.pastefy_password),
     )
 
     event = Event(
