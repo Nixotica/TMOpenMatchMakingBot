@@ -156,7 +156,7 @@ export class BotServiceStack extends Stack {
                 AWS_REGION: 'us-west-2',
                 AWS_DEFAULT_REGION: 'us-west-2',
             },
-            memoryLimitMiB: 512,
+            memoryLimitMiB: 1024,
             healthCheck: {
                 command: ['CMD-SHELL', 'curl -f http://localhost:8080/health || exit 1']
             }
@@ -184,6 +184,7 @@ export class BotServiceStack extends Stack {
                 PlacementConstraint.distinctInstances(),
             ],
             healthCheckGracePeriod: Duration.seconds(120),
+            minHealthyPercent: 0,
         });
     }
 }
