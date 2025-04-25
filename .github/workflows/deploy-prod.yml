@@ -75,3 +75,23 @@ jobs:
           npm install --save-dev @types/node
           cdk synth  
           cdk deploy --all --require-approval never
+
+      - name: Associate EIP to EC2
+        run: |
+          INSTANCE_ARN=$(aws ecs list-container-instances --cluster MM-Bot-Cluster-prod \
+            --query 'containerInstanceArns[0]' --output text)
+        
+          EC2_ID=$(aws ecs describe-container-instances --cluster MM-Bot-Cluster-prod \
+            --container-instances "$INSTANCE_ARN" \
+            --query 'containerInstances[0].ec2InstanceId' --output text)
+
+          ENI_ID=$(aws ec2 describe-instances \
+            --instance-ids $EC2_ID \
+            --query 'Reservations[0].Instances[0].NetworkInterfaces[0].NetworkInterfaceId' \
+            --output text)
+
+          aws ec2 associate-address \
+            --allocation-id eipalloc-0fae76a43ff8b3496 \
+            --network-interface-id $ENI_ID \
+            --allow-reassociation
+        
