@@ -91,7 +91,7 @@ jobs:
             --output text)
 
           aws ec2 associate-address \
-            --allocation-id eipalloc-0fae76a43ff8b3496 \
+            --allocation-id eipalloc-098dfb9f8b0cdedaf \
             --network-interface-id $ENI_ID \
             --allow-reassociation
         
