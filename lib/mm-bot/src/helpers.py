@@ -190,6 +190,37 @@ async def get_party_channel(
     return party_channel
 
 
+async def get_profile_channel(
+    bot: commands.Bot,
+    s3_manager: S3ClientManager,
+) -> Optional[discord.TextChannel]:
+    """Gets the profile channel for profile messages.
+
+    Args:
+        bot (commands.Bot): The discord bot
+        s3_manager (S3ClientManager): The s3 client manager for retrieving configs
+
+    Returns:
+        Optional[discord.TextChannel]: _description_
+    """
+    configs = s3_manager.get_configs()
+    profile_channel_id = configs.profile_channel_id
+
+    if profile_channel_id is None:
+        logging.error("No profile channel set.")
+        return None
+
+    profile_channel = bot.get_channel(profile_channel_id)
+    if profile_channel is None:
+        logging.error(f"Profile channel not found with ID {profile_channel_id}.")
+        return None
+    if not isinstance(profile_channel, discord.TextChannel):
+        logging.error(f"Channel {profile_channel_id} is not a text channel.")
+        return None
+
+    return profile_channel
+
+
 async def safe_delete_message(message: discord.Message) -> None:
     """Delete message safely, catching errors"""
     try:

@@ -7,7 +7,7 @@ from aws.s3 import S3ClientManager
 from cogs.constants import COLOR_EMBED, ROLE_ADMIN, ROLE_MOD
 from discord.ext import commands
 from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
-from helpers import get_rank_for_player
+from helpers import get_profile_channel, get_rank_for_player
 
 
 class General(commands.Cog):
@@ -183,7 +183,18 @@ class General(commands.Cog):
         )
         embed.add_field(name=most_played_queue_name, value=most_played_queue_value)
 
+        leaderboard_section_name = "Leaderboards"
+        leaderboard_section_value = ""
         for player_elo in player_elos:
+            leaderboard = self.ddb_manager.get_leaderboard(player_elo.leaderboard_id)
+            if not leaderboard:
+                logging.warning(
+                    f"Leaderboard {player_elo.leaderboard_id} not found. Skipping."
+                )
+                continue
+            if leaderboard.active is False:
+                continue
+
             leaderboard_id = player_elo.leaderboard_id
             leaderboard_ranks = (
                 self.ddb_manager.get_ranks_for_leaderboard_by_min_elo_descending(
@@ -191,22 +202,60 @@ class General(commands.Cog):
                 )
             )
 
-            leaderboard_name = f"{leaderboard_id} Leaderboard"
+            leaderboard_name = (
+                leaderboard.display_name
+                if leaderboard.display_name is not None
+                else leaderboard_id
+            )
             player_rank = get_rank_for_player(
                 player_elo.elo, leaderboard_id, leaderboard_ranks
             )
 
             if player_rank is not None:
-                leaderboard_value = f"{player_rank.display_name} {player_elo.elo} elo"
+                leaderboard_elo = f"{player_rank.display_name} {player_elo.elo} elo"
             else:
-                leaderboard_value = f"{player_elo.elo} elo"
+                leaderboard_elo = f"{player_elo.elo} elo"
 
-            embed.add_field(
-                name=leaderboard_name, value=leaderboard_value, inline=False
-            )
+            leaderboard_section_value += f"{leaderboard_name} ({leaderboard_elo})\n"
 
-        await ctx.send(embed=embed, ephemeral=True)
+        embed.add_field(
+            name=leaderboard_section_name, value=leaderboard_section_value, inline=False
+        )
+
+        # Send to profile channel, if set, and make it non-ephemeral
+        profile_channel = await get_profile_channel(self.bot, self.s3_manager)
+        if profile_channel is not None:
+            await profile_channel.send(embed=embed)
+            await ctx.send("Profile sent to profile channel.", ephemeral=True)
+        else:
+            await ctx.send(embed=embed, ephemeral=True)
+
         return
+
+    @commands.hybrid_command(
+        name="set_profile_channel",
+        description="Set the channel that displays player profiles",
+    )
+    @commands.has_role(ROLE_ADMIN)
+    async def set_profile_channel(
+        self,
+        ctx: commands.Context,
+        channel_id: str,  # Cannot be int - too long for discord bot
+    ) -> None:
+        logging.info(
+            f"Processing command to set profile channel from user {ctx.message.author.name}."
+        )
+
+        channel_id = eval(channel_id)
+        if not isinstance(channel_id, int):
+            await ctx.send(f"Invalid channel ID: {channel_id}.")
+            return
+
+        configs = self.s3_manager.get_configs()
+        configs.profile_channel_id = channel_id
+        self.s3_manager.update_config(configs)
+
+        await ctx.send(f"Profile channel set to {channel_id}.", ephemeral=True)
 
     @commands.hybrid_command(
         name="fake_join_queue",
