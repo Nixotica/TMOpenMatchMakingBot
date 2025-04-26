@@ -25,6 +25,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
         PLAYER_ELOS_TABLE=tm-mm-bot-player-elos-dev-<account-id>
         MATCH_RESULTS_TABLE=tm-mm-bot-match-results-dev-<account-id>
         MATCH_QUEUES_TABLE=tm-mm-bot-match-queues-dev-<account-id>
+        MATCHES_PLAYED_TABLE=tm-mm-bot-matches-played-dev-<account-id>
         LEADERBOARDS_TABLE=tm-mm-bot-leaderboards-dev-<account-id>
         RANKS_TABLE=tm-mm-bot-ranks-dev-<account-id>
         LEADERBOARD_RANKS_TABLE=tm-mm-bot-leaderboard-ranks-dev-<account-id>
@@ -51,10 +52,12 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
             "UBI_AUTHS": ["Basic <user:pass base64>"],
             "DISCORD_BOT_TOKEN": "<token>",
             "PASTES_IO_LOGIN": "<username>",
-            "PASTES_IO_PASSWORD": "<password>"
+            "PASTES_IO_PASSWORD": "<password>",
+            "PASTEFY_LOGIN": "<username>",
+            "PASTEFY_PASSWORD": "<password>"
         }
     ```
-    For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. 
+    For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. Currently the pastefy server is hosted by Matrix/skiff. You will need to contact them for credentials!
 
 8. Go to S3 and upload `secrets.json` to the bucket `tm-mm-bot-secrets-dev-<account_id>` at the root directory. 
 

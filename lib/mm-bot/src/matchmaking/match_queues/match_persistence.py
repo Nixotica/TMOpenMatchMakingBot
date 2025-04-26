@@ -3,7 +3,6 @@ from typing import List
 
 from aws.dynamodb import DynamoDbManager
 from matchmaking.constants import NUM_1v1v1v1_PLAYERS
-from matchmaking.match_queues.enum import QueueType
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
 from models.persisted_match import PersistedMatch
@@ -40,7 +39,7 @@ def active_match_from_persisted_match(persisted_match: PersistedMatch) -> Active
         raise LookupError(f"Could not find queue for {persisted_match.queue_id}")
 
     player_profiles = None
-    if queue.type == QueueType.Queue2v2:
+    if queue.type.is_2v2():
         event_teams = get_event_teams(event_id)
 
         team_a_p1_tmacc = event_teams[0].players[0].account_id
