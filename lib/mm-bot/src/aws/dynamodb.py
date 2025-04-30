@@ -624,13 +624,14 @@ class DynamoDbManager:
 
         Args:
             tm_account_id (str): The TM account ID for which to return the given player's elos.
+            omit_disabled (bool, Optional): Whether to only include active leaderboards. Default False.
 
         Returns:
             List[PlayerElo]: The elos for a specific player across all their played leaderboards.
         """
         try:
             response = self._player_elos_table.query(
-                KeyConditionExpression=Key(KEY_TM_ACCOUNT_ID).eq(tm_account_id)
+                KeyConditionExpression=Key(KEY_TM_ACCOUNT_ID).eq(tm_account_id),
             )
             items = response.get("Items", [])
             if not items:

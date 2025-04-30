@@ -173,6 +173,18 @@ TODO
 
 TODO
 
+### Set Profile Channel
+
+Setting a profile channel will redirect all `/profile` commands to this channel, and make them non-ephemeral (everyone with access to that text channel can see it). 
+
+#### Usage:
+
+`/set_profile_channel <channel_id>`
+
+#### Parameters:
+
+* `channel_id` - The ID of the discord channel to display the profile embed when `/profile` is called. Must be a text channel. 
+
 ### Ping
 
 Pings the bot messages channel with `Pong!`
