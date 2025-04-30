@@ -625,8 +625,9 @@ class MatchmakingManagerV2(commands.Cog):
                     now - queued_party.queue_join_time()
                     > MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC
                 ):
-                    for player in queued_party.players():
-                        active_queue.remove_party([player])
+                    self.remove_party_from_queue(
+                        queued_party.players(), active_queue.queue.queue_id
+                    )
                     logging.info(
                         f"Kicked players {queued_party.players()} from {active_queue.queue.queue_id} queue "
                         f"for exceeding {MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC} seconds in queue."
