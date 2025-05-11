@@ -73,6 +73,7 @@ async def create_1v1v1v1_match(
                     script_settings=CupSpecialScriptSettings(
                         base_script_settings=BaseScriptSettings(
                             warmup_number=1,
+                            warmup_duration=15,
                         ),
                         points_repartition="10,6,4,3",
                         number_of_winners=3,
@@ -147,6 +148,7 @@ async def create_1v1_match(
                     script_settings=CupSpecialScriptSettings(
                         base_script_settings=BaseScriptSettings(
                             warmup_number=1,
+                            warmup_duration=15,
                         ),
                         points_repartition="1,0",
                         number_of_winners=1,
@@ -321,6 +323,7 @@ async def create_2v2_match(
                         base_tmwt_script_settings=BaseTMWTScriptSettings(
                             base_script_settings=BaseScriptSettings(
                                 warmup_number=1,
+                                warmup_duration=15,
                             ),
                             match_points_limit=1,
                             teams_url=teams_url,
@@ -430,6 +433,7 @@ async def create_2v2_bo5_match(
                         base_tmwt_script_settings=BaseTMWTScriptSettings(
                             base_script_settings=BaseScriptSettings(
                                 warmup_number=1,
+                                warmup_duration=15,
                                 pick_ban_enable=True,
                             ),
                             match_points_limit=3,
