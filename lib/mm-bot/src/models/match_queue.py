@@ -33,7 +33,7 @@ class MatchQueue:
     display_name: Optional[str]
     category_id: Optional[int]
 
-    def get_primary_leaderboard(self) -> str | None:
+    def get_primary_leaderboard(self) -> Optional[str]:
         return (
             self.leaderboard_ids[0]
             if self.primary_leaderboard_id is None and self.leaderboard_ids

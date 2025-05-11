@@ -32,6 +32,7 @@ class ActiveMatch:
         round_id: int,
         match_id: int,
         match_live_id: str,
+        match_join_link: str,
         bot_match_id: int,
         player_profiles: (
             List[PlayerProfile] | Teams2v2
@@ -43,6 +44,7 @@ class ActiveMatch:
         self.round_id = round_id
         self.match_id = match_id
         self.match_live_id = match_live_id
+        self.match_join_link = match_join_link
         self.bot_match_id = bot_match_id
         self.player_profiles = player_profiles
         self.match_queue = match_queue
@@ -64,6 +66,7 @@ class ActiveMatch:
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            match_info.match_join_link,
             bot_match_id,
             players,
             match_queue,
@@ -84,6 +87,7 @@ class ActiveMatch:
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            match_info.match_join_link,
             bot_match_id,
             players,
             match_queue,
@@ -104,6 +108,7 @@ class ActiveMatch:
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            match_info.match_join_link,
             bot_match_id,
             teams,
             match_queue,
@@ -124,6 +129,7 @@ class ActiveMatch:
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            match_info.match_join_link,
             bot_match_id,
             teams,
             match_queue,
@@ -157,6 +163,7 @@ class ActiveMatch:
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            match_info.match_join_link,
             bot_match_id,
             [player],
             match_queue,
@@ -177,6 +184,7 @@ class ActiveMatch:
             match_info.round_id,
             match_info.match_id,
             match_info.match_live_id,
+            match_info.match_join_link,
             bot_match_id,
             players,
             match_queue,
@@ -210,11 +218,3 @@ class ActiveMatch:
             if self._match_info.status == "COMPLETED":  # type: ignore
                 return True
             return False
-
-    def get_match_join_link(self) -> str | None:
-        match_info = self._get_cached_match_info()
-        if match_info.join_link:
-            return match_info.join_link
-        else:
-            logging.warning("Match join link not found.")
-            return None
