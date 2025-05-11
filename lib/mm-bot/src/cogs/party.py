@@ -4,8 +4,11 @@ import discord
 from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs.constants import ROLE_MOD
+from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
 from cogs.party_manager import get_party_manager
 from discord.ext import commands
+
+from helpers import get_party_channel
 
 
 class Party(commands.Cog):
@@ -17,6 +20,13 @@ class Party(commands.Cog):
         self.bot = bot
         self.ddb_manager = DynamoDbManager()
         self.s3_manager = S3ClientManager()
+
+        mm_manager = get_matchmaking_manager_v2()
+        if mm_manager is None:
+            raise ValueError(
+                "Matchmaking manager, a fatally dependent resource, not found."
+            )
+        self.mm_manager = mm_manager
 
     @commands.hybrid_command(
         name="set_party_channel",
@@ -111,8 +121,22 @@ class Party(commands.Cog):
             await ctx.send("You are not in a party.", ephemeral=True)
             return
 
+        # If players are in any queues, remove them
+        self.mm_manager.remove_party_from_all_queues(party.players())
+
+        # Ping the player's teammate
+        teammate_discord_id = party.teammate(requester_profile).discord_account_id
+        party_channel = await get_party_channel(self.bot, self.s3_manager)
+        if party_channel:
+            embed = discord.Embed(
+                color=discord.Color.red(),
+                description=f"<@{requester_profile.discord_account_id}> unpartied from you."
+                f"⚠️ You must rejoin any queues you were in.",
+            )
+            await party_channel.send(content=f"<@{teammate_discord_id}>", embed=embed)
+
         await ctx.send(
-            f"Unpartied from <@{party.teammate(requester_profile).discord_account_id}>.",
+            f"Unpartied from <@{teammate_discord_id}>. ⚠️ You must rejoin any queues you were in.",
             ephemeral=True,
         )
 

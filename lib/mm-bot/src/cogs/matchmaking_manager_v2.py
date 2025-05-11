@@ -232,6 +232,18 @@ class MatchmakingManagerV2(commands.Cog):
 
         self.mm_event_bus.add_player_left_queue(queue_id, players)
 
+    def remove_party_from_all_queues(
+        self,
+        players: List[PlayerProfile],
+    ) -> None:
+        """Removes a list of players from all queues they are in, and returns the list of queues.
+
+        Args:
+            players (List[PlayerProfile]): The players to remove from all queues.
+        """
+        for active_queue in self.active_queues:
+            self.remove_party_from_queue(players, active_queue.queue.queue_id)
+
     def cancel_match(self, bot_match_id: int) -> Optional[ActiveMatch]:
         """Cancels an active match with the given bot match ID, if one exists.
 
