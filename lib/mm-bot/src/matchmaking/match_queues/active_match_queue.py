@@ -1,7 +1,14 @@
 import logging
-from typing import List
+from typing import List, Optional
 
-from matchmaking.constants import NUM_LSC_PLAYERS, NUM_1v1_PLAYERS, NUM_1v1v1v1_PLAYERS
+from aws.dynamodb import DynamoDbManager
+from matchmaking.constants import (
+    NUM_LSC_PLAYERS,
+    NUM_1v1_PLAYERS,
+    NUM_1v1v1v1_PLAYERS,
+    NUM_2v2_PLAYERS,
+)
+from matchmaking.match_queues.constants import TEAM_BLUE, TEAM_RED
 from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.queued_party import QueuedParty, QueuedPlayer, QueuedTeam
 from matchmaking.matches.active_match import ActiveMatch
@@ -159,34 +166,12 @@ class ActiveMatchQueue:
             )
 
         elif self.queue.type.is_2v2():
-            solo_players: List[PlayerProfile] = []
-            teams_in_match: List[Team2v2] = []
-
-            for party in self.player_parties:
-                # If this is a team, add it to teams in match
-                if len(party.players()) == 2:
-                    team_name = "Blue" if len(teams_in_match) == 0 else "Red"
-                    teams_in_match.append(
-                        Team2v2(team_name, party.players()[0], party.players()[1])
-                    )
-
-                # Otherwise add it to solo players
-                if len(party.players()) == 1:
-                    solo_players.append(party.players()[0])
-
-                # If 2 solo players, make them a team
-                if len(solo_players) == 2:
-                    team_name = "Blue" if len(teams_in_match) == 0 else "Red"
-                    teams_in_match.append(
-                        Team2v2(team_name, solo_players[0], solo_players[1])
-                    )
-                    solo_players = []
-
-                # if two teams in match, break
-                if len(teams_in_match) == 2:
-                    break
-
-            teams = Teams2v2(teams_in_match[0], teams_in_match[1])
+            teams = self._get_2v2_teams_from_parties()
+            if teams is None:
+                raise Exception(
+                    f"Failed to form teams from parties in queue {self.queue.queue_id}."
+                    f"Player parties: {self.player_parties}"
+                )
 
             if self.queue.type == QueueType.Queue2v2:
                 return await ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
@@ -215,3 +200,100 @@ class ActiveMatchQueue:
 
         else:
             raise Exception("Invalid queue type")
+
+    def _get_2v2_teams_from_parties(self) -> Optional[Teams2v2]:
+        # If the first 4 parties are solo queued, form teams from them
+        # TODO - if we have a lot of players queued at once in the future, we should check all of them and
+        # perform a more intelligent elo balancing across all queued parties (even teams vs 2 solo players)
+        first_four_parties = self.player_parties[:NUM_2v2_PLAYERS]
+        if all(len(party.players()) == 1 for party in first_four_parties):
+            teams = self._form_teams_from_solo_queued_players(
+                [party.players()[0] for party in self.player_parties]
+            )
+            return teams
+
+        # Otherwise form teams from the queued parties (only can be done deterministically)
+        solo_players: List[PlayerProfile] = []
+        teams_in_match: List[Team2v2] = []
+
+        for party in self.player_parties:
+            # If this is a team, add it to teams in match
+            if len(party.players()) == 2:
+                team_name = TEAM_BLUE if len(teams_in_match) == 0 else TEAM_RED
+                teams_in_match.append(
+                    Team2v2(team_name, party.players()[0], party.players()[1])
+                )
+
+            # Otherwise add it to solo players
+            if len(party.players()) == 1:
+                solo_players.append(party.players()[0])
+
+            # If 2 solo players, make them a team
+            if len(solo_players) == 2:
+                team_name = TEAM_BLUE if len(teams_in_match) == 0 else TEAM_RED
+                teams_in_match.append(
+                    Team2v2(team_name, solo_players[0], solo_players[1])
+                )
+                solo_players = []
+
+            # if two teams in match, break
+            if len(teams_in_match) == 2:
+                break
+
+        teams = Teams2v2(teams_in_match[0], teams_in_match[1])
+        return teams
+
+    def _form_teams_from_solo_queued_players(
+        self, players: List[PlayerProfile]
+    ) -> Optional[Teams2v2]:
+        """Forms teams from all solo queued players. It will try to balance the teams based on their
+            elo rating on the queue's primary leaderboard such that (avg_elo_team1 - avg_elo_team2) is minimized.
+
+        Args:
+            players (List[PlayerProfile]): List of solo queued players (must be 4 players).
+
+        Returns:
+            Optional[Teams2v2]: Teams2v2 object with the teams formed from the players, or None if conditions not met.
+        """
+        if len(players) != NUM_2v2_PLAYERS:
+            logging.warning(
+                f"Attempted to form teams from {len(players)} players, but 2v2 requires exactly"
+                f"{NUM_2v2_PLAYERS} players."
+            )
+            return None
+
+        primary_leaderboard_id = self.queue.get_primary_leaderboard()
+        if primary_leaderboard_id is None:
+            logging.info(
+                f"Queue {self.queue.queue_id} does not have a primary leaderboard ID. Naively forming teams"
+            )
+
+            return Teams2v2(
+                team_a=Team2v2(TEAM_BLUE, players[0], players[1]),
+                team_b=Team2v2(TEAM_RED, players[2], players[3]),
+            )
+
+        # Get all players' leaderboard elo ratings and sort them
+        ddb_manager = self._get_ddb_manager()
+        player_elos = [
+            ddb_manager.get_or_create_player_elo(
+                player.tm_account_id, primary_leaderboard_id
+            )
+            for player in players
+        ]
+        sorted_players = sorted(player_elos, key=lambda x: x.elo)
+        sorted_tm_account_ids = [player.tm_account_id for player in sorted_players]
+        sorted_players = [
+            player
+            for player in players
+            if player.tm_account_id in sorted_tm_account_ids
+        ]
+
+        # Players ranked 1, 4 will be on one team, and players ranked 2, 3 will be on the other team
+        return Teams2v2(
+            team_a=Team2v2(TEAM_BLUE, sorted_players[0], sorted_players[3]),
+            team_b=Team2v2(TEAM_RED, sorted_players[1], sorted_players[2]),
+        )
+
+    def _get_ddb_manager(self) -> DynamoDbManager:
+        return DynamoDbManager()
