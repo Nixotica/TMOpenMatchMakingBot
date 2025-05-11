@@ -75,6 +75,7 @@ class MatchSimulator:
             match_live_id=str(
                 bot_match_id
             ),  # This needs to be unique, since it's DDB index key
+            match_join_link="",
             bot_match_id=bot_match_id,
             player_profiles=teams,
             match_queue=match_queue,

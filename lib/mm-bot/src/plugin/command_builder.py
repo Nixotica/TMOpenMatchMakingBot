@@ -36,11 +36,8 @@ class CommandBuilder:
             club_name="Better Matchmaking",  # TODO: This should be retrieved by the club_id
             activity_name=match.event_name,
             is_team_mode=match.match_queue.type.is_2v2(),
+            join_link=match.match_join_link,
         )
-
-        join_link = match.get_match_join_link()
-        if join_link:
-            command.add_join_link(join_link)
 
         leaderboard_id = match.match_queue.get_primary_leaderboard()
         if match.match_queue.type.is_2v2():

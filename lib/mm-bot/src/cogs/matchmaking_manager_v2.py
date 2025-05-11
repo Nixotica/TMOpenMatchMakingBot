@@ -16,6 +16,7 @@ from cogs.constants import (
     COLOR_EMBED,
     MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC,
 )
+from matchmaking.matches.event_creator import CreateMatchError
 from matchmaking.mm_event_bus import MatchmakingManagerEventBus
 from helpers import get_ping_channel
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
@@ -536,44 +537,50 @@ class MatchmakingManagerV2(commands.Cog):
                 should_generate_match = active_queue.should_generate_match()
                 if not should_generate_match:
                     continue
-
-                bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
-                active_match = await active_queue.generate_match(bot_match_id)
-
-                if active_match is None:
-                    logging.error(
-                        f"Error generating match {bot_match_id} for active queue {active_queue}."
-                    )
-                    # Remove from active queues so we don't keep retrying with failures
-                    self.active_queues.remove(active_queue)
-                    # Notify players/mods in bot ping channel.
-                    bot_ping_channel = await get_ping_channel(self.bot, self.s3_manager)
-                    if bot_ping_channel is not None:
-                        await bot_ping_channel.send(
-                            f"Error generating match {bot_match_id} for "
-                            f"active queue {active_queue}. Disabling it temporarily."
-                        )
-                    continue
-
-                logging.info(
-                    f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}."
-                )
-
-                # Remove all players in this match from every other queue
-                for player in active_match.participants():
-                    self.remove_player_from_all_active_queues(player)
-
-                # Persist the match in the case of bot going down
-                persist_match(active_match)
-
-                # Distribute the match to whom it may concern
-                self.mm_event_bus.add_new_active_match(active_match)
-
-                # Add to active matches to be monitored
-                self.active_matches.append(active_match)
-
             except Exception as e:
                 logging.error(f"Error checking queues to spawn new match: {e}")
+                continue
+
+            try:
+                bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
+                active_match = await active_queue.generate_match(bot_match_id)
+            except CreateMatchError as e:
+                logging.error(
+                    f"Error generating match {bot_match_id} for active queue {active_queue}: {e}"
+                )
+                continue
+            except Exception as e:
+                # Any other type of error - report it and disable the queue
+                logging.error(
+                    f"Error generating match {bot_match_id} for active queue {active_queue}: {e}"
+                )
+                # Remove from active queues so we don't keep retrying with failures
+                self.active_queues.remove(active_queue)
+                # Notify players/mods in bot ping channel.
+                bot_ping_channel = await get_ping_channel(self.bot, self.s3_manager)
+                if bot_ping_channel is not None:
+                    await bot_ping_channel.send(
+                        f"Error generating match {bot_match_id} for "
+                        f"active queue {active_queue}. Disabling it temporarily."
+                    )
+                continue
+
+            logging.info(
+                f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}."
+            )
+
+            # Remove all players in this match from every other queue
+            for player in active_match.participants():
+                self.remove_player_from_all_active_queues(player)
+
+            # Persist the match in the case of bot going down
+            persist_match(active_match)
+
+            # Distribute the match to whom it may concern
+            self.mm_event_bus.add_new_active_match(active_match)
+
+            # Add to active matches to be monitored
+            self.active_matches.append(active_match)
 
     @tasks.loop(seconds=CHECK_ACTIVE_MATCHES_FINISHED_TASK_SEC)
     async def check_active_matches_to_complete(self):

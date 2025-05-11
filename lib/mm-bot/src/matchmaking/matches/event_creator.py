@@ -1,6 +1,7 @@
 import asyncio
 import datetime as dt
-from typing import List
+import logging
+from typing import List, Optional
 
 from aws.s3 import S3ClientManager
 from matchmaking.constants import POINTS_LIMIT_1v1v1v1
@@ -10,6 +11,7 @@ from matchmaking.matches.team_2v2 import Teams2v2
 from models.match_queue import MatchQueue
 from models.player_profile import PlayerProfile
 from nadeo_event_api.api.event_api import (
+    get_match_info,
     get_matches_for_round,
     get_rounds_for_event,
     post_event,
@@ -39,6 +41,15 @@ from nadeo_event_api.objects.outbound.pastebin.tmwt_2v2 import (
     Tmwt2v2PasteTeam,
 )
 from nadeo_event_api.api.pastefy.pastefy_api import post_tmwt_2v2, get_auth
+
+
+class CreateMatchError(Exception):
+    """Custom exception for match creation errrors."""
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+        logging.error(f"CreateMatchError: {message}")
 
 
 async def create_1v1v1v1_match(
@@ -93,22 +104,7 @@ async def create_1v1v1v1_match(
         ],
     )
 
-    # TODO - error handling
-    event_id = post_event(event)
-
-    # Add players before event actually starts
-    for idx in range(len(players)):
-        event.add_participant(players[idx].tm_account_id, idx + 1)
-
-    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
-    matches = get_matches_for_round(round_id, 1, 0)
-    while matches == []:
-        await asyncio.sleep(5)
-        matches = get_matches_for_round(round_id, 1, 0)
-    match_id = matches[0].id
-    match_live_id = matches[0].club_match_live_id
-
-    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+    return await create_match(event, players=players)
 
 
 async def create_1v1_match(
@@ -168,22 +164,7 @@ async def create_1v1_match(
         ],
     )
 
-    # TODO - error handling
-    event_id = post_event(event)
-
-    # Add players before event actually starts
-    for idx in range(len(players)):
-        event.add_participant(players[idx].tm_account_id, idx + 1)
-
-    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
-    matches = get_matches_for_round(round_id, 1, 0)
-    while matches == []:
-        await asyncio.sleep(5)
-        matches = get_matches_for_round(round_id, 1, 0)
-    match_id = matches[0].id
-    match_live_id = matches[0].club_match_live_id
-
-    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+    return await create_match(event, players=players)
 
 
 async def create_lsc_match(
@@ -240,22 +221,7 @@ async def create_lsc_match(
         ],
     )
 
-    # TODO - error handling
-    event_id = post_event(event)
-
-    # Add players before event actually starts
-    for idx in range(len(players)):
-        event.add_participant(players[idx].tm_account_id, idx + 1)
-
-    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
-    matches = get_matches_for_round(round_id, 1, 0)
-    while matches == []:
-        await asyncio.sleep(5)
-        matches = get_matches_for_round(round_id, 1, 0)
-    match_id = matches[0].id
-    match_live_id = matches[0].club_match_live_id
-
-    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+    return await create_match(event, players=players)
 
 
 async def create_2v2_match(
@@ -342,30 +308,7 @@ async def create_2v2_match(
         participant_type=ParticipantType.TEAM,
     )
 
-    # TODO - error handling
-    event_id = post_event(event)
-
-    # Add players before event actually starts
-    event.add_team(
-        team_a.team_name,
-        team_a.members(),
-        1,
-    )
-    event.add_team(
-        team_b.team_name,
-        team_b.members(),
-        2,
-    )
-
-    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
-    matches = get_matches_for_round(round_id, 1, 0)
-    while matches == []:
-        await asyncio.sleep(5)
-        matches = get_matches_for_round(round_id, 1, 0)
-    match_id = matches[0].id
-    match_live_id = matches[0].club_match_live_id
-
-    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+    return await create_match(event, teams=[team_a, team_b])
 
 
 async def create_2v2_bo5_match(
@@ -457,30 +400,7 @@ async def create_2v2_bo5_match(
         participant_type=ParticipantType.TEAM,
     )
 
-    # TODO - error handling
-    event_id = post_event(event)
-
-    # Add players before event actually starts
-    event.add_team(
-        team_a.team_name,
-        team_a.members(),
-        1,
-    )
-    event.add_team(
-        team_b.team_name,
-        team_b.members(),
-        2,
-    )
-
-    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
-    matches = get_matches_for_round(round_id, 1, 0)
-    while matches == []:
-        await asyncio.sleep(5)
-        matches = get_matches_for_round(round_id, 1, 0)
-    match_id = matches[0].id
-    match_live_id = matches[0].club_match_live_id
-
-    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+    return await create_match(event, teams=[team_a, team_b])
 
 
 async def create_solo_match(
@@ -529,18 +449,88 @@ async def create_solo_match(
         ],
     )
 
-    # TODO - error handling
+    return await create_match(event, players=[player])
+
+
+async def create_match(
+    event: Event,
+    players: Optional[List[PlayerProfile]] = None,
+    teams: Optional[List[Tmwt2v2PasteTeam]] = None,
+) -> CreatedMatchInfo:
+    """Creates a match using the Trackmania competition tool.
+
+    Args:
+        event (Event): The event structure for the match. Assumes that there is 1 round and 1 match.
+        players (Optional[List[PlayerProfile]], optional): Players to add to the match. Leave None if teams match.
+        teams (Optional[List[Tmwt2v2PasteTeam]], optional): Teams to add to the match. Leave None if solo players match.
+
+    Returns:
+        CreatedMatchInfo: The info for the created match.
+    """
+    if players is None and teams is None:
+        raise ValueError("Either players or teams must be provided.")
+
+    if players is not None and teams is not None:
+        raise ValueError("Only one of players or teams can be provided.")
+
     event_id = post_event(event)
+    if event_id is None:
+        raise Exception("Failed to create event.")
 
-    # Add player before event actually start
-    event.add_participant(player.tm_account_id, 1)
+    # Add players or teams before event starts
+    if players is not None:
+        for idx in range(len(players)):
+            event.add_participant(players[idx].tm_account_id, idx + 1)
+    elif teams is not None:
+        event.add_team(
+            teams[0].team_name,
+            teams[0].members(),
+            1,
+        )
+        event.add_team(
+            teams[1].team_name,
+            teams[1].members(),
+            2,
+        )
 
-    round_id = get_rounds_for_event(event_id)[0].id  # type: ignore
+    max_retries = 10
+    attempt = 0
+
+    round_id = get_rounds_for_event(event_id)[0].id
     matches = get_matches_for_round(round_id, 1, 0)
     while matches == []:
+        attempt += 1
+        if attempt > max_retries:
+            raise CreateMatchError(
+                f"Failed to create match after max attempts ({max_retries})."
+            )
+        logging.info(
+            f"Matches are empty, waiting for 5 seconds then retrying (attempt {attempt})..."
+        )
         await asyncio.sleep(5)
         matches = get_matches_for_round(round_id, 1, 0)
     match_id = matches[0].id
     match_live_id = matches[0].club_match_live_id
 
-    return CreatedMatchInfo(event_id, event_name, round_id, match_id, match_live_id)  # type: ignore
+    attempt = 0
+    match_info = get_match_info(match_live_id)
+    while match_info.join_link is None:
+        attempt += 1
+        if attempt > max_retries:
+            raise CreateMatchError(
+                f"Failed to get match join link after max attempts ({max_retries})."
+            )
+        logging.info(
+            f"Match join link is empty, waiting for 10 seconds then retrying (attempt {attempt})..."
+        )
+        await asyncio.sleep(10)
+        match_info = get_match_info(match_live_id)
+
+    return CreatedMatchInfo(
+        event_id=event_id,
+        event_name=event._name,
+        round_id=round_id,
+        match_id=match_id,
+        match_live_id=match_live_id,
+        match_join_link=match_info.join_link,
+    )
