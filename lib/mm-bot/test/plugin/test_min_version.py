@@ -31,5 +31,5 @@ class TestMinVersionCheck(unittest.TestCase):
         self.assertIsInstance(
             response,
             InvalidVersionRequest,
-            "Request version 0.1.2 is not in " + MIN_VERSION,
+            "Request version 0.1.2 is not in " + str(MIN_VERSION),
         )
