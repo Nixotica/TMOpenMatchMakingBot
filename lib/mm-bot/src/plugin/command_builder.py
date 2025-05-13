@@ -32,6 +32,8 @@ class CommandBuilder:
 
     def build_match_ready(self, match: ActiveMatch) -> MatchReadyCommand:
         command = MatchReadyCommand(
+            queue_id=match.match_queue.queue_id,
+            queue_name=match.match_queue.display_name,
             match_id=match.match_id,
             club_name="Better Matchmaking",  # TODO: This should be retrieved by the club_id
             activity_name=match.event_name,
