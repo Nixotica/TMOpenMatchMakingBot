@@ -6,6 +6,7 @@ from models.player_profile import PlayerProfile
 from plugin.command_builder import CommandBuilder
 from plugin.requests.base_request import BaseRequest
 from plugin.requests.get_queues import GetQueuesRequest
+from plugin.requests.invalid_version import InvalidVersionRequest
 from plugin.requests.join_queue import JoinQueueRequest
 from plugin.requests.leave_queue import LeaveQueueRequest
 from plugin.requests.get_leaderboards import GetLeaderboardsRequest
@@ -58,12 +59,20 @@ class ResponseBuilder:
                 return self._get_stats_response(profile, request)
             case PingRequest():
                 return self._ping_response(profile, request)
+            case InvalidVersionRequest():
+                return ErrorResponse(
+                    "Your plugin is out of date. Please update to the latest version!"
+                )
             case _:
                 return ErrorResponse("Invalid request received")
 
     def _get_queues_response(
         self, profile: PlayerProfile, request: GetQueuesRequest
     ) -> BaseResponse:
+        active_match = self._mm_manager.find_match_with_player(profile)
+        if active_match:
+            return self._command_builder.build_match_ready(active_match)
+
         response = GetQueuesResponse()
 
         sorted_queues: list[ActiveMatchQueue] = sorted(
@@ -77,6 +86,12 @@ class ResponseBuilder:
                 ).elo
             except Exception:
                 pass
+
+            if active_queue.is_player_queued(profile):
+                return self._join_queue_response(
+                    profile,
+                    JoinQueueRequest(request.identifier(), active_queue.queue.queue_id),
+                )
 
             response.add_queue(
                 active_queue.queue.queue_id,
@@ -97,6 +112,17 @@ class ResponseBuilder:
             return ErrorResponse(
                 "Unable to find requested queue. Please refresh queues"
             )
+
+        my_elo = 0
+        try:
+            my_elo = self._ddb_manager.get_or_create_player_elo(
+                profile.tm_account_id, queue.queue.get_primary_leaderboard()
+            ).elo
+        except Exception:
+            pass
+
+        response = JoinQueueResponse()
+        response.add_queue(queue.queue.queue_id, queue.queue.display_name, my_elo)
 
         num_players = queue.player_count()
         add_count = 0
@@ -126,16 +152,11 @@ class ResponseBuilder:
                     return ErrorResponse("Unable to add your party to queue")
                 add_count = len(player_party.players())
 
-            party_members: list[dict] = []
             for player in player_party:
                 player_elo = self._ddb_manager.get_or_create_player_elo(
                     player.tm_account_id, queue.queue.get_primary_leaderboard()
                 )
-                party_members.append(
-                    {"TmAccountId": player.tm_account_id, "Points": player_elo.elo}
-                )
-
-            return JoinQueueResponse(num_players + add_count, party_members)
+                response.add_party_member(player.tm_account_id, player_elo.elo)
         else:
             if not queue.is_player_queued(profile):
                 result = self._mm_manager.add_party_to_queue(
@@ -145,7 +166,8 @@ class ResponseBuilder:
                     return ErrorResponse("Unable to join queue")
                 add_count = 1
 
-            return JoinQueueResponse(num_players + add_count)
+        response.set_player_count(num_players + add_count)
+        return response
 
     def _leave_queue_response(self, profile: PlayerProfile, request: LeaveQueueRequest):
         if self._mm_manager.is_player_in_match(profile):
@@ -176,6 +198,9 @@ class ResponseBuilder:
         )
 
         for leaderboard_id in leaderboard_ids:
+            if leaderboard_id is None:
+                continue
+
             leaderboard = self._ddb_manager.get_leaderboard(leaderboard_id)
 
             player_elo = self._ddb_manager.get_or_create_player_elo(

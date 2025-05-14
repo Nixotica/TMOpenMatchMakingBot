@@ -4,6 +4,8 @@ from plugin.responses.base_response import BaseResponse
 class MatchReadyCommand(BaseResponse):
     def __init__(
         self,
+        queue_id: str,
+        queue_name: str,
         match_id: str,
         club_name: str,
         activity_name: str,
@@ -11,6 +13,8 @@ class MatchReadyCommand(BaseResponse):
         join_link: str,
     ):
         super().__init__()
+        self._queue_id = queue_id
+        self._queue_name = queue_name
         self._match_id = match_id
         self._club_name = club_name
         self._activity_name = activity_name
@@ -23,6 +27,8 @@ class MatchReadyCommand(BaseResponse):
 
     def payload(self) -> dict:
         data = {
+            "QueueId": self._queue_id,
+            "QueueName": self._queue_name,
             "Id": self._match_id,
             "ClubName": self._club_name,
             "ActivityName": self._activity_name,

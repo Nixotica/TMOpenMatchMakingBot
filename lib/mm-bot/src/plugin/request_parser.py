@@ -1,8 +1,11 @@
 import json
 from json.decoder import JSONDecodeError
 import logging
+from packaging.version import parse, InvalidVersion
+from plugin.constants import MIN_VERSION
 from plugin.requests.base_request import BaseRequest
 from plugin.requests.get_queues import GetQueuesRequest
+from plugin.requests.invalid_version import InvalidVersionRequest
 from plugin.requests.join_queue import JoinQueueRequest
 from plugin.requests.leave_queue import LeaveQueueRequest
 from plugin.requests.get_leaderboards import GetLeaderboardsRequest
@@ -29,6 +32,9 @@ class RequestParser:
             return None
 
         user: str = obj.get("User", "")
+        if not self.is_valid_version(obj):
+            return InvalidVersionRequest(user)
+
         command: str = obj.get("Command", "")
         payload: dict = obj.get("Payload", {})
 
@@ -47,3 +53,16 @@ class RequestParser:
                 return PingRequest(user)
             case _:
                 return None
+
+    def is_valid_version(self, obj: dict) -> bool:
+        if "Version" not in obj:
+            return False
+
+        try:
+            version = parse(obj.get("Version"))
+            if version not in MIN_VERSION:
+                return False
+        except InvalidVersion:
+            return False
+
+        return True
