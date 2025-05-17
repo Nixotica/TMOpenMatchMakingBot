@@ -544,16 +544,18 @@ class MatchmakingManagerV2(commands.Cog):
             try:
                 bot_match_id = self.ddb_manager.get_next_bot_match_id_and_increment()
                 active_match = await active_queue.generate_match(bot_match_id)
-            except CreateMatchError as e:
-                logging.error(
-                    f"Error generating match {bot_match_id} for active queue {active_queue}: {e}"
-                )
-                continue
             except Exception as e:
-                # Any other type of error - report it and disable the queue
                 logging.error(
                     f"Error generating match {bot_match_id} for active queue {active_queue}: {e}"
                 )
+                # If the error is a CreateMatchError, Nadeo is taking too long to respond and we
+                # don't want to disable our queue sinc it's not a bug in our code.
+                if isinstance(e, CreateMatchError):
+                    logging.info(
+                        f"Not disabling queue {active_queue.queue.queue_id} because it is a CreateMatchError."
+                    )
+                    continue
+                # Any other type of error - report it and disable the queue
                 # Remove from active queues so we don't keep retrying with failures
                 self.active_queues.remove(active_queue)
                 # Notify players/mods in bot ping channel.
