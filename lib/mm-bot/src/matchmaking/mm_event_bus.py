@@ -14,6 +14,13 @@ class QueueStartedEvent:
     player: PlayerProfile
 
 
+@dataclass
+class PendingMatchEvent:
+    queue_id: str
+    bot_match_id: int
+    players: List[PlayerProfile]
+
+
 class EventType(Enum):
     """
     Defines the types of events that can be subscribed to.
@@ -24,6 +31,7 @@ class EventType(Enum):
     QUEUE_STARTED = 3
     QUEUE_UPDATE = 4
     LEFT_QUEUE = 5
+    NEW_PENDING_MATCH = 6
 
 
 class MatchmakingManagerEventBus:
@@ -173,6 +181,35 @@ class MatchmakingManagerEventBus:
 
         Returns:
             Optional[list[PlayerProfile]]: list[PlayerProfile] if a new one exists, False otherwise.
+        """
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_new_pending_match(
+        self, queue_id: str, bot_match_id: int, players: List[PlayerProfile]
+    ) -> None:
+        """Adds a new pending match even to a pub-sub queue to be consumed by subscribers.
+
+        Args:
+            queue_id (str): The queue that has a new match.
+            players (List[PlayerProfile]): The players staged to be in the match.
+        """
+        pending_match_subs = self.subscriptions[EventType.NEW_PENDING_MATCH]
+        for sub in pending_match_subs:
+            sub.put_nowait(PendingMatchEvent(queue_id, bot_match_id, players))
+
+    def get_new_pending_match(
+        self, queue: asyncio.Queue
+    ) -> Optional[PendingMatchEvent]:
+        """Gets a new pending match event from the given queue, None if empty.
+
+        Args:
+            queue (asyncio.Queue): A queue subscribed to NEW_PENDING_MATCH event.
+
+        Returns:
+            Optional[PendingMatchEvent]: PendingMatchEvent if a new one exists, False otherwise.
         """
         try:
             return queue.get_nowait()
