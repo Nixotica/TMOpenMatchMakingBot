@@ -566,7 +566,7 @@ class MatchQueueView(ui.View):
         embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
         embed.add_field(
             name="❗ Queue Activated",
-            value=f"{self.queue_id} queue started by <@{queue_started.player.discord_account_id}>.",
+            value=f"{self.queue_id} queue has active players.",
             inline=True,
         )
         msg = await self.queue_channel.send(
