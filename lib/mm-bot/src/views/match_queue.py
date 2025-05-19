@@ -53,6 +53,9 @@ class MatchQueueView(ui.View):
             EventType.NEW_COMPLETED_MATCH
         )
         self.queue_started_sub = self.mm_event_bus.subscribe(EventType.QUEUE_STARTED)
+        self.new_pending_match_sub = self.mm_event_bus.subscribe(
+            EventType.NEW_PENDING_MATCH
+        )
 
     async def start_task(self, message: discord.message.Message):
         self.active_queue_message = message
@@ -468,6 +471,35 @@ class MatchQueueView(ui.View):
             f"Match Queue Cog checking for new active matches to process for queue {self.queue_id}"
         )
 
+        # Get new pending matches and send the messages for them.
+        pending_match = self.mm_event_bus.get_new_pending_match(
+            self.new_pending_match_sub
+        )
+        if pending_match is not None:
+            # Ignore if it doesn't belong to this queue
+            if pending_match.queue_id != self.queue_id:
+                return
+
+            logging.info(f"New pending match found, pinging players: {pending_match}")
+
+            bot_ping_channel = await get_ping_channel(self.bot, self.s3_manager)
+            if not bot_ping_channel:
+                logging.warning(
+                    "No bot ping channel provided. Players won't get any indication of their match starting."
+                )
+                return
+
+            players_content = ""
+            for player in pending_match.players:
+                players_content += f"<@{player.discord_account_id}> "
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name="❗ Match Generating...",
+                value=f"Match #{pending_match.bot_match_id} is being generated. Please wait.",
+            )
+
+            await bot_ping_channel.send(content=players_content, embed=embed)
+
         # Get new active matches and send the messages for them.
         active_match = self.mm_event_bus.get_new_active_match(self.new_active_match_sub)
         if active_match is not None:
@@ -566,7 +598,7 @@ class MatchQueueView(ui.View):
         embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
         embed.add_field(
             name="❗ Queue Activated",
-            value=f"{self.queue_id} queue started by <@{queue_started.player.discord_account_id}>.",
+            value=f"{self.queue_id} queue has active players.",
             inline=True,
         )
         msg = await self.queue_channel.send(

@@ -13,6 +13,7 @@ from matchmaking.match_queues.enum import QueueType
 from matchmaking.match_queues.queued_party import QueuedParty, QueuedPlayer, QueuedTeam
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.team_2v2 import Team2v2, Teams2v2
+from matchmaking.mm_event_bus import MatchmakingManagerEventBus
 from models.match_queue import MatchQueue
 from models.player_profile import PlayerProfile
 
@@ -23,6 +24,7 @@ class ActiveMatchQueue:
     def __init__(self, match_queue: MatchQueue):
         self.player_parties: List[QueuedParty] = []
         self.queue = match_queue
+        self.mm_event_bus = MatchmakingManagerEventBus()
 
     def player_count(self) -> int:
         """Get the number of players currently queued in this match queue.
@@ -154,6 +156,9 @@ class ActiveMatchQueue:
         if self.queue.type == QueueType.Queue1v1v1v1:
             players_in_match = self.player_parties[:NUM_1v1v1v1_PLAYERS]
             players_in_match = [p.players()[0] for p in players_in_match]
+            self.mm_event_bus.add_new_pending_match(
+                self.queue.queue_id, bot_match_id, players_in_match
+            )
             return await ActiveMatch.create_1v1v1v1(
                 self.queue, bot_match_id, players_in_match
             )
@@ -161,6 +166,9 @@ class ActiveMatchQueue:
         elif self.queue.type == QueueType.Queue1v1:
             players_in_match = self.player_parties[:NUM_1v1_PLAYERS]
             players_in_match = [p.players()[0] for p in players_in_match]
+            self.mm_event_bus.add_new_pending_match(
+                self.queue.queue_id, bot_match_id, players_in_match
+            )
             return await ActiveMatch.create_1v1(
                 self.queue, bot_match_id, players_in_match
             )
@@ -173,6 +181,9 @@ class ActiveMatchQueue:
                     f"Player parties: {self.player_parties}"
                 )
 
+            self.mm_event_bus.add_new_pending_match(
+                self.queue.queue_id, bot_match_id, teams.players()
+            )
             if self.queue.type == QueueType.Queue2v2:
                 return await ActiveMatch.create_2v2(self.queue, bot_match_id, teams)
             elif self.queue.type == QueueType.QueueScrim2v2:
@@ -186,6 +197,9 @@ class ActiveMatchQueue:
 
         elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.player_parties[0].players()[0]
+            self.mm_event_bus.add_new_pending_match(
+                self.queue.queue_id, bot_match_id, [player_in_match]
+            )
             return await ActiveMatch.create_solo(
                 self.queue, bot_match_id, player_in_match
             )
