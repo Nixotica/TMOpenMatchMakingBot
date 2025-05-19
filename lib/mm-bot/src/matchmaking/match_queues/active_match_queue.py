@@ -197,6 +197,9 @@ class ActiveMatchQueue:
 
         elif self.queue.type == QueueType.QueueSoloTest:
             player_in_match = self.player_parties[0].players()[0]
+            self.mm_event_bus.add_new_pending_match(
+                self.queue.queue_id, bot_match_id, [player_in_match]
+            )
             return await ActiveMatch.create_solo(
                 self.queue, bot_match_id, player_in_match
             )
