@@ -54,6 +54,18 @@ class ActiveMatchQueue:
 
         return False
 
+    def kick_all_players_from_queue(self) -> List[PlayerProfile]:
+        """Kicks all players from the queue and returns them.
+
+        Returns:
+            List[PlayerProfile]: List of players that were kicked from the queue.
+        """
+        players = [
+            player for party in self.player_parties for player in party.players()
+        ]
+        self.player_parties.clear()
+        return players
+
     def add_party(self, players: List[PlayerProfile]) -> bool:
         """Adds a party to the active queue.
 

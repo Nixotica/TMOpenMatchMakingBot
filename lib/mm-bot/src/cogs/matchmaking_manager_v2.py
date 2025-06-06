@@ -233,6 +233,20 @@ class MatchmakingManagerV2(commands.Cog):
 
         self.mm_event_bus.add_player_left_queue(queue_id, players)
 
+    def remove_all_parties_from_queue(self, queue_id: str) -> List[PlayerProfile]:
+        """Removes all parties from a queue.
+
+        Args:
+            queue_id (str): The queue to remove all parties from.
+        """
+        queue = self.get_queue(queue_id)
+        if queue is None:
+            return []
+
+        kicked_players = queue.kick_all_players_from_queue()
+        self.mm_event_bus.add_player_left_queue(queue.queue.queue_id, kicked_players)
+        return kicked_players
+
     def remove_party_from_all_queues(
         self,
         players: List[PlayerProfile],
@@ -548,18 +562,31 @@ class MatchmakingManagerV2(commands.Cog):
                 logging.error(
                     f"Error generating match {bot_match_id} for active queue {active_queue}: {e}"
                 )
+                bot_ping_channel = await get_ping_channel(self.bot, self.s3_manager)
                 # If the error is a CreateMatchError, Nadeo is taking too long to respond and we
                 # don't want to disable our queue sinc it's not a bug in our code.
                 if isinstance(e, CreateMatchError):
                     logging.info(
                         f"Not disabling queue {active_queue.queue.queue_id} because it is a CreateMatchError."
                     )
+                    # Kick all players from the queue
+                    kicked_players = self.remove_all_parties_from_queue(
+                        active_queue.queue.queue_id
+                    )
+                    if bot_ping_channel is not None:
+                        players_str = ", ".join(
+                            f"<@{player.discord_account_id}>"
+                            for player in kicked_players
+                        )
+                        await bot_ping_channel.send(
+                            f"Queue {active_queue.queue.queue_id} is taking too long to generate a match. "
+                            f"Kicking players: {players_str}."
+                        )
                     continue
                 # Any other type of error - report it and disable the queue
                 # Remove from active queues so we don't keep retrying with failures
                 self.active_queues.remove(active_queue)
                 # Notify players/mods in bot ping channel.
-                bot_ping_channel = await get_ping_channel(self.bot, self.s3_manager)
                 if bot_ping_channel is not None:
                     await bot_ping_channel.send(
                         f"Error generating match {bot_match_id} for "
