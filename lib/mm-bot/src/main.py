@@ -16,9 +16,16 @@ from plugin.server import PluginServer
 # Define bot
 class DiscordBot(Bot):
     def __init__(self) -> None:
+        # Define minimum required intents for matchmaking bot
+        intents = Intents.default()
+        intents.guilds = True  # Required for guild/channel/role access
+        intents.guild_messages = True  # Required for sending messages
+        intents.message_content = False  # Not needed - using slash commands only
+        intents.members = True  # Required for member role management
+
         super().__init__(
             command_prefix="/",
-            intents=Intents.all(),
+            intents=intents,
         )
         self.is_shutdown = False
 
