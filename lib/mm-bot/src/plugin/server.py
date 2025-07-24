@@ -3,10 +3,8 @@ import logging
 import threading
 from aws.dynamodb import DynamoDbManager
 from cogs.matchmaking_manager_v2 import get_matchmaking_manager_v2
-from matchmaking.mm_event_bus import EventType, MatchmakingManagerEventBus
 from plugin.connection import PluginConnection
-from plugin.responses.base_response import BaseResponse
-from plugin.command_builder import CommandBuilder
+from plugin.event_processor import EventProcessor
 
 
 class PluginServer:
@@ -24,21 +22,9 @@ class PluginServer:
             self._loop = None
             self._server = None
             self._connected_clients: dict[str, PluginConnection] = {}
-            self._command_builder = CommandBuilder()
             self._ddb_manager = DynamoDbManager()
             self._mm_manager = get_matchmaking_manager_v2()
-            self._mm_event_bus = MatchmakingManagerEventBus()
-            self._match_ready_queue = self._mm_event_bus.subscribe(
-                EventType.NEW_ACTIVE_MATCH
-            )
-            self._match_complete_queue = self._mm_event_bus.subscribe(
-                EventType.NEW_COMPLETED_MATCH
-            )
-            self._queue_update_queue = self._mm_event_bus.subscribe(
-                EventType.QUEUE_UPDATE
-            )
-            self._left_queue_queue = self._mm_event_bus.subscribe(EventType.LEFT_QUEUE)
-
+            self._event_processor = EventProcessor()
             logging.info("Instantiating plugin server.")
 
     def startup(self):
@@ -72,18 +58,6 @@ class PluginServer:
         except Exception:
             logging.error(f"Unable to remove player {tm_account_id} from queues")
 
-    async def try_send_command(self, tm_account_id: str, response: BaseResponse):
-        try:
-            client: PluginConnection = self._connected_clients.get(tm_account_id)
-            if client:
-                await client.send_command(response)
-                return True
-        except Exception as e:
-            logging.exception(
-                f"Failed trying to sending command to user: {tm_account_id}", e
-            )
-        return False
-
     def _start_event_loops(self):
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
@@ -96,59 +70,7 @@ class PluginServer:
         logging.info("Starting plugin server event bus loop")
         while not self._stopped:
             try:
-                completed_match = self._mm_event_bus.get_new_completed_match(
-                    self._match_complete_queue
-                )
-                if completed_match is not None:
-                    logging.info(
-                        f"Sending Match Completed request to plugins for match {completed_match.active_match.match_id}"
-                    )
-                    completed_match_command = self._command_builder.build_match_results(
-                        completed_match
-                    )
-                    for player in completed_match.active_match.participants():
-                        await self.try_send_command(
-                            player.tm_account_id, completed_match_command
-                        )
-
-                new_match = self._mm_event_bus.get_new_active_match(
-                    self._match_ready_queue
-                )
-                if new_match is not None:
-                    logging.info(
-                        f"Sending Match Ready request to plugins for match {new_match.match_id}"
-                    )
-                    new_match_command = self._command_builder.build_match_ready(
-                        new_match
-                    )
-                    for player in new_match.participants():
-                        await self.try_send_command(
-                            player.tm_account_id, new_match_command
-                        )
-
-                left_queue = self._mm_event_bus.get_new_left_queue(
-                    self._left_queue_queue
-                )
-                if left_queue is not None:
-                    left_queue_command = self._command_builder.build_leave_queue()
-                    for player in left_queue:
-                        await self.try_send_command(
-                            player.tm_account_id, left_queue_command
-                        )
-
-                queue_update = self._mm_event_bus.get_new_queue_update(
-                    self._queue_update_queue
-                )
-                if queue_update is not None:
-                    queue = self._mm_manager.get_queue(queue_update)
-                    if queue:
-                        queue_update_command = self._command_builder.build_queue_update(
-                            queue
-                        )
-                        for tm_account_id, _ in self._connected_clients.items():
-                            await self.try_send_command(
-                                tm_account_id, queue_update_command
-                            )
+                await self._event_processor.loop(self._connected_clients)
             except Exception as e:
                 logging.exception("Exception occurred in plugin event worker", e)
             finally:

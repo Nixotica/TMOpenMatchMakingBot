@@ -47,7 +47,8 @@ class PluginConnection:
 
             self._tm_account_id = request.identifier()
 
-            response: BaseResponse = ResponseBuilder().build_response(request)
+            builder = ResponseBuilder()
+            response: BaseResponse = await builder.build_response(request)
             await self.send_command(response)
 
             return False

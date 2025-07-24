@@ -50,7 +50,7 @@ class ResponseBuilder:
             self._ddb_manager = DynamoDbManager()
             self._command_builder = CommandBuilder()
 
-    def build_response(self, request: BaseRequest) -> BaseResponse:
+    async def build_response(self, request: BaseRequest) -> BaseResponse:
         profile: PlayerProfile = (
             self._ddb_manager.query_player_profile_for_tm_account_id(
                 request.identifier()
@@ -76,6 +76,10 @@ class ResponseBuilder:
                 return self._get_party_invite_response(profile, request)
             case CancelPartyInviteRequest():
                 return self._get_cancel_party_invite_response(profile, request)
+            case AcceptPartyInviteRequest():
+                return await self._get_accept_party_invite_response(profile, request)
+            case LeavePartyRequest():
+                return self._get_leave_party_response(profile, request)
             case PingRequest():
                 return self._ping_response(profile, request)
             case InvalidVersionRequest():
@@ -301,7 +305,7 @@ class ResponseBuilder:
             if player_party and invitee in player_party.players():
                 return ErrorResponse("You are already in a party with this player!")
 
-        # TODO: send party request through discord and plugins
+            party_manager.add_outstanding_party_request(profile, invitee)
 
         return PartyInviteResponse(invitee.tm_account_id)
 
@@ -319,12 +323,12 @@ class ResponseBuilder:
             active_requests = party_manager.get_outstanding_party_requests(profile)
             for party_request in active_requests:
                 if party_request.accepter == invitee:
-                    # TODO: clean up party request
+                    party_manager.remove_outstanding_party_request(party_request)
                     break
 
         return CancelPartyInviteResponse(invitee.tm_account_id)
 
-    def _get_accept_party_invite_response(
+    async def _get_accept_party_invite_response(
         self, profile: PlayerProfile, request: AcceptPartyInviteRequest
     ) -> BaseResponse:
         inviter: PlayerProfile = (
@@ -338,8 +342,7 @@ class ResponseBuilder:
             for party_request in active_requests:
                 if party_request.accepter == profile:
                     found_invite = True
-                    # TODO: accept party invite
-                    # TODO: clean up party request
+                    await party_manager.add_accepted_party_request(party_request)
                     break
 
         if not found_invite:
@@ -363,7 +366,6 @@ class ResponseBuilder:
         party_manager = get_party_manager()
         if party_manager:
             party_manager.remove_party(profile)
-            # TODO: clean up party members
 
         return self._command_builder.build_clear_party()
 

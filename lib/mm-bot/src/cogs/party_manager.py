@@ -15,6 +15,7 @@ from matchmaking.party.constants import (
 )
 from matchmaking.party.party_request import PartyRequest
 from matchmaking.party.request_status import PartyRequestStatus
+from matchmaking.mm_event_bus import MatchmakingManagerEventBus
 from models.player_profile import PlayerProfile
 from views.party_request import PartyRequestView
 
@@ -27,6 +28,7 @@ class PartyManager(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.s3_manager = S3ClientManager()
+        self.mm_event_bus = MatchmakingManagerEventBus()
 
         self.active_parties: List[ActiveParty] = []
 
@@ -85,11 +87,24 @@ class PartyManager(commands.Cog):
             view=view,
         )
 
+        self.mm_event_bus.add_new_party_request(requester, [accepter])
+
         logging.info(f"Party request sent for {active_party}.")
 
         self.outstanding_party_request_messages[active_party] = PartyRequest(
             message, view
         )
+
+    async def remove_outstanding_party_request(self, party: ActiveParty) -> None:
+        party_request = self.outstanding_party_request_messages[party]
+        await safe_delete_message(party_request.message)
+        self.outstanding_party_request_messages.pop(party)
+        return
+
+    async def add_accepted_party_request(self, party: ActiveParty) -> None:
+        self.active_parties.append(party)
+        self.mm_event_bus.add_party_request_accepted(party.accepter, [party.requester])
+        await self.remove_outstanding_party_request(party)
 
     def update_party_activity(self, party: ActiveParty) -> None:
         """Updates the party activity such that it pushes back the party disband expiration.
@@ -128,6 +143,7 @@ class PartyManager(commands.Cog):
         for active_party in self.active_parties:
             if requester in active_party:
                 self.active_parties.remove(active_party)
+                self.mm_event_bus.add_leave_party(requester, active_party.players())
                 return active_party
 
         return None
@@ -145,9 +161,7 @@ class PartyManager(commands.Cog):
 
             if status == PartyRequestStatus.ACCEPTED:
                 logging.info(f"Party request for {active_party} has been accepted.")
-
-                self.active_parties.append(active_party)
-                self.outstanding_party_request_messages.pop(active_party)
+                await self.add_accepted_party_request(active_party)
 
             if status == PartyRequestStatus.REJECTED:
                 logging.info(f"Party request for {active_party} has been rejected.")
@@ -170,13 +184,9 @@ class PartyManager(commands.Cog):
                 > party_request.message.created_at
             ):
                 logging.info(f"Party request for {active_party} is stale. Removing...")
-
-                await safe_delete_message(party_request.message)
-
-                self.outstanding_party_request_messages.pop(active_party)
+                await self.remove_outstanding_party_request(active_party)
 
                 party_channel = await get_party_channel(self.bot, self.s3_manager)
-
                 if party_channel:
                     embed = discord.Embed(
                         color=COLOR_EMBED, timestamp=datetime.utcnow()
