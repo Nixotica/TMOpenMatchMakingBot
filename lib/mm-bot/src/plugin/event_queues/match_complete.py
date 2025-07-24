@@ -17,4 +17,6 @@ class MatchCompleteEventQueue(BaseEventQueue):
             )
             completed_match_command = self.command_builder.build_match_results(event)
             for player in event.active_match.participants():
-                await self.send_command(player.tm_account_id, completed_match_command)
+                client = connections.get(player.tm_account_id)
+                if client:
+                    await self.send_command(client, completed_match_command)

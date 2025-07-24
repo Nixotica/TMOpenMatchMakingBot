@@ -82,7 +82,7 @@ class PluginConnection:
         self, error_message: str = "An error occurred processing request"
     ):
         try:
-            error = ErrorResponse(error_message)
+            error = ErrorResponse(error_message, False)
             await self.send_command(error)
         except Exception:
             pass

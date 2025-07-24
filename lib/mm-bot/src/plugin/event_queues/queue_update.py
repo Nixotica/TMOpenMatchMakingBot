@@ -14,5 +14,5 @@ class QueueUpdateEventQueue(BaseEventQueue):
             queue = self.mm_manager.get_queue(event)
             if queue:
                 queue_update_command = self.command_builder.build_queue_update(queue)
-                for tm_account_id, _ in connections.items():
-                    await self.send_command(tm_account_id, queue_update_command)
+                for _, client in connections.items():
+                    await self.send_command(client, queue_update_command)

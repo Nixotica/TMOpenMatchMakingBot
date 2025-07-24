@@ -32,4 +32,4 @@ class EventProcessor:
 
     async def loop(self, connections: dict[str, PluginConnection]) -> None:
         for event_queue in self._event_queues:
-            event_queue.check(connections)
+            await event_queue.check(connections)

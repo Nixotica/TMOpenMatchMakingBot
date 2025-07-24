@@ -73,7 +73,7 @@ class ResponseBuilder:
             case GetStatsRequest():
                 return self._get_stats_response(profile, request)
             case PartyInviteRequest():
-                return self._get_party_invite_response(profile, request)
+                return await self._get_party_invite_response(profile, request)
             case CancelPartyInviteRequest():
                 return self._get_cancel_party_invite_response(profile, request)
             case AcceptPartyInviteRequest():
@@ -133,6 +133,8 @@ class ResponseBuilder:
         if active_match:
             match_ready_command = self._command_builder.build_match_ready(active_match)
             response.add_match(match_ready_command.payload())
+
+        return response
 
     def _get_queues_response(
         self, profile: PlayerProfile, request: GetQueuesResponse
@@ -288,7 +290,7 @@ class ResponseBuilder:
     def _get_stats_response(self, profile: PlayerProfile, request: GetStatsRequest):
         return GetStatsResponse()
 
-    def _get_party_invite_response(
+    async def _get_party_invite_response(
         self, profile: PlayerProfile, request: PartyInviteRequest
     ) -> BaseResponse:
         invitee: PlayerProfile = (
@@ -305,7 +307,7 @@ class ResponseBuilder:
             if player_party and invitee in player_party.players():
                 return ErrorResponse("You are already in a party with this player!")
 
-            party_manager.add_outstanding_party_request(profile, invitee)
+            await party_manager.add_outstanding_party_request(profile, invitee)
 
         return PartyInviteResponse(invitee.tm_account_id)
 

@@ -13,4 +13,6 @@ class LeftQueueEventQueue(BaseEventQueue):
         if event is not None:
             command = self.command_builder.build_leave_queue()
             for player in event:
-                await self.send_command(player.tm_account_id, command)
+                client = connections.get(player.tm_account_id)
+                if client:
+                    await self.send_command(client, command)
