@@ -2,6 +2,13 @@ from aws.dynamodb import DynamoDbManager
 from matchmaking.match_queues.active_match_queue import ActiveMatchQueue
 from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
+from models.player_profile import PlayerProfile
+from plugin.commands.party import (
+    PartyInvitationCommand,
+    ClearPartyCommand,
+    AddPlayersToPartyCommand,
+    RemovePlayersFromPartyCommand,
+)
 from plugin.commands.queue_update import QueueUpdateCommand
 from plugin.commands.match_ready import MatchReadyCommand
 from plugin.commands.match_canceled import MatchCanceledCommand
@@ -29,6 +36,9 @@ class CommandBuilder:
 
     def build_leave_queue(self) -> LeaveQueueResponse:
         return LeaveQueueResponse()
+
+    def build_clear_party(self) -> ClearPartyCommand:
+        return ClearPartyCommand()
 
     def build_match_ready(self, match: ActiveMatch) -> MatchReadyCommand:
         command = MatchReadyCommand(
@@ -98,4 +108,19 @@ class CommandBuilder:
                     player.tm_account_id, player_map[player.tm_account_id], player.elo
                 )
 
+        return command
+
+    def build_party_invitation(self, player: PlayerProfile):
+        return PartyInvitationCommand(invitee_id=player.tm_account_id)
+
+    def build_add_players_to_party(self, players: list[PlayerProfile]):
+        command = AddPlayersToPartyCommand()
+        for player in players:
+            command.add_party_member(player.tm_account_id)
+        return command
+
+    def build_remove_players_from_party(self, players: list[PlayerProfile]):
+        command = RemovePlayersFromPartyCommand()
+        for player in players:
+            command.add_party_member(player.tm_account_id)
         return command

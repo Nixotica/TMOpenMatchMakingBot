@@ -4,12 +4,19 @@ import logging
 from packaging.version import parse, InvalidVersion
 from plugin.constants import MIN_VERSION
 from plugin.requests.base_request import BaseRequest
+from plugin.requests.initialize import InitializeRequest
 from plugin.requests.get_queues import GetQueuesRequest
 from plugin.requests.invalid_version import InvalidVersionRequest
 from plugin.requests.join_queue import JoinQueueRequest
 from plugin.requests.leave_queue import LeaveQueueRequest
 from plugin.requests.get_leaderboards import GetLeaderboardsRequest
 from plugin.requests.get_stats import GetStatsRequest
+from plugin.requests.party import (
+    PartyInviteRequest,
+    CancelPartyInviteRequest,
+    AcceptPartyInviteRequest,
+    LeavePartyRequest,
+)
 from plugin.requests.ping import PingRequest
 
 
@@ -39,6 +46,8 @@ class RequestParser:
         payload: dict = obj.get("Payload", {})
 
         match command:
+            case "Initialize":
+                return InitializeRequest(user)
             case "GetQueues":
                 return GetQueuesRequest(user)
             case "JoinQueue":
@@ -49,6 +58,14 @@ class RequestParser:
                 return GetLeaderboardsRequest(user)
             case "GetStats":
                 return GetStatsRequest(user)
+            case "PartyInvite":
+                return PartyInviteRequest(user, payload.get("TmAccountId"))
+            case "CancelPartyInvite":
+                return CancelPartyInviteRequest(user, payload.get("TmAccountId"))
+            case "AcceptPartyInvite":
+                return AcceptPartyInviteRequest(user, payload.get("TmAccountId"))
+            case "LeaveParty":
+                return LeavePartyRequest(user)
             case "Ping":
                 return PingRequest(user)
             case _:

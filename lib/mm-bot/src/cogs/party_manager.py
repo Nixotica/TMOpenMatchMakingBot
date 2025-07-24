@@ -47,6 +47,15 @@ class PartyManager(commands.Cog):
         self.check_for_stale_party_requests.cancel()
         self.check_inactive_parties_to_disband.cancel()
 
+    def get_outstanding_party_requests(
+        self, requester: PlayerProfile
+    ) -> list[ActiveParty]:
+        requests = []
+        for request in self.outstanding_party_request_messages.keys():
+            if request.requester == requester:
+                requests.append(request)
+        return requests
+
     async def add_outstanding_party_request(
         self, requester: PlayerProfile, accepter: PlayerProfile
     ) -> None:
