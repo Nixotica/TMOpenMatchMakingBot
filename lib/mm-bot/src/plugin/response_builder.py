@@ -75,7 +75,7 @@ class ResponseBuilder:
             case PartyInviteRequest():
                 return await self._get_party_invite_response(profile, request)
             case CancelPartyInviteRequest():
-                return self._get_cancel_party_invite_response(profile, request)
+                return await self._get_cancel_party_invite_response(profile, request)
             case AcceptPartyInviteRequest():
                 return await self._get_accept_party_invite_response(profile, request)
             case LeavePartyRequest():
@@ -311,7 +311,7 @@ class ResponseBuilder:
 
         return PartyInviteResponse(invitee.tm_account_id)
 
-    def _get_cancel_party_invite_response(
+    async def _get_cancel_party_invite_response(
         self, profile: PlayerProfile, request: CancelPartyInviteRequest
     ) -> BaseResponse:
         invitee: PlayerProfile = (
@@ -325,7 +325,7 @@ class ResponseBuilder:
             active_requests = party_manager.get_outstanding_party_requests(profile)
             for party_request in active_requests:
                 if party_request.accepter == invitee:
-                    party_manager.remove_outstanding_party_request(party_request)
+                    await party_manager.remove_outstanding_party_request(party_request)
                     break
 
         return CancelPartyInviteResponse(invitee.tm_account_id)
