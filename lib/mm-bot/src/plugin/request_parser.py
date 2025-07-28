@@ -18,6 +18,8 @@ from plugin.requests.party import (
     LeavePartyRequest,
 )
 from plugin.requests.ping import PingRequest
+from plugin.requests.register_account import RegisterAccountRequest
+from plugin.requests.check_registration import CheckRegistrationRequest
 
 
 class RequestParser:
@@ -68,6 +70,16 @@ class RequestParser:
                 return LeavePartyRequest(user)
             case "Ping":
                 return PingRequest(user)
+            case "RegisterAccount":
+                return RegisterAccountRequest(
+                    user,
+                    payload.get("DiscordUsername") or "",
+                    payload.get("UbisoftAccountId") or "",
+                )
+            case "CheckRegistration":
+                return CheckRegistrationRequest(
+                    user, payload.get("UbisoftAccountId") or ""
+                )
             case _:
                 return None
 

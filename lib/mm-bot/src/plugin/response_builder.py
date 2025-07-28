@@ -19,6 +19,8 @@ from plugin.requests.party import (
     CancelPartyInviteRequest,
 )
 from plugin.requests.ping import PingRequest
+from plugin.requests.register_account import RegisterAccountRequest
+from plugin.requests.check_registration import CheckRegistrationRequest
 from plugin.responses.base_response import BaseResponse
 from plugin.responses.error import ErrorResponse
 from plugin.responses.initialize import InitializeResponse
@@ -33,6 +35,9 @@ from plugin.responses.party import (
     CancelPartyInviteResponse,
 )
 from plugin.responses.ping_response import PingResponse
+from plugin.responses.register_account import RegisterAccountResponse
+from plugin.responses.check_registration import CheckRegistrationResponse
+import requests  # type: ignore[import-untyped]
 
 
 class ResponseBuilder:
@@ -46,15 +51,26 @@ class ResponseBuilder:
     def __init__(self):
         if not hasattr(self, "_initialized"):  # Avoid re-initializing the instance
             self._initialized = True
-            self._mm_manager = get_matchmaking_manager_v2()
+            mm_manager = get_matchmaking_manager_v2()
+            if mm_manager is None:
+                raise RuntimeError(
+                    "Matchmaking manager, a fatally dependent resource, not initialized"
+                )
+            self._mm_manager = mm_manager
             self._ddb_manager = DynamoDbManager()
             self._command_builder = CommandBuilder()
 
     async def build_response(self, request: BaseRequest) -> BaseResponse:
-        profile: PlayerProfile = (
-            self._ddb_manager.query_player_profile_for_tm_account_id(
-                request.identifier()
-            )
+        # Handle registration requests separately since they don't require existing profile
+        if isinstance(request, RegisterAccountRequest):
+            return self._register_account_response(request)
+
+        # Handle check registration requests - also don't require existing profile
+        if isinstance(request, CheckRegistrationRequest):
+            return self._check_registration_response(request)
+
+        profile = self._ddb_manager.query_player_profile_for_tm_account_id(
+            request.identifier()
         )
         if not profile:
             return ErrorResponse("You have not registered your account yet", False)
@@ -378,3 +394,216 @@ class ResponseBuilder:
                     active_queue.queue.queue_id, active_queue.player_count()
                 )
         return PingResponse()
+
+    def _register_account_response(
+        self, request: RegisterAccountRequest
+    ) -> BaseResponse:
+        """Handle account registration from plugin"""
+        import re
+
+        # Validate inputs
+        if not request.discord_username or not request.ubisoft_account_id:
+            return ErrorResponse("Missing required fields")
+
+        # Validate Ubisoft account ID format (UUID)
+        UUID_REGEX = re.compile(
+            r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.I
+        )
+        if not UUID_REGEX.match(request.ubisoft_account_id):
+            return ErrorResponse("Invalid Ubisoft account ID format")
+
+        # Validate Discord username format
+        if not self._is_valid_discord_username(request.discord_username):
+            return ErrorResponse(
+                "Invalid Discord username format. Use either 'username#1234' or '@username' format"
+            )
+
+        # Resolve Discord username to actual Discord user ID
+        try:
+            discord_user_id = self._resolve_discord_username_to_id_sync(
+                request.discord_username
+            )
+            if discord_user_id is None:
+                return ErrorResponse(
+                    f"Discord user '{request.discord_username}' not found"
+                )
+        except Exception as e:
+            return ErrorResponse(f"Failed to resolve Discord username: {str(e)}")
+
+        # Check for existing registrations by Ubisoft account
+        existing_tm_account = self._ddb_manager.query_player_profile_for_tm_account_id(
+            request.ubisoft_account_id
+        )
+        if existing_tm_account:
+            return ErrorResponse("Ubisoft account already registered")
+
+        # Check if this Discord user ID is already registered
+        existing_discord_account = (
+            self._ddb_manager.query_player_profile_for_discord_account_id(
+                discord_user_id
+            )
+        )
+        if existing_discord_account:
+            return ErrorResponse(
+                f"Discord user '{request.discord_username}' is already registered"
+            )
+
+        # Create the registration with actual Discord user ID
+        success = self._ddb_manager.create_player_profile_for_tm_account_id(
+            request.ubisoft_account_id, discord_user_id
+        )
+
+        if success:
+            return RegisterAccountResponse()
+        else:
+            return ErrorResponse("Failed to create registration")
+
+    def _resolve_discord_username_to_id_sync(self, username: str) -> int | None:
+        """Resolve Discord username to user ID using Discord REST API (synchronous)"""
+        from models.bot_secrets import Secrets
+        from aws.s3 import S3ClientManager
+
+        try:
+            # Get Discord bot token from secrets
+            secrets: Secrets = S3ClientManager().get_secrets()
+            token = secrets.discord_bot_token
+
+            headers = {
+                "Authorization": f"Bot {token}",
+                "Content-Type": "application/json",
+            }
+
+            # Handle different username formats
+            if "#" in username:
+                # Old format: username#1234
+                username_part, discriminator = username.split("#")
+                return self._search_user_by_username_sync(
+                    headers, username_part, discriminator
+                )
+            else:
+                # New format: @username or username
+                clean_username = username.lstrip("@")
+                return self._search_user_by_new_username_sync(headers, clean_username)
+
+        except Exception as e:
+            print(f"Error resolving Discord username: {e}")
+            return None
+
+    def _search_user_by_username_sync(
+        self, headers: dict, username: str, discriminator: str
+    ) -> int | None:
+        """Search for user by old format username#discriminator (synchronous)"""
+        try:
+            # Get guilds the bot has access to
+            response = requests.get(
+                "https://discord.com/api/v10/users/@me/guilds", headers=headers
+            )
+            if response.status_code == 200:
+                guilds = response.json()
+
+                # Search through each guild for the user
+                for guild in guilds:
+                    guild_id = guild["id"]
+
+                    # Search guild members
+                    member_response = requests.get(
+                        f"https://discord.com/api/v10/guilds/{guild_id}/members",
+                        headers=headers,
+                        params={"limit": 1000},  # Adjust as needed
+                    )
+                    if member_response.status_code == 200:
+                        members = member_response.json()
+
+                        for member in members:
+                            user = member.get("user", {})
+                            # Check both old and new username formats
+                            if (
+                                user.get("username") == username
+                                and user.get("discriminator") == discriminator
+                            ):
+                                return int(user["id"])
+
+        except Exception as e:
+            print(f"Error searching user by username: {e}")
+
+        return None
+
+    def _search_user_by_new_username_sync(
+        self, headers: dict, username: str
+    ) -> int | None:
+        """Search for user by new format username (synchronous)"""
+        try:
+            # Get guilds the bot has access to
+            response = requests.get(
+                "https://discord.com/api/v10/users/@me/guilds", headers=headers
+            )
+            if response.status_code == 200:
+                guilds = response.json()
+
+                for guild in guilds:
+                    guild_id = guild["id"]
+
+                    member_response = requests.get(
+                        f"https://discord.com/api/v10/guilds/{guild_id}/members",
+                        headers=headers,
+                        params={"limit": 1000},
+                    )
+                    if member_response.status_code == 200:
+                        members = member_response.json()
+
+                        for member in members:
+                            user = member.get("user", {})
+                            # For new usernames, check the username field
+                            if user.get("username", "").lower() == username.lower():
+                                return int(user["id"])
+                            # Also check global_name (display name)
+                            if user.get("global_name", "").lower() == username.lower():
+                                return int(user["id"])
+
+        except Exception as e:
+            print(f"Error searching user by new username: {e}")
+
+        return None
+
+    def _is_valid_discord_username(self, username: str) -> bool:
+        """Validate Discord username format"""
+        # Old format: username#1234 (4 digits)
+        if "#" in username:
+            parts = username.split("#")
+            if len(parts) == 2 and len(parts[1]) == 4 and parts[1].isdigit():
+                return True
+
+        # New format: @username or just username (3-32 characters, alphanumeric + underscore + period)
+        clean_username = username.lstrip("@")
+        if 3 <= len(clean_username) <= 32:
+            # Allow alphanumeric, underscore, and period
+            import string
+
+            allowed_chars = string.ascii_letters + string.digits + "_."
+            return all(c in allowed_chars for c in clean_username)
+
+        return False
+
+    def _check_registration_response(
+        self, request: CheckRegistrationRequest
+    ) -> CheckRegistrationResponse:
+        """Check if a Ubisoft account is registered"""
+        import re
+
+        # Validate input
+        if not request.ubisoft_account_id:
+            return CheckRegistrationResponse(False)
+
+        # Validate Ubisoft account ID format (UUID)
+        UUID_REGEX = re.compile(
+            r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.I
+        )
+        if not UUID_REGEX.match(request.ubisoft_account_id):
+            return CheckRegistrationResponse(False)
+
+        # Check if account is registered
+        existing_profile = self._ddb_manager.query_player_profile_for_tm_account_id(
+            request.ubisoft_account_id
+        )
+
+        return CheckRegistrationResponse(existing_profile is not None)

@@ -7,6 +7,7 @@ mypy-boto3-dynamodb==1.35.0
 mypy-boto3-s3==1.35.2
 numpy==2.1.1
 requests==2.32.3
+types-requests==2.32.4.20250611
 pytest==8.3.3
 pytest-asyncio==0.24.0
 pytz==2024.1
