@@ -74,12 +74,10 @@ class RequestParser:
                 return RegisterAccountRequest(
                     user,
                     payload.get("DiscordUsername") or "",
-                    payload.get("UbisoftAccountId") or "",
+                    payload.get("TmAccountId") or "",
                 )
             case "CheckRegistration":
-                return CheckRegistrationRequest(
-                    user, payload.get("UbisoftAccountId") or ""
-                )
+                return CheckRegistrationRequest(user, payload.get("TmAccountId") or "")
             case _:
                 return None
 

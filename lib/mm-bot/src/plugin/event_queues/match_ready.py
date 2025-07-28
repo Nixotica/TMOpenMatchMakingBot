@@ -20,3 +20,5 @@ class MatchReadyEventQueue(BaseEventQueue):
                 client = connections.get(player.tm_account_id)
                 if client:
                     await self.send_command(client, command)
+
+            self.mm_event_bus.add_queue_update(event.match_queue.queue_id)
