@@ -46,7 +46,7 @@ class TestRegistrationRequests(unittest.TestCase):
             "Command": "RegisterAccount",
             "Payload": {
                 "DiscordUsername": "testuser#1234",
-                "UbisoftAccountId": "550e8400-e29b-41d4-a716-446655440001",
+                "TmAccountId": "550e8400-e29b-41d4-a716-446655440001",
             },
         }
 
@@ -71,7 +71,7 @@ class TestRegistrationRequests(unittest.TestCase):
             "User": "550e8400-e29b-41d4-a716-446655440000",
             "Version": "1.0.0",
             "Command": "CheckRegistration",
-            "Payload": {"UbisoftAccountId": "550e8400-e29b-41d4-a716-446655440001"},
+            "Payload": {"TmAccountId": "550e8400-e29b-41d4-a716-446655440001"},
         }
 
         parsed_request = self.request_parser.from_buffer(json.dumps(check_request))
