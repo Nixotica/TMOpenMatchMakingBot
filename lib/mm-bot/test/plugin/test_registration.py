@@ -208,7 +208,7 @@ class TestRegistrationResponses(unittest.TestCase):
 
     def test_register_account_error_response(self):
         """Test creating an error response for registration failure"""
-        response = ErrorResponse("Registration failed")
+        response = ErrorResponse("Registration failed", False)
 
         self.assertEqual(response.name(), "ErrorResponse")
         self.assertEqual(response.status_code(), 500)

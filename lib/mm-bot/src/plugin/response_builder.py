@@ -403,19 +403,20 @@ class ResponseBuilder:
 
         # Validate inputs
         if not request.discord_username or not request.ubisoft_account_id:
-            return ErrorResponse("Missing required fields")
+            return ErrorResponse("Missing required fields", False)
 
         # Validate Ubisoft account ID format (UUID)
         UUID_REGEX = re.compile(
             r"^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$", re.I
         )
         if not UUID_REGEX.match(request.ubisoft_account_id):
-            return ErrorResponse("Invalid Ubisoft account ID format")
+            return ErrorResponse("Invalid Ubisoft account ID format", False)
 
         # Validate Discord username format
         if not self._is_valid_discord_username(request.discord_username):
             return ErrorResponse(
-                "Invalid Discord username format. Use either 'username#1234' or '@username' format"
+                "Invalid Discord username format. Use either 'username#1234' or '@username' format",
+                False,
             )
 
         # Resolve Discord username to actual Discord user ID
@@ -425,17 +426,17 @@ class ResponseBuilder:
             )
             if discord_user_id is None:
                 return ErrorResponse(
-                    f"Discord user '{request.discord_username}' not found"
+                    f"Discord user '{request.discord_username}' not found", False
                 )
         except Exception as e:
-            return ErrorResponse(f"Failed to resolve Discord username: {str(e)}")
+            return ErrorResponse(f"Failed to resolve Discord username: {str(e)}", False)
 
         # Check for existing registrations by Ubisoft account
         existing_tm_account = self._ddb_manager.query_player_profile_for_tm_account_id(
             request.ubisoft_account_id
         )
         if existing_tm_account:
-            return ErrorResponse("Ubisoft account already registered")
+            return ErrorResponse("Ubisoft account already registered", False)
 
         # Check if this Discord user ID is already registered
         existing_discord_account = (
@@ -445,7 +446,8 @@ class ResponseBuilder:
         )
         if existing_discord_account:
             return ErrorResponse(
-                f"Discord user '{request.discord_username}' is already registered"
+                f"Discord user '{request.discord_username}' is already registered",
+                False,
             )
 
         # Create the registration with actual Discord user ID
@@ -456,7 +458,7 @@ class ResponseBuilder:
         if success:
             return RegisterAccountResponse()
         else:
-            return ErrorResponse("Failed to create registration")
+            return ErrorResponse("Failed to create registration", False)
 
     def _resolve_discord_username_to_id_sync(self, username: str) -> int | None:
         """Resolve Discord username to user ID using Discord REST API (synchronous)"""
