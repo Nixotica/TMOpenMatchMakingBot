@@ -70,7 +70,7 @@ class LeaderboardView(ui.View):
 
         if nearby_players == []:
             await interaction.response.send_message(
-                "Error finding you in the leaderboard.",
+                f"{user.name} not found on leaderboard, you must play at least one match in this queue!",
                 ephemeral=True,
             )
             return
@@ -83,7 +83,7 @@ class LeaderboardView(ui.View):
 
         if player_pos == -1:
             await interaction.response.send_message(
-                "Error finding you in the leaderboard.",
+                f"{user.name} not found on leaderboard, you must play at least one match in this queue!",
                 ephemeral=True,
             )
             return
