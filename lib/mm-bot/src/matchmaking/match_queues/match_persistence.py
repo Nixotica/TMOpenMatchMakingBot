@@ -87,9 +87,11 @@ def active_match_from_persisted_match(persisted_match: PersistedMatch) -> Active
 
     return ActiveMatch(
         event_id,
+        f"Event {event_id}",  # event_name - use a default since it's not persisted
         round_id,
         match_id,
         match_live_id,
+        "",  # match_join_link - use empty string since it's not persisted
         persisted_match.bot_match_id,
         player_profiles,
         queue,
