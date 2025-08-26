@@ -15,6 +15,7 @@ from matchmaking.party.constants import (
 )
 from matchmaking.party.party_request import PartyRequest
 from matchmaking.party.request_status import PartyRequestStatus
+from matchmaking.mm_event_bus import EventType, MatchmakingManagerEventBus
 from models.player_profile import PlayerProfile
 from views.party_request import PartyRequestView
 
@@ -27,11 +28,18 @@ class PartyManager(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
         self.s3_manager = S3ClientManager()
+        self.mm_event_bus = MatchmakingManagerEventBus()
 
         self.active_parties: List[ActiveParty] = []
 
         # Represented as an "active" party for which this message will party the two players.
         self.outstanding_party_request_messages: Dict[ActiveParty, PartyRequest] = {}
+        self.new_party_request_queue = self.mm_event_bus.subscribe(
+            EventType.NEW_PARTY_REQUEST
+        )
+        self.cancel_party_request_queue = self.mm_event_bus.subscribe(
+            EventType.CANCEL_PARTY_REQUEST
+        )
 
         registry.register_cog(COG_PARTY_MANAGER, self)
 
@@ -40,47 +48,37 @@ class PartyManager(commands.Cog):
         self.check_party_requests_status.start()
         self.check_for_stale_party_requests.start()
         self.check_inactive_parties_to_disband.start()
+        self.check_event_bus.start()
 
     def cog_unload(self):
         logging.info("Party manager unloading...")
         self.check_party_requests_status.cancel()
         self.check_for_stale_party_requests.cancel()
         self.check_inactive_parties_to_disband.cancel()
+        self.check_event_bus.cancel()
+
+    def get_outstanding_party_requests(
+        self, requester: PlayerProfile
+    ) -> list[ActiveParty]:
+        requests = []
+        for request in self.outstanding_party_request_messages.keys():
+            if request.requester == requester:
+                requests.append(request)
+        return requests
 
     async def add_outstanding_party_request(
         self, requester: PlayerProfile, accepter: PlayerProfile
     ) -> None:
-        active_party = ActiveParty(requester, accepter)
+        self.mm_event_bus.add_new_party_request(requester, [accepter])
+        logging.info(f"Party request sent from {requester} to {accepter}.")
 
-        view = PartyRequestView(active_party)
+    async def remove_outstanding_party_request(self, party: ActiveParty) -> None:
+        self.mm_event_bus.add_cancel_party_request(party.requester, [party.accepter])
 
-        if not self.bot:
-            logging.error(
-                "Bot is not initialized in party manager. Skipping sending party request."
-            )
-            return
-
-        party_channel = await get_party_channel(self.bot, self.s3_manager)
-        if not party_channel:
-            logging.error("Party channel not found. Skipping sending party request.")
-            return
-
-        embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
-        embed.add_field(
-            name="❗ Party System",
-            value=f"<@{accepter.discord_account_id}>, <@{requester.discord_account_id}> has invited you to a party!",
-        )
-        message = await party_channel.send(
-            content=f"<@{accepter.discord_account_id}>",
-            embed=embed,
-            view=view,
-        )
-
-        logging.info(f"Party request sent for {active_party}.")
-
-        self.outstanding_party_request_messages[active_party] = PartyRequest(
-            message, view
-        )
+    async def add_accepted_party_request(self, party: ActiveParty) -> None:
+        self.active_parties.append(party)
+        self.mm_event_bus.add_party_request_accepted(party.accepter, [party.requester])
+        await self.remove_outstanding_party_request(party)
 
     def update_party_activity(self, party: ActiveParty) -> None:
         """Updates the party activity such that it pushes back the party disband expiration.
@@ -119,9 +117,65 @@ class PartyManager(commands.Cog):
         for active_party in self.active_parties:
             if requester in active_party:
                 self.active_parties.remove(active_party)
+                self.mm_event_bus.add_leave_party(requester, active_party.players())
                 return active_party
 
         return None
+
+    @tasks.loop(seconds=1)
+    async def check_event_bus(self):
+        new_party_request = self.mm_event_bus.get_new_party_request(
+            self.new_party_request_queue
+        )
+        if new_party_request:
+            accepter = new_party_request.receivers[0]
+            requester = new_party_request.initiator
+
+            active_party = ActiveParty(requester, accepter)
+            view = PartyRequestView(active_party)
+
+            if not self.bot:
+                logging.error(
+                    "Bot is not initialized in party manager. Skipping sending party request."
+                )
+                return
+
+            party_channel = await get_party_channel(self.bot, self.s3_manager)
+            if not party_channel:
+                logging.error(
+                    "Party channel not found. Skipping sending party request."
+                )
+                return
+
+            embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
+            embed.add_field(
+                name="❗ Party System",
+                value=f"<@{accepter.discord_account_id}>, <@{requester.discord_account_id}> has invited you to a party",
+            )
+            message = await party_channel.send(
+                content=f"<@{accepter.discord_account_id}>",
+                embed=embed,
+                view=view,
+            )
+            self.outstanding_party_request_messages[active_party] = PartyRequest(
+                message, view
+            )
+
+        cancel_party_request = self.mm_event_bus.get_cancel_party_request(
+            self.cancel_party_request_queue
+        )
+        if cancel_party_request:
+            active_party_requests = self.get_outstanding_party_requests(
+                cancel_party_request.initiator
+            )
+            for active_party in active_party_requests:
+                if active_party.accepter == cancel_party_request.receivers[0]:
+                    party_request = self.outstanding_party_request_messages[
+                        active_party
+                    ]
+                    await safe_delete_message(party_request.message)
+                    self.outstanding_party_request_messages.pop(active_party)
+                    break
 
     @tasks.loop(seconds=1)
     async def check_party_requests_status(self):
@@ -136,9 +190,7 @@ class PartyManager(commands.Cog):
 
             if status == PartyRequestStatus.ACCEPTED:
                 logging.info(f"Party request for {active_party} has been accepted.")
-
-                self.active_parties.append(active_party)
-                self.outstanding_party_request_messages.pop(active_party)
+                await self.add_accepted_party_request(active_party)
 
             if status == PartyRequestStatus.REJECTED:
                 logging.info(f"Party request for {active_party} has been rejected.")
@@ -161,13 +213,9 @@ class PartyManager(commands.Cog):
                 > party_request.message.created_at
             ):
                 logging.info(f"Party request for {active_party} is stale. Removing...")
-
-                await safe_delete_message(party_request.message)
-
-                self.outstanding_party_request_messages.pop(active_party)
+                await self.remove_outstanding_party_request(active_party)
 
                 party_channel = await get_party_channel(self.bot, self.s3_manager)
-
                 if party_channel:
                     embed = discord.Embed(
                         color=COLOR_EMBED, timestamp=datetime.utcnow()

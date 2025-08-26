@@ -47,7 +47,8 @@ class PluginConnection:
 
             self._tm_account_id = request.identifier()
 
-            response: BaseResponse = ResponseBuilder().build_response(request)
+            builder = ResponseBuilder()
+            response: BaseResponse = await builder.build_response(request)
             await self.send_command(response)
 
             return False
@@ -81,7 +82,7 @@ class PluginConnection:
         self, error_message: str = "An error occurred processing request"
     ):
         try:
-            error = ErrorResponse(error_message)
+            error = ErrorResponse(error_message, False)
             await self.send_command(error)
         except Exception:
             pass

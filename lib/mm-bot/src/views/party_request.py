@@ -1,6 +1,7 @@
 import discord
 from matchmaking.party.active_party import ActiveParty
 from matchmaking.party.request_status import PartyRequestStatus
+from matchmaking.mm_event_bus import MatchmakingManagerEventBus
 
 
 class PartyRequestView(discord.ui.View):
@@ -8,6 +9,7 @@ class PartyRequestView(discord.ui.View):
         super().__init__()
         self.active_party = active_party
         self.status: PartyRequestStatus = PartyRequestStatus.PENDING
+        self.mm_event_bus = MatchmakingManagerEventBus()
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         """Ensure that only the accepter can interact with the buttons."""

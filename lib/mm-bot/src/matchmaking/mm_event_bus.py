@@ -21,6 +21,12 @@ class PendingMatchEvent:
     players: List[PlayerProfile]
 
 
+@dataclass
+class PendingPartyRequestEvent:
+    initiator: PlayerProfile
+    receivers: List[PlayerProfile]
+
+
 class EventType(Enum):
     """
     Defines the types of events that can be subscribed to.
@@ -32,6 +38,10 @@ class EventType(Enum):
     QUEUE_UPDATE = 4
     LEFT_QUEUE = 5
     NEW_PENDING_MATCH = 6
+    NEW_PARTY_REQUEST = 7
+    CANCEL_PARTY_REQUEST = 8
+    PARTY_REQUEST_ACCEPTED = 9
+    LEAVE_PARTY = 10
 
 
 class MatchmakingManagerEventBus:
@@ -211,6 +221,66 @@ class MatchmakingManagerEventBus:
         Returns:
             Optional[PendingMatchEvent]: PendingMatchEvent if a new one exists, False otherwise.
         """
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_new_party_request(
+        self, initiator: PlayerProfile, receivers: list[PlayerProfile]
+    ) -> None:
+        new_party_request_subs = self.subscriptions[EventType.NEW_PARTY_REQUEST]
+        for sub in new_party_request_subs:
+            sub.put_nowait(PendingPartyRequestEvent(initiator, receivers))
+
+    def get_new_party_request(
+        self, queue: asyncio.Queue
+    ) -> Optional[PendingPartyRequestEvent]:
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_cancel_party_request(
+        self, initiator: PlayerProfile, receivers: list[PlayerProfile]
+    ) -> None:
+        new_party_request_subs = self.subscriptions[EventType.CANCEL_PARTY_REQUEST]
+        for sub in new_party_request_subs:
+            sub.put_nowait(PendingPartyRequestEvent(initiator, receivers))
+
+    def get_cancel_party_request(
+        self, queue: asyncio.Queue
+    ) -> Optional[PendingPartyRequestEvent]:
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_party_request_accepted(
+        self, initiator: PlayerProfile, receivers: list[PlayerProfile]
+    ) -> None:
+        new_party_request_subs = self.subscriptions[EventType.PARTY_REQUEST_ACCEPTED]
+        for sub in new_party_request_subs:
+            sub.put_nowait(PendingPartyRequestEvent(initiator, receivers))
+
+    def get_party_request_accepted(
+        self, queue: asyncio.Queue
+    ) -> Optional[PendingPartyRequestEvent]:
+        try:
+            return queue.get_nowait()
+        except asyncio.QueueEmpty:
+            return None
+
+    def add_leave_party(
+        self, initiator: PlayerProfile, receivers: list[PlayerProfile]
+    ) -> None:
+        new_party_request_subs = self.subscriptions[EventType.LEAVE_PARTY]
+        for sub in new_party_request_subs:
+            sub.put_nowait(PendingPartyRequestEvent(initiator, receivers))
+
+    def get_leave_party(
+        self, queue: asyncio.Queue
+    ) -> Optional[PendingPartyRequestEvent]:
         try:
             return queue.get_nowait()
         except asyncio.QueueEmpty:

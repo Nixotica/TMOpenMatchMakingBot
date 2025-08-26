@@ -215,6 +215,7 @@ class QueueViewBuilder(commands.Cog):
             value = f"Channel ID: {queue.channel_id}\n"
             value += f"Display Name: {display_name}\n"
             value += f"Campaign Link: {campaign_link}\n"
+            value += f"Primary Leaderboard: {queue.get_primary_leaderboard()}"
             value += f"Active: {active}\n"
 
             embed.add_field(
