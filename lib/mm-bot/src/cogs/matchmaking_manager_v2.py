@@ -1,7 +1,7 @@
 from datetime import datetime
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 import discord
 from discord.ext import commands, tasks
 
@@ -31,6 +31,12 @@ from matchmaking.matches.active_match import ActiveMatch
 from matchmaking.matches.completed_match import CompletedMatch
 from models.match_queue import MatchQueue
 from models.player_profile import PlayerProfile
+
+# Type definitions for match completion notifications
+EloChange = Tuple[int, int]  # (new_elo, elo_change)
+LeaderboardElos = Dict[str, EloChange]  # leaderboard_id -> (new_elo, elo_change)
+PlayerMatchResult = Tuple[int, LeaderboardElos]  # (position, leaderboard_elos)
+MatchResultsDict = Dict[PlayerProfile, PlayerMatchResult]  # player -> (position, elos)
 
 
 class MatchmakingManagerV2(commands.Cog):
@@ -331,29 +337,36 @@ class MatchmakingManagerV2(commands.Cog):
 
     async def calculate_elos_and_upload(
         self, match: CompletedMatch
-    ) -> Dict[PlayerProfile, Dict[str, tuple[int, int]]]:
+    ) -> MatchResultsDict:
         """Calculates elo for each player in the match, persists to DDB, and returns a mapping
-            of players to their respective gained elo on each leaderboard.
+            of players to their position and respective gained elo on each leaderboard.
 
         Args:
             match (CompletedMatch): The completed match to calculate elo from.
 
         Returns:
-            Dict[PlayerProfile, Dict[str, tuple[int, int]]]: A mapping of players
-            to their respective changed elo on each leaderboard.
+            MatchResultsDict: A mapping of players to (position, leaderboard_elos)
+            where leaderboard_elos maps leaderboard_id to (new_elo, elo_change).
         """
         if isinstance(match.active_match.player_profiles, List):
             match_players = match.active_match.player_profiles
         else:
             match_players = match.active_match.player_profiles.players()
 
-        # Create a mapping from player profile -> dict of leaderboard id -> (updated elo, elo diff)
-        player_profile_to_leaderboard_elo_update_and_diff_map: Dict[
-            PlayerProfile, Dict[str, tuple[int, int]]
-        ] = {}
+        # Create a mapping from player profile -> (position, dict of leaderboard id -> (updated elo, elo diff))
+        player_profile_to_match_results: MatchResultsDict = {}
 
         for player_profile in match_players:
-            leaderboards_to_elo_update_and_diff_map: Dict[str, tuple[int, int]] = {}
+            # Get player's position in the match
+            player_position = match.match_results.get_rank(player_profile.tm_account_id)
+            if player_position is None:
+                logging.error(
+                    f"Could not find position for player {player_profile.tm_account_id} "
+                    f"in match {match.active_match.match_id}"
+                )
+                player_position = 0  # Default to 0 if position not found
+
+            leaderboards_to_elo_update_and_diff_map: LeaderboardElos = {}
             for leaderboard_id in match.active_match.match_queue.leaderboard_ids:  # type: ignore
                 # Find the updated elo rating for this player on this leaderboard
                 updated_elo = None
@@ -382,16 +395,17 @@ class MatchmakingManagerV2(commands.Cog):
                     elo_diff,
                 )
 
-            # Add all the leaderboards' updated elos and differences to the map
-            player_profile_to_leaderboard_elo_update_and_diff_map[player_profile] = (
-                leaderboards_to_elo_update_and_diff_map
+            # Add position and all the leaderboards' updated elos and differences to the map
+            player_profile_to_match_results[player_profile] = (
+                player_position,
+                leaderboards_to_elo_update_and_diff_map,
             )
 
         # Now add the updated elos back to the elo table for each leaderboard
         for (
             player_profile,
-            updated_elos_by_leaderboard_id,
-        ) in player_profile_to_leaderboard_elo_update_and_diff_map.items():
+            (position, updated_elos_by_leaderboard_id),
+        ) in player_profile_to_match_results.items():
             for leaderboard_id, (
                 updated_elo,
                 elo_diff,
@@ -400,12 +414,12 @@ class MatchmakingManagerV2(commands.Cog):
                     player_profile.tm_account_id, leaderboard_id, updated_elo
                 )
 
-        return player_profile_to_leaderboard_elo_update_and_diff_map
+        return player_profile_to_match_results
 
     async def update_player_rank_role(
         self,
         player_profile: PlayerProfile,
-        updated_elos_by_leaderboard_id: Dict[str, tuple[int, int]],
+        updated_elos_by_leaderboard_id: LeaderboardElos,
         global_leaderboard: str,
     ) -> None:
         """Updates a player's rank role in discord if they have surpassed a new minimum elo or
@@ -413,8 +427,9 @@ class MatchmakingManagerV2(commands.Cog):
 
         Args:
             player_profile (PlayerProfile): Player to update the rank role for.
-            updated_elos_by_leaderboard_id (Dict[str, tuple[int, int]]): A mapping of leaderboard IDs
+            updated_elos_by_leaderboard_id (LeaderboardElos): A mapping of leaderboard IDs
                 to a player's updated elo and elo diff from the latest match.
+            global_leaderboard (str): The global leaderboard ID to use for rank roles.
         """
         try:
             # NOTE we are operating under the assumption this bot is only connected to one server
@@ -473,18 +488,16 @@ class MatchmakingManagerV2(commands.Cog):
     async def send_players_match_complete_notification(
         self,
         bot_match_id: int,
-        player_profile_to_leaderboard_elo_update_and_diff_map: Dict[
-            PlayerProfile, Dict[str, tuple[int, int]]
-        ],
+        match_results: MatchResultsDict,
     ) -> None:
-        """Sends players from a match the complete notification with their updated elo and
-        difference for each leaderboard the match queue is in.
+        """Sends players from a match the complete notification with their positions and updated elo
+        for each leaderboard the match queue is in.
 
         Args:
             bot_match_id (int): The bot match ID completed.
-            player_profile_to_leaderboard_elo_update_and_diff_map
-                (Dict[PlayerProfile, Dict[str, tuple[int, int]]]): A dictionary mapping players
-                to a map of leaderboard ID to a tuple of player elo and elo difference.
+            match_results (MatchResultsDict): A dictionary mapping players to
+                (position, leaderboard_elos) where leaderboard_elos maps leaderboard_id
+                to (new_elo, elo_change).
         """
         try:
             ping_channel = await get_ping_channel(self.bot, self.s3_manager)
@@ -493,23 +506,33 @@ class MatchmakingManagerV2(commands.Cog):
                 logging.warning("No ping channel found.")
                 return
 
-            players = list(player_profile_to_leaderboard_elo_update_and_diff_map.keys())
+            # Build content with player pings
+            players = list(match_results.keys())
             content = ""
             for player in players:
                 content += f"<@{player.discord_account_id}> "
 
-            value = "Updated elos have been calculated:\n"
+            # Build positions section - sorted by position
+            value = "**Match Positions:**\n"
+            sorted_results = sorted(match_results.items(), key=lambda x: x[1][0])
+            for player, (position, _) in sorted_results:
+                value += f"{position}. <@{player.discord_account_id}>\n"
+
+            value += "\n**ELO Changes:**\n"
             value += "-----------------------------------------\n"
-            for (
-                player,
-                leaderboard_to_elos,
-            ) in player_profile_to_leaderboard_elo_update_and_diff_map.items():
+
+            # Build ELO changes section - sorted by position
+            for player, (position, leaderboard_to_elos) in sorted_results:
                 value += f"<@{player.discord_account_id}>\n"
-                for leaderboard, (updated_elo, elo_diff) in leaderboard_to_elos.items():
-                    elo_diff_prefix = "+" if elo_diff >= 0 else ""
-                    value += (
-                        f"{leaderboard}: {updated_elo} ({elo_diff_prefix}{elo_diff})\n"
-                    )
+                if leaderboard_to_elos:
+                    for leaderboard, (
+                        updated_elo,
+                        elo_diff,
+                    ) in leaderboard_to_elos.items():
+                        elo_diff_prefix = "+" if elo_diff >= 0 else ""
+                        value += f"  {leaderboard}: {updated_elo} ({elo_diff_prefix}{elo_diff})\n"
+                else:
+                    value += "  No ELO changes recorded\n"
                 value += "-----------------------------------------\n"
 
             embed = discord.Embed(color=COLOR_EMBED, timestamp=datetime.utcnow())
@@ -517,7 +540,7 @@ class MatchmakingManagerV2(commands.Cog):
 
             await ping_channel.send(content=content, embed=embed)
         except Exception as e:
-            logging.error(f"Error sending message to {player.discord_account_id}: {e}")
+            logging.error(f"Error sending match complete notification: {e}")
 
     def maybe_publish_queue_started_message(
         self, player: PlayerProfile, queue: ActiveMatchQueue
@@ -628,9 +651,7 @@ class MatchmakingManagerV2(commands.Cog):
                 await self.upload_match_results_and_cleanup_event(completed_match)
 
                 # Handle elo calculation
-                player_profile_to_leaderboard_elo_update_and_diff_map = (
-                    await self.calculate_elos_and_upload(completed_match)
-                )
+                match_results = await self.calculate_elos_and_upload(completed_match)
 
                 # Update players' rank roles if there's a global leaderboard
                 configs = self.s3_manager.get_configs()
@@ -642,8 +663,8 @@ class MatchmakingManagerV2(commands.Cog):
                 else:
                     for (
                         player_profile,
-                        updated_elos_by_leaderboard_id,
-                    ) in player_profile_to_leaderboard_elo_update_and_diff_map.items():
+                        (position, updated_elos_by_leaderboard_id),
+                    ) in match_results.items():
                         await self.update_player_rank_role(
                             player_profile,
                             updated_elos_by_leaderboard_id,
@@ -653,7 +674,7 @@ class MatchmakingManagerV2(commands.Cog):
                 # Notify players of match completion with info on results
                 await self.send_players_match_complete_notification(
                     completed_match.active_match.bot_match_id,
-                    player_profile_to_leaderboard_elo_update_and_diff_map,
+                    match_results,
                 )
 
                 # Distribute the completed match to whom it may concern
