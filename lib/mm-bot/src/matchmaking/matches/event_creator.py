@@ -86,7 +86,7 @@ async def create_1v1v1v1_match(
                             warmup_number=1,
                             warmup_duration=15,
                         ),
-                        points_repartition="10,6,4,3",
+                        points_repartition="10,7,4,3",
                         number_of_winners=3,
                         finish_timeout=15,
                         points_limit=POINTS_LIMIT_1v1v1v1,
