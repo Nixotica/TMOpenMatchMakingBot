@@ -19,6 +19,9 @@ class MatchReadyEventQueue(BaseEventQueue):
             for player in event.participants():
                 client = connections.get(player.tm_account_id)
                 if client:
+                    logging.info(
+                        "Sending match ready command to %s", client.identifier()
+                    )
                     await self.send_command(client, command)
 
             self.mm_event_bus.add_queue_update(event.match_queue.queue_id)

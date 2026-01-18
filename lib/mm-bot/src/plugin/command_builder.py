@@ -55,25 +55,30 @@ class CommandBuilder:
         if match.match_queue.type.is_2v2():
             team_id = 0
             for team in match.teams():
-                player_a_elo = self._ddb_manager.get_or_create_player_elo(
-                    team.player_a.tm_account_id, leaderboard_id
-                )
-                player_b_elo = self._ddb_manager.get_or_create_player_elo(
-                    team.player_b.tm_account_id, leaderboard_id
-                )
-                command.add_player(
-                    team.player_a.tm_account_id, player_a_elo.elo, team_id
-                )
-                command.add_player(
-                    team.player_b.tm_account_id, player_b_elo.elo, team_id
-                )
+                if leaderboard_id:
+                    player_a_elo = self._ddb_manager.get_or_create_player_elo(
+                        team.player_a.tm_account_id, leaderboard_id
+                    ).elo
+                    player_b_elo = self._ddb_manager.get_or_create_player_elo(
+                        team.player_b.tm_account_id, leaderboard_id
+                    ).elo
+                else:
+                    player_a_elo = 0
+                    player_b_elo = 0
+
+                command.add_player(team.player_a.tm_account_id, player_a_elo, team_id)
+                command.add_player(team.player_b.tm_account_id, player_b_elo, team_id)
                 team_id += 1
         else:
             for player in match.participants():
-                player_elo = self._ddb_manager.get_or_create_player_elo(
-                    player.tm_account_id, leaderboard_id
-                )
-                command.add_player(player.tm_account_id, player_elo.elo)
+                if leaderboard_id:
+                    player_elo = self._ddb_manager.get_or_create_player_elo(
+                        player.tm_account_id, leaderboard_id
+                    ).elo
+                else:
+                    player_elo = 0
+
+                command.add_player(player.tm_account_id, player_elo)
 
         return command
 
