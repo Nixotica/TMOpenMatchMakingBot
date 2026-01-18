@@ -132,13 +132,11 @@ class ResponseBuilder:
                 if current_queue is not None:
                     for player in player_party:
                         player_elo = 0
-                        try:
+                        if current_queue.queue.get_primary_leaderboard():
                             player_elo = self._ddb_manager.get_or_create_player_elo(
                                 player.tm_account_id,
                                 current_queue.queue.get_primary_leaderboard(),
                             ).elo
-                        except Exception:
-                            pass
 
                         response.add_party_member(player.tm_account_id, player_elo)
                 else:
@@ -162,12 +160,10 @@ class ResponseBuilder:
         )
         for active_queue in sorted_queues:
             player_elo = 0
-            try:
+            if active_queue.queue.get_primary_leaderboard():
                 player_elo = self._ddb_manager.get_or_create_player_elo(
                     profile.tm_account_id, active_queue.queue.get_primary_leaderboard()
                 ).elo
-            except Exception:
-                pass
 
             response.add_queue(
                 active_queue.queue.queue_id,
@@ -186,12 +182,10 @@ class ResponseBuilder:
             )
 
         my_elo = 0
-        try:
+        if queue.queue.get_primary_leaderboard():
             my_elo = self._ddb_manager.get_or_create_player_elo(
                 profile.tm_account_id, queue.queue.get_primary_leaderboard()
             ).elo
-        except Exception:
-            pass
 
         response = JoinQueueResponse()
         response.add_queue(queue.queue.queue_id, queue.queue.display_name, my_elo)
@@ -226,12 +220,10 @@ class ResponseBuilder:
 
             for player in player_party:
                 player_elo = 0
-                try:
+                if queue.queue.get_primary_leaderboard():
                     player_elo = self._ddb_manager.get_or_create_player_elo(
                         player.tm_account_id, queue.queue.get_primary_leaderboard()
                     ).elo
-                except Exception:
-                    pass
 
                 response.add_party_member(player.tm_account_id, player_elo)
         else:
