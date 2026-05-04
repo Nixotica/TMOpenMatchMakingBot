@@ -9,7 +9,9 @@ from aws.dynamodb import DynamoDbManager
 from aws.s3 import S3ClientManager
 from cogs import registry
 from cogs.constants import (
+    AUTO_CANCEL_MATCH_TIMEOUT_MINUTES,
     CHECK_ACTIVE_MATCHES_FINISHED_TASK_SEC,
+    CHECK_AUTO_CANCEL_MATCHES_TASK_SEC,
     CHECK_KICK_QUEUED_PLAYERS_TASK_SEC,
     CHECK_QUEUES_TO_SPAWN_NEW_MATCH_TASK_SEC,
     COG_MATCHMAKING_MANAGER_V2,
@@ -83,6 +85,7 @@ class MatchmakingManagerV2(commands.Cog):
         self.check_queues_to_spawn_new_match.start()
         self.check_active_matches_to_complete.start()
         self.check_kick_queued_players.start()
+        self.check_auto_cancel_matches.start()
 
     def cog_unload(self):
         logging.info("Matchmaking Manager V2 unloading...")
@@ -702,9 +705,36 @@ class MatchmakingManagerV2(commands.Cog):
                         f"for exceeding {MAX_TIME_BEFORE_KICK_PLAYER_QUEUE_SEC} seconds in queue."
                     )
 
+    @tasks.loop(seconds=CHECK_AUTO_CANCEL_MATCHES_TASK_SEC)
+    async def check_auto_cancel_matches(self):
+        """Checks if matches should be auto-cancelled for not starting within the timeout."""
+        logging.debug("Checking matches for auto-cancellation...")
+        matches_to_cancel = []
+
+        for active_match in self.active_matches:
+            try:
+                if active_match.should_auto_cancel(AUTO_CANCEL_MATCH_TIMEOUT_MINUTES):
+                    matches_to_cancel.append(active_match)
+                    logging.info(
+                        f"Auto-cancelling match {active_match.bot_match_id} for not starting within "
+                        f"{AUTO_CANCEL_MATCH_TIMEOUT_MINUTES} minutes"
+                    )
+            except Exception as e:
+                logging.error(
+                    f"Error checking match {active_match.bot_match_id} for auto-cancellation: {e}"
+                )
+
+        # Cancel the matches that need to be cancelled
+        for match in matches_to_cancel:
+            try:
+                self.cancel_match(match.bot_match_id)
+            except Exception as e:
+                logging.error(f"Error auto-cancelling match {match.bot_match_id}: {e}")
+
     @check_queues_to_spawn_new_match.before_loop
     @check_active_matches_to_complete.before_loop
     @check_kick_queued_players.before_loop
+    @check_auto_cancel_matches.before_loop
     async def before_checks(self):
         """Wait until the bot is ready before starting the loop."""
         await self.bot.wait_until_ready()

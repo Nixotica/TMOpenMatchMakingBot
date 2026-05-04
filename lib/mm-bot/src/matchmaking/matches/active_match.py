@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import datetime
 import logging
 from typing import List, Optional
 
@@ -48,6 +49,7 @@ class ActiveMatch:
         self.bot_match_id = bot_match_id
         self.player_profiles = player_profiles
         self.match_queue = match_queue
+        self.creation_time = datetime.datetime.now(datetime.timezone.utc)
 
         self._match_info = None
 
@@ -218,3 +220,33 @@ class ActiveMatch:
             if self._match_info.status == "COMPLETED":  # type: ignore
                 return True
             return False
+
+    def should_auto_cancel(self, timeout_minutes: int = 5) -> bool:
+        """Check if this match should be auto-cancelled due to not starting within the timeout.
+
+        Args:
+            timeout_minutes (int): The timeout in minutes after which to auto-cancel.
+
+        Returns:
+            bool: True if the match should be auto-cancelled, False otherwise.
+        """
+        if self.match_queue.type.is_simulated():
+            # Simulated matches don't need auto-cancellation
+            return False
+
+        # Check if enough time has passed since creation
+        now = datetime.datetime.now(datetime.timezone.utc)
+        time_elapsed = now - self.creation_time
+        timeout_seconds = timeout_minutes * 60
+
+        if time_elapsed.total_seconds() < timeout_seconds:
+            # Not enough time has passed yet
+            return False
+
+        # Get current match status
+        self._match_info = get_match_info(self.match_live_id)
+        status = self._match_info.status
+
+        # Cancel if status is not ONGOING and not COMPLETED
+        # (ONGOING means the match started successfully, COMPLETED means it finished)
+        return status != "ONGOING" and status != "COMPLETED"
