@@ -49,7 +49,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
 7. Create `secrets.json` file anywhere, copy the snippet below, and update the required variables:
     ```
         {
-            "UBI_AUTHS": ["Basic <user:pass base64>"],
+            "UBI_AUTHS": ["Basic <login:password base64>"],
             "DISCORD_BOT_TOKEN": "<token>",
             "PASTES_IO_LOGIN": "<username>",
             "PASTES_IO_PASSWORD": "<password>",
@@ -57,7 +57,7 @@ WARNING! Deploying a stack locally can currently cost up to $10/mo. This is prim
             "PASTEFY_PASSWORD": "<password>"
         }
     ```
-    For the username and password, use what you sign in with for Ubisoft, and enter it into [this website](https://www.base64decode.org/), making sure you switch to *encode* mode. For example, if you had username "my" and password "pass", type in "my:pass" and it would return "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. Currently the pastefy server is hosted by Matrix/skiff. You will need to contact them for credentials!
+    The bot now authenticates with Nadeo via a **service account**, not your personal Trackmania/Ubisoft login. Create one at [https://www.trackmania.com/player/service-account](https://www.trackmania.com/player/service-account) — you'll get a service-account *login* and set its *password*. Then take `<login>:<password>` and encode it via [this website](https://www.base64decode.org/) in *encode* mode. For example, if the service account login were "my" and password "pass", encoding "my:pass" returns "bXk6cGFzcw==", so you would set `"UBI_AUTHS": ["Basic bXk6cGFzcw=="]`. You can list multiple service-account auths in the array to rotate between them. Currently the pastefy server is hosted by Matrix/skiff. You will need to contact them for credentials!
 
 8. Go to S3 and upload `secrets.json` to the bucket `tm-mm-bot-secrets-dev-<account_id>` at the root directory. 
 
