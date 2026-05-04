@@ -14,5 +14,5 @@ pytz==2024.1
 waitress==3.0.1
 packaging==24.2
 
-git+https://github.com/Nixotica/NadeoEventAPIWrapper.git@c0e3448caffc397d38238dbc477522c722e057a0#egg=nadeo_event_api&subdirectory=nadeo_event_api
+git+https://github.com/Nixotica/NadeoEventAPIWrapper.git@490b1e65ff785686c28e1fdec2e260acad2879f4#egg=nadeo_event_api&subdirectory=nadeo_event_api
 
