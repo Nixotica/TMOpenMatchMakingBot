@@ -286,6 +286,27 @@ class MatchmakingManagerV2(commands.Cog):
 
         return match
 
+    def register_active_match(self, active_match: ActiveMatch) -> None:
+        """Distributes a newly created match to whom it may concern, and monitors it until it completes.
+
+        Args:
+            active_match (ActiveMatch): The match to register.
+        """
+        # Remove all players in this match from every other queue
+        for player in active_match.participants():
+            self.remove_player_from_all_active_queues(player)
+
+        # Persist the match in the case of bot going down. Scrim queues only exist in memory,
+        # so their matches couldn't be restored.
+        if not active_match.match_queue.is_scrim:
+            persist_match(active_match)
+
+        # Distribute the match to whom it may concern
+        self.mm_event_bus.add_new_active_match(active_match)
+
+        # Add to active matches to be monitored
+        self.active_matches.append(active_match)
+
     def remove_player_from_all_active_queues(self, player: PlayerProfile) -> None:
         """Removes a player from all queues they are in.
 
@@ -317,21 +338,23 @@ class MatchmakingManagerV2(commands.Cog):
             match.match_results.__str__(),
         )
 
-        for player in match.active_match.participants():
-            player_pos = match.match_results.get_rank(player.tm_account_id)
-            if player_pos is None:
-                logging.warning(
-                    f"Could not find player position for player {player.tm_account_id} "
-                    f"in match {match.active_match.match_id}."
-                )
-                continue
-            player_won = True if player_pos == 1 else False
+        # Scrims don't count towards players' matchmaking stats
+        if not match.active_match.match_queue.is_scrim:
+            for player in match.active_match.participants():
+                player_pos = match.match_results.get_rank(player.tm_account_id)
+                if player_pos is None:
+                    logging.warning(
+                        f"Could not find player position for player {player.tm_account_id} "
+                        f"in match {match.active_match.match_id}."
+                    )
+                    continue
+                player_won = True if player_pos == 1 else False
 
-            self.ddb_manager.update_player_matches_played(
-                player.tm_account_id,
-                match.active_match.match_queue.queue_id,
-                player_won,
-            )
+                self.ddb_manager.update_player_matches_played(
+                    player.tm_account_id,
+                    match.active_match.match_queue.queue_id,
+                    player_won,
+                )
 
         match.cleanup()
 
@@ -542,6 +565,40 @@ class MatchmakingManagerV2(commands.Cog):
         except Exception as e:
             logging.error(f"Error sending match complete notification: {e}")
 
+    async def distribute_elos_and_notify_players(self, match: CompletedMatch) -> None:
+        """Calculates and uploads players' elo from a ranked match, updates their rank roles,
+            and notifies them of the results.
+
+        Args:
+            match (CompletedMatch): The completed match to distribute elo from.
+        """
+        # Handle elo calculation
+        match_results = await self.calculate_elos_and_upload(match)
+
+        # Update players' rank roles if there's a global leaderboard
+        configs = self.s3_manager.get_configs()
+        global_leaderboard = configs.global_leaderboard_id
+        if global_leaderboard is None:
+            logging.debug(
+                "No global leaderboard configured, skipping rank role updates."
+            )
+        else:
+            for (
+                player_profile,
+                (position, updated_elos_by_leaderboard_id),
+            ) in match_results.items():
+                await self.update_player_rank_role(
+                    player_profile,
+                    updated_elos_by_leaderboard_id,
+                    global_leaderboard,
+                )
+
+        # Notify players of match completion with info on results
+        await self.send_players_match_complete_notification(
+            match.active_match.bot_match_id,
+            match_results,
+        )
+
     def maybe_publish_queue_started_message(
         self, player: PlayerProfile, queue: ActiveMatchQueue
     ) -> None:
@@ -621,18 +678,7 @@ class MatchmakingManagerV2(commands.Cog):
                 f"Match generated for queue {active_queue.queue.queue_id}, match id {active_match.match_id}."
             )
 
-            # Remove all players in this match from every other queue
-            for player in active_match.participants():
-                self.remove_player_from_all_active_queues(player)
-
-            # Persist the match in the case of bot going down
-            persist_match(active_match)
-
-            # Distribute the match to whom it may concern
-            self.mm_event_bus.add_new_active_match(active_match)
-
-            # Add to active matches to be monitored
-            self.active_matches.append(active_match)
+            self.register_active_match(active_match)
 
     @tasks.loop(seconds=CHECK_ACTIVE_MATCHES_FINISHED_TASK_SEC)
     async def check_active_matches_to_complete(self):
@@ -650,32 +696,9 @@ class MatchmakingManagerV2(commands.Cog):
                 # Handle remote match completion (AWS + Nadeo services)
                 await self.upload_match_results_and_cleanup_event(completed_match)
 
-                # Handle elo calculation
-                match_results = await self.calculate_elos_and_upload(completed_match)
-
-                # Update players' rank roles if there's a global leaderboard
-                configs = self.s3_manager.get_configs()
-                global_leaderboard = configs.global_leaderboard_id
-                if global_leaderboard is None:
-                    logging.debug(
-                        "No global leaderboard configured, skipping rank role updates."
-                    )
-                else:
-                    for (
-                        player_profile,
-                        (position, updated_elos_by_leaderboard_id),
-                    ) in match_results.items():
-                        await self.update_player_rank_role(
-                            player_profile,
-                            updated_elos_by_leaderboard_id,
-                            global_leaderboard,
-                        )
-
-                # Notify players of match completion with info on results
-                await self.send_players_match_complete_notification(
-                    completed_match.active_match.bot_match_id,
-                    match_results,
-                )
+                # Scrims are unranked, and the scrim manager reports their results in the scrim room
+                if not completed_match.active_match.match_queue.is_scrim:
+                    await self.distribute_elos_and_notify_players(completed_match)
 
                 # Distribute the completed match to whom it may concern
                 self.mm_event_bus.add_new_completed_match(completed_match)

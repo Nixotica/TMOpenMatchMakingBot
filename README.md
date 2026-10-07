@@ -193,6 +193,41 @@ Pings the bot messages channel with `Pong!`
 
 `/ping`
 
+### Scrims
+
+Instead of queueing, a player (or a party) can open a scrim room: a private text channel in the scrim category where they set up unranked matches against players they invite. In the room:
+
+* The host picks a mode (`2v2`, `2v2 Bo5`, `1v1v1v1` or `1v1`) and a mappack. Mappacks are the campaigns of the active queues, or any club campaign by its trackmania.io link.
+* Anyone in the room invites players by @mentioning them in the channel (or with `/scrim_invite`). Invited players can see the room and accept or decline. A partied player brings their teammate along.
+* Players use Switch Side to pick their team in 2v2 modes.
+* The host presses Start Scrim once the room has the right number of players. Results are posted in the room, and the roster stays together for rematches.
+
+Scrims don't change elo, rank roles or matches played. A room closes when the host closes it, or after 30 minutes without activity between matches. Rooms only live in memory, so the bot deletes leftover room channels when it restarts.
+
+#### Usage:
+
+`/scrim`
+
+`/scrim_invite <player>` (in the room)
+
+`/scrim_kick <player>` (in the room, host only) - Removes a player or withdraws their invite.
+
+### Set Scrim Category
+
+Sets the category scrim rooms are created in. Scrims are unavailable until this is set.
+
+#### Usage:
+
+`/set_scrim_category <category>`
+
+### Set Scrim Match Club
+
+Sets the club hosting scrim matches. By default, scrim matches are hosted by the match club of the queue the mappack came from, or of any queue for custom mappacks.
+
+#### Usage:
+
+`/set_scrim_match_club <club_id>`
+
 ## Contact
 
 The current owner and sole contributor to this package is @Nixotica, available on most platforms via that same alias. 

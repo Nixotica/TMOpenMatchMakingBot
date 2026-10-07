@@ -32,6 +32,8 @@ class MatchQueue:
     ping_role_id: Optional[int]
     display_name: Optional[str]
     category_id: Optional[int]
+    # Scrim queues are built in memory for a single scrim room and never stored in DDB
+    is_scrim: bool = False
 
     def get_primary_leaderboard(self) -> Optional[str]:
         return (

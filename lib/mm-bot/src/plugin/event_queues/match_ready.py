@@ -11,7 +11,8 @@ class MatchReadyEventQueue(BaseEventQueue):
 
     async def check(self, connections: dict[str, PluginConnection]) -> None:
         event = self.mm_event_bus.get_new_active_match(self.queue)
-        if event is not None:
+        # The plugin tracks matches against the queue it joined, so it isn't told about scrims
+        if event is not None and not event.match_queue.is_scrim:
             logging.info(
                 f"Sending Match Ready request to plugins for match {event.match_id}"
             )
