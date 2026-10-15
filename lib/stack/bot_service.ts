@@ -180,7 +180,8 @@ export class BotServiceStack extends Stack {
         const ec2Service = new Ec2Service(this, 'MM-Bot-Service', {
             cluster, 
             taskDefinition: ec2TaskDefinition,
-            desiredCount: 1,
+            // TODO: re-enable (set back to 1) once the bot is in use again. Scaled to 0 while unused.
+            desiredCount: 0,
             placementConstraints: [
                 PlacementConstraint.distinctInstances(),
             ],
