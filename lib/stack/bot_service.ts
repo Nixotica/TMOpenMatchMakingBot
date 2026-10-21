@@ -102,6 +102,11 @@ export class BotServiceStack extends Stack {
             blockDevices: [rootVolume],
             vpcSubnets: { subnetType: SubnetType.PUBLIC },
             associatePublicIpAddress: true,
+            // TODO: re-enable (set both back to 1) once the bot is in use again, along with the
+            // service's desiredCount below and the EIP step in deploy-prod.yml. Scaled to 0 while
+            // unused, so no EC2 instance or its EBS volume is billed.
+            minCapacity: 0,
+            maxCapacity: 0,
         });
         autoScalingGroup.addSecurityGroup(ecsSecurityGroup);
 
@@ -180,7 +185,8 @@ export class BotServiceStack extends Stack {
         const ec2Service = new Ec2Service(this, 'MM-Bot-Service', {
             cluster, 
             taskDefinition: ec2TaskDefinition,
-            // TODO: re-enable (set back to 1) once the bot is in use again. Scaled to 0 while unused.
+            // TODO: re-enable (set back to 1) once the bot is in use again, along with the auto
+            // scaling group's capacity above. Scaled to 0 while unused.
             desiredCount: 0,
             placementConstraints: [
                 PlacementConstraint.distinctInstances(),
