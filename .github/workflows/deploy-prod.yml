@@ -80,7 +80,15 @@ jobs:
         run: |
           INSTANCE_ARN=$(aws ecs list-container-instances --cluster MM-Bot-Cluster-prod \
             --query 'containerInstanceArns[0]' --output text)
-        
+
+          # TODO: remove this check once the bot is in use again (lib/stack/bot_service.ts), so a
+          # missing instance fails the deploy as before. While the bot is scaled to 0 there's no
+          # instance to give the EIP to, and the deploy would otherwise fail here.
+          if [ -z "$INSTANCE_ARN" ] || [ "$INSTANCE_ARN" = "None" ]; then
+            echo "No container instance in MM-Bot-Cluster-prod (the bot is scaled to 0), so no EIP to associate."
+            exit 0
+          fi
+
           EC2_ID=$(aws ecs describe-container-instances --cluster MM-Bot-Cluster-prod \
             --container-instances "$INSTANCE_ARN" \
             --query 'containerInstances[0].ec2InstanceId' --output text)
