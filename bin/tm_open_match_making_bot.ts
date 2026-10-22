@@ -58,11 +58,14 @@ if (process.env.STAGE == 'dev') {
     matchesPlayedTable: storage.matchesPlayedTable,
     terminationProtection: true,
   })
-  new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {
-    env: env,
-    stage: 'prod',
-    terminationProtection: true,
-  })
+  // TODO: put this back once the bot is in use again (#137). The Elastic IP is released while
+  // it's unused, since an idle one still costs $3.60 a month. Its old address, 54.200.250.39,
+  // is gone, so this allocates a new one, which bmm.skiff.dev then has to point at.
+  // new ElasticIpStack(app, 'TmOpenMatchMakingBotStack-ElasticIp-prod', {
+  //   env: env,
+  //   stage: 'prod',
+  //   terminationProtection: true,
+  // })
   new ReadOnlyAccessStack(app, 'TmOpenMatchMakingBotStack-ReadOnlyAccess-prod', {
     env: env,
     terminationProtection: true,
